@@ -28,6 +28,8 @@ type ContainerInfo struct {
 	Service         string
 	ContainerNumber int
 	OneOff          bool
+	ConfigFiles     string
+	WorkingDir      string
 
 	Details *container.InspectResponse
 }
@@ -72,11 +74,10 @@ func (c *ContainerInfo) HasDetailsLoaded() bool {
 
 // Docker container cmd
 
-// ListContainers returns a list of containers with basic information.
 func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 	result, err := c.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
-		return nil, fmt.Errorf("Can not list containers: %w", err)
+		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 	var containers []ContainerInfo
 	for _, ctr := range result.Items {
@@ -88,7 +89,11 @@ func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 		var ports []string
 		for _, p := range ctr.Ports {
 			if p.PublicPort > 0 {
-				ports = append(ports, fmt.Sprintf("%d:%d/%s", p.PublicPort, p.PrivatePort, p.Type))
+				if p.IP.IsValid() && !p.IP.IsUnspecified() {
+					ports = append(ports, fmt.Sprintf("%s:%d->%d/%s", p.IP.String(), p.PublicPort, p.PrivatePort, p.Type))
+				} else {
+					ports = append(ports, fmt.Sprintf("%d->%d/%s", p.PublicPort, p.PrivatePort, p.Type))
+				}
 			} else {
 				ports = append(ports, fmt.Sprintf("%d/%s", p.PrivatePort, p.Type))
 			}
@@ -108,6 +113,8 @@ func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 			info.ProjectName = project
 			info.Service = ctr.Labels["com.docker.compose.service"]
 			info.OneOff = ctr.Labels["com.docker.compose.oneoff"] == "True"
+			info.ConfigFiles = ctr.Labels["com.docker.compose.project.config_files"]
+			info.WorkingDir = ctr.Labels["com.docker.compose.project.working_dir"]
 
 			if numString, ok := ctr.Labels["com.docker.compose.container-number"]; ok {
 				if num, err := strconv.Atoi(numString); err == nil {
@@ -121,9 +128,9 @@ func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 }
 
 func (c *Client) InspectContainer(ctx context.Context, containerID string) (*container.InspectResponse, error) {
-	inspect, err := c.cli.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	inspect, err := c.cli.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{Size: false})
 	if err != nil {
-		return nil, fmt.Errorf("Can not inspect container %s: %w", containerID, err)
+		return nil, fmt.Errorf("failed to inspect container %s: %w", containerID, err)
 	}
 	return &inspect.Container, nil
 }
@@ -131,7 +138,7 @@ func (c *Client) InspectContainer(ctx context.Context, containerID string) (*con
 func (c *Client) ContainerTop(ctx context.Context, containerID string) (*container.TopResponse, error) {
 	top, err := c.cli.ContainerTop(ctx, containerID, client.ContainerTopOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Can not get top info for container %s: %w", containerID, err)
+		return nil, fmt.Errorf("failed to get top processes for container %s: %w", containerID, err)
 	}
 	return &container.TopResponse{Processes: top.Processes, Titles: top.Titles}, nil
 }
@@ -184,5 +191,5 @@ func (c *Client) PruneContainers(ctx context.Context) (container.PruneReport, er
 }
 
 func (c *Client) ExecShellCmd(containerID string) *exec.Cmd {
-	return exec.Command("docker", "exec", "-it", containerID, "sh", "-c", "bash || sh")
+	return exec.Command("docker", "exec", "-it", containerID, "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh")
 }

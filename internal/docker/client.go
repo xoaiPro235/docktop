@@ -13,11 +13,23 @@ type Client struct {
 
 func NewClient() (*Client, error) {
 	cli, err := client.New(client.FromEnv)
-	return &Client{cli: cli}, err
+	if err != nil {
+		return nil, err
+	}
+	c := &Client{cli: cli}
+
+	if err := c.Ping(); err != nil {
+		_ = cli.Close()
+		return nil, err
+	}
+	return c, nil
 }
 
 func (c *Client) Close() error {
-	return c.cli.Close()
+	if c.cli != nil {
+		return c.cli.Close()
+	}
+	return nil
 }
 
 func (c *Client) Ping() error {
