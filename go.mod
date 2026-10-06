@@ -3,6 +3,7 @@ module github.com/xoaiPro235/docktop
 go 1.27.1
 
 require (
+	github.com/docker/go-units v0.5.0
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
 )
@@ -13,7 +14,6 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
