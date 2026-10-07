@@ -73,7 +73,6 @@ func (c *ContainerInfo) HasDetailsLoaded() bool {
 }
 
 // Docker container cmd
-
 func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 	result, err := c.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
@@ -89,7 +88,7 @@ func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 		var ports []string
 		for _, p := range ctr.Ports {
 			if p.PublicPort > 0 {
-				if p.IP.IsValid() && !p.IP.IsUnspecified() {
+				if p.IP.Is6() || (p.IP.IsValid() && !p.IP.IsUnspecified()) {
 					ports = append(ports, fmt.Sprintf("%s:%d->%d/%s", p.IP.String(), p.PublicPort, p.PrivatePort, p.Type))
 				} else {
 					ports = append(ports, fmt.Sprintf("%d->%d/%s", p.PublicPort, p.PrivatePort, p.Type))
