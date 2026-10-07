@@ -15,13 +15,10 @@ import (
 
 type ImageInfo struct {
 	ID               string
-	ShortID          string
 	RepoTags         []string
 	Tag              string
 	Size             int64
-	FormattedSize    string
 	Created          time.Time
-	FormattedCreated string
 	InUse            bool
 	Dangling         bool
 	UsedByContainers []string
@@ -30,13 +27,12 @@ type ImageInfo struct {
 }
 
 type ImageLayer struct {
-	Index         int
-	ID            string
-	Size          int64
-	FormattedSize string
-	Command       string
-	Created       time.Time
-	Comment       string
+	Index   int
+	ID      string
+	Size    int64
+	Command string
+	Created time.Time
+	Comment string
 }
 
 // CleanLayerCommand returns a single-line, Dockerfile-like instruction
@@ -141,13 +137,10 @@ func (c *Client) ListImages(ctx context.Context) ([]ImageInfo, error) {
 
 		images = append(images, ImageInfo{
 			ID:               raw.ID,
-			ShortID:          cleanImageID(raw.ID),
 			RepoTags:         raw.RepoTags,
 			Tag:              primaryTag,
 			Size:             raw.Size,
-			FormattedSize:    units.HumanSize(float64(raw.Size)),
 			Created:          createdTime,
-			FormattedCreated: FormatTimeAgo(createdTime),
 			InUse:            len(containersUsing) > 0,
 			Dangling:         isDangling,
 			UsedByContainers: containersUsing,
@@ -200,13 +193,12 @@ func (c *Client) GetImageHistory(ctx context.Context, imageID string) ([]ImageLa
 	layers := make([]ImageLayer, 0, len(hist.Items))
 	for i, item := range hist.Items {
 		layers = append(layers, ImageLayer{
-			Index:         i + 1,
-			ID:            cleanImageID(item.ID),
-			Size:          item.Size,
-			FormattedSize: units.HumanSize(float64(item.Size)),
-			Command:       CleanLayerCommand(item.CreatedBy),
-			Created:       time.Unix(item.Created, 0),
-			Comment:       item.Comment,
+			Index:   i + 1,
+			ID:      cleanImageID(item.ID),
+			Size:    item.Size,
+			Command: CleanLayerCommand(item.CreatedBy),
+			Created: time.Unix(item.Created, 0),
+			Comment: item.Comment,
 		})
 	}
 	return layers, nil
