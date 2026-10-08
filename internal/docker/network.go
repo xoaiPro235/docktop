@@ -30,8 +30,6 @@ type NetworkInfo struct {
 	Internal       bool
 	IsSystem       bool
 	ConnectedCount int
-	StoppedCount   int
-	IsOrphan       bool
 	Containers     []NetworkEndpointInfo
 	RawInspect     *network.Inspect
 }
@@ -45,7 +43,6 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 
 	ctrRes, _ := c.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	containerPortsMap := make(map[string]string)
-	stoppedContainersCount := make(map[string]int)
 	for _, ctr := range ctrRes.Items {
 		var portStrs []string
 		for _, p := range ctr.Ports {
@@ -61,14 +58,6 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 		}
 		if len(portStrs) > 0 {
 			containerPortsMap[ctr.ID] = strings.Join(portStrs, ", ")
-		}
-
-		if ctr.State != "running" && ctr.NetworkSettings != nil {
-			for _, netSettings := range ctr.NetworkSettings.Networks {
-				if netSettings != nil && netSettings.NetworkID != "" {
-					stoppedContainersCount[netSettings.NetworkID]++
-				}
-			}
 		}
 	}
 
@@ -134,9 +123,6 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 		})
 
 		connectedCount := len(endpoints)
-		stoppedCount := stoppedContainersCount[netInspect.ID]
-		isOrphan := !isSystem && connectedCount == 0 && stoppedCount == 0
-
 		networks = append(networks, NetworkInfo{
 			ID:             netInspect.ID,
 			Name:           netInspect.Name,
@@ -147,17 +133,15 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 			Internal:       netInspect.Internal,
 			IsSystem:       isSystem,
 			ConnectedCount: connectedCount,
-			StoppedCount:   stoppedCount,
-			IsOrphan:       isOrphan,
 			Containers:     endpoints,
 			RawInspect:     &netInspect,
 		})
 	}
 
-	// 1. User networks with active containers (score 1)
-	// 2. User networks with stopped containers (score 2)
-	// 3. Orphan user networks (score 3)
-	// 4. System networks (bridge, host, none) (score 4)
+	// Sort networks:
+	// 1. User networks with attached containers (score 1)
+	// 2. User networks without attached containers (score 2)
+	// 3. System networks (bridge, host, none) (score 3)
 	// Then by name alphabetical
 	slices.SortStableFunc(networks, func(a, b NetworkInfo) int {
 		if c := cmp.Compare(networkScore(a), networkScore(b)); c != 0 {
@@ -171,15 +155,12 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 
 func networkScore(n NetworkInfo) int {
 	if n.IsSystem {
-		return 4
-	}
-	if n.IsOrphan {
 		return 3
 	}
-	if n.ConnectedCount == 0 && n.StoppedCount > 0 {
-		return 2
+	if n.ConnectedCount > 0 {
+		return 1
 	}
-	return 1
+	return 2
 }
 
 // InspectNetwork fetches full inspection metadata for a network
