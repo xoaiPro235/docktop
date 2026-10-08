@@ -3,6 +3,7 @@ module github.com/xoaiPro235/docktop
 go 1.27.1
 
 require (
+	charm.land/bubbles/v2 v2.2.1
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/docker/go-units v0.5.0
 	github.com/moby/moby/api v1.56.0
@@ -28,7 +29,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
-	github.com/mattn/go-runewidth v0.0.24 // indirect
+	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
