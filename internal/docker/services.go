@@ -22,6 +22,7 @@ type ContainerService interface {
 	PauseContainer(ctx context.Context, containerID string) error
 	UnpauseContainer(ctx context.Context, containerID string) error
 	RemoveContainer(ctx context.Context, id string, opts RemoveContainerOpts) error
+	PruneContainers(ctx context.Context) (container.PruneReport, error)
 	ExecShellCmd(containerID string) *exec.Cmd
 	StreamContainerLogs(ctx context.Context, containerID string, tail string) <-chan string
 	StreamContainerStats(ctx context.Context, id string) <-chan ContainerMetrics
