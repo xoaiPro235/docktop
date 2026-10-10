@@ -14,6 +14,16 @@ import (
 
 var ErrMustStopContainer = errors.New("container must be stopped before removal")
 
+const (
+	StateCreated    = container.StateCreated
+	StateRunning    = container.StateRunning
+	StatePaused     = container.StatePaused
+	StateRestarting = container.StateRestarting
+	StateRemoving   = container.StateRemoving
+	StateExited     = container.StateExited
+	StateDead       = container.StateDead
+)
+
 type ContainerInfo struct {
 	ID     string
 	Name   string
