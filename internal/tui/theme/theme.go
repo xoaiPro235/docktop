@@ -163,20 +163,6 @@ func NewTheme(p Palette) *Theme {
 	}
 }
 
-// RenderStatusBadge returns a styled status string (e.g. ● RUNNING, ○ PAUSED, ○ EXITED).
-func (t *Theme) RenderStatusBadge(state string) string {
-	switch strings.ToLower(state) {
-	case "running":
-		return t.StatusRunning.Render("● RUNNING")
-	case "paused":
-		return t.StatusPaused.Render("○ PAUSED")
-	case "restarting":
-		return t.StatusPaused.Render("↻ RESTARTS")
-	default:
-		return t.StatusStopped.Render("○ " + strings.ToUpper(state))
-	}
-}
-
 // Global active theme instance
 var Current = NewTheme(DefaultPalette())
 

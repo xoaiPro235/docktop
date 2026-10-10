@@ -4,7 +4,9 @@ go 1.27.1
 
 require (
 	charm.land/bubbles/v2 v2.2.1
+	charm.land/bubbletea/v2 v2.0.8
 	charm.land/lipgloss/v2 v2.0.6
+	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/docker/go-units v0.5.0
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
@@ -15,7 +17,6 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260811164956-006e29f97886 // indirect
-	github.com/charmbracelet/x/ansi v0.11.8 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
