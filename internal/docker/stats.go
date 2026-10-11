@@ -10,9 +10,14 @@ import (
 )
 
 type ContainerMetrics struct {
-	CPUPercent float64
-	MemUsageMB float64
-	MemLimitMB float64
+	CPUPercent  float64
+	MemUsage    float64
+	MemLimit    float64
+	HasMemLimit bool
+	NetworkRx   float64
+	NetworkTx   float64
+	BlockRead   uint64
+	BlockWrite  uint64
 }
 
 func CalculateStats(v *container.StatsResponse) ContainerMetrics {
@@ -42,10 +47,37 @@ func CalculateStats(v *container.StatsResponse) ContainerMetrics {
 		usage -= float64(cache) // cgroup v1
 	}
 
-	m.MemUsageMB = usage / (1024 * 1024)
-	m.MemLimitMB = float64(v.MemoryStats.Limit) / (1024 * 1024)
+	m.MemUsage = usage
+	m.MemLimit = float64(v.MemoryStats.Limit)
+	m.NetworkRx, m.NetworkTx = calculateNetwork(v.Networks)
+	m.BlockRead, m.BlockWrite = calculateBlockIO(v.BlkioStats)
 
 	return m
+}
+
+func calculateNetwork(network map[string]container.NetworkStats) (float64, float64) {
+	var rx, tx float64
+	for _, v := range network {
+		rx += float64(v.RxBytes)
+		tx += float64(v.TxBytes)
+	}
+	return rx, tx
+}
+
+func calculateBlockIO(blkio container.BlkioStats) (uint64, uint64) {
+	var blkRead, blkWrite uint64
+	for _, bioEntry := range blkio.IoServiceBytesRecursive {
+		if len(bioEntry.Op) == 0 {
+			continue
+		}
+		switch bioEntry.Op[0] {
+		case 'r', 'R':
+			blkRead += bioEntry.Value
+		case 'w', 'W':
+			blkWrite += bioEntry.Value
+		}
+	}
+	return blkRead, blkWrite
 }
 
 func (c *Client) StreamContainerStats(ctx context.Context, containerID string) <-chan ContainerMetrics {
@@ -62,6 +94,15 @@ func (c *Client) StreamContainerStats(ctx context.Context, containerID string) <
 		}
 		defer resp.Body.Close()
 
+		var hasMemLimit bool
+		var explicitLimit float64
+		if insp, err := c.InspectContainer(ctx, containerID); err == nil && insp != nil && insp.HostConfig != nil {
+			if insp.HostConfig.Memory > 0 {
+				hasMemLimit = true
+				explicitLimit = float64(insp.HostConfig.Memory)
+			}
+		}
+
 		decoder := jsontext.NewDecoder(resp.Body)
 		for {
 			var stats container.StatsResponse
@@ -70,6 +111,10 @@ func (c *Client) StreamContainerStats(ctx context.Context, containerID string) <
 			}
 
 			metrics := CalculateStats(&stats)
+			metrics.HasMemLimit = hasMemLimit
+			if hasMemLimit && explicitLimit > 0 {
+				metrics.MemLimit = explicitLimit
+			}
 			select {
 			case <-ctx.Done():
 				return
