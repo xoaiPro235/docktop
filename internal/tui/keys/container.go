@@ -19,8 +19,10 @@ type ContainerKeyMap struct {
 	Expand       key.Binding
 	Up           key.Binding
 	Down         key.Binding
-	FollowLogs   key.Binding
-	ToggleRaw    key.Binding
+	FollowLogs    key.Binding
+	TopLogs       key.Binding
+	ToggleRaw     key.Binding
+	ToggleBraille key.Binding
 }
 
 var ContainerKeys = ContainerKeyMap{
@@ -89,11 +91,19 @@ var ContainerKeys = ContainerKeyMap{
 		key.WithHelp("j/↓", "Down"),
 	),
 	FollowLogs: key.NewBinding(
-		key.WithKeys("G"),
+		key.WithKeys("G", "end"),
 		key.WithHelp("G", "Follow"),
+	),
+	TopLogs: key.NewBinding(
+		key.WithKeys("g", "home"),
+		key.WithHelp("g", "Top"),
 	),
 	ToggleRaw: key.NewBinding(
 		key.WithKeys("t", "T"),
 		key.WithHelp("t", "Raw JSON"),
+	),
+	ToggleBraille: key.NewBinding(
+		key.WithKeys("b", "B"),
+		key.WithHelp("b", "Graph Up/Down"),
 	),
 }

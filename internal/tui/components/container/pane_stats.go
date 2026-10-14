@@ -1,4 +1,4 @@
-// Layout concepts and graph inspired by btop (https://github.com/aristocratos/btop).
+// Layout conceptsaand graph inspired by btop (https://github.com/aristocratos/btop).
 package container
 
 import (
@@ -21,7 +21,6 @@ const (
 	GraphDirectionDown
 )
 
-// GraphMode defines the visual orientation layout of CPU and Memory braille graphs.
 type GraphMode int
 
 const (
@@ -183,14 +182,13 @@ func (s *StatsPane) Reset() {
 	s.blockWrite = 0
 }
 
-func (s *StatsPane) Render(selected *docker.ContainerInfo, width, height int, actionLoading, actionType, spinnerView string) string {
+func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, actionLoading, actionType, spinnerView string) string {
 	if selected == nil {
 		return theme.Current.MutedText.Padding(2).Render("No container selected.")
 	}
 
 	var b strings.Builder
 
-	// Container header with dynamic action state
 	var statusBadge string
 	switch actionType {
 	case "restart":
@@ -216,10 +214,7 @@ func (s *StatsPane) Render(selected *docker.ContainerInfo, width, height int, ac
 	b.WriteString("\n\n")
 
 	// CPU graph
-	graphWidth := width - 4
-	if graphWidth < 10 {
-		graphWidth = 10
-	}
+	graphWidth := max(width-4, 10)
 	availableForGraphs := height - 14
 	graphHeight := availableForGraphs / 2
 	if graphHeight < 3 {
@@ -231,10 +226,7 @@ func (s *StatsPane) Render(selected *docker.ContainerInfo, width, height int, ac
 
 	// Calculate peak only across visible points so expired spikes scroll away cleanly
 	totalPointsNeeded := graphWidth * 2
-	startIdx := len(s.cpuHistory) - totalPointsNeeded
-	if startIdx < 0 {
-		startIdx = 0
-	}
+	startIdx := max(len(s.cpuHistory)-totalPointsNeeded, 0)
 	for _, val := range s.cpuHistory[startIdx:] {
 		if val > peakCPU {
 			peakCPU = val
@@ -306,10 +298,7 @@ func (s *StatsPane) Render(selected *docker.ContainerInfo, width, height int, ac
 	peakMem := s.memUsage
 
 	// Calculate peak only across visible points so expired spikes scroll away cleanly
-	startIdxMem := len(s.memHistory) - totalPointsNeeded
-	if startIdxMem < 0 {
-		startIdxMem = 0
-	}
+	startIdxMem := max(len(s.memHistory)-totalPointsNeeded, 0)
 	for _, val := range s.memHistory[startIdxMem:] {
 		if val > peakMem {
 			peakMem = val
@@ -325,15 +314,16 @@ func (s *StatsPane) Render(selected *docker.ContainerInfo, width, height int, ac
 
 	// Check if container has a limit explicitly set
 	hasLimit := s.hasMemLimit
+	effectiveMemLimit := s.memLimit
 	if !hasLimit && selected.Details != nil && selected.Details.HostConfig != nil && selected.Details.HostConfig.Memory > 0 {
 		hasLimit = true
-		if s.memLimit <= 0 {
-			s.memLimit = float64(selected.Details.HostConfig.Memory)
+		if effectiveMemLimit <= 0 {
+			effectiveMemLimit = float64(selected.Details.HostConfig.Memory)
 		}
 	}
 
-	if hasLimit && s.memLimit > 0 {
-		displayLimit = s.memLimit
+	if hasLimit && effectiveMemLimit > 0 {
+		displayLimit = effectiveMemLimit
 		memPercent = (currentMem / displayLimit) * 100.0
 	} else {
 		isDynamic = true
@@ -373,10 +363,10 @@ func (s *StatsPane) Render(selected *docker.ContainerInfo, width, height int, ac
 
 	var memTitle string
 	if isDynamic {
-		if s.memLimit > 0 {
+		if effectiveMemLimit > 0 {
 			memTitle = fmt.Sprintf("Memory: %s / %s (%.1f%%)  [Peak: %s | Scale: %s | Host: %s]  [%s 'b']",
 				units.BytesSize(currentMem), units.BytesSize(displayLimit), memPercent,
-				units.BytesSize(peakMem), units.BytesSize(displayLimit), units.BytesSize(s.memLimit),
+				units.BytesSize(peakMem), units.BytesSize(displayLimit), units.BytesSize(effectiveMemLimit),
 				memDirSymbol)
 		} else {
 			memTitle = fmt.Sprintf("Memory: %s / %s (%.1f%%)  [Peak: %s | Scale: %s]  [%s 'b']",
@@ -458,7 +448,7 @@ func renderBtopBraille(data []float64, width, height int, scaleMax float64, dir 
 		if idx >= 0 && idx < len(data) {
 			normData[i] = math.Max(0.0, math.Min(scaleMax, data[idx]))
 		} else {
-			normData[i] = -1.0
+			normData[i] = -1.0 // Unfilled padding before data starts (blank)
 		}
 	}
 
@@ -468,7 +458,7 @@ func renderBtopBraille(data []float64, width, height int, scaleMax float64, dir 
 	}
 
 	lines := make([]string, height)
-	for y := 0; y < height; y++ {
+	for y := range height {
 		var rowBuilder strings.Builder
 		var curLow, curHigh float64
 		var isBaseLine bool
