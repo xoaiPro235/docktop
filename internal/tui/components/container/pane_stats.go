@@ -216,10 +216,7 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, act
 	// CPU graph
 	graphWidth := max(width-4, 10)
 	availableForGraphs := height - 14
-	graphHeight := availableForGraphs / 2
-	if graphHeight < 3 {
-		graphHeight = 3
-	}
+	graphHeight := max(availableForGraphs / 2, 3)
 
 	currentCPU := 0.0
 	peakCPU := 0.0
@@ -443,7 +440,7 @@ func renderBtopBraille(data []float64, width, height int, scaleMax float64, dir 
 	normData := make([]float64, totalPointsNeeded)
 	offset := len(data) - totalPointsNeeded
 
-	for i := 0; i < totalPointsNeeded; i++ {
+	for i := range totalPointsNeeded {
 		idx := offset + i
 		if idx >= 0 && idx < len(data) {
 			normData[i] = math.Max(0.0, math.Min(scaleMax, data[idx]))

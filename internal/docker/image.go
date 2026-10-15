@@ -49,14 +49,14 @@ func cleanLayerCommand(cmd string) string {
 
 	// Dockerfile directives: /bin/sh -c #(nop)  <INSTRUCTION>
 	const nopPrefix = "/bin/sh -c #(nop)"
-	if strings.HasPrefix(cmd, nopPrefix) {
-		return strings.TrimSpace(strings.TrimPrefix(cmd, nopPrefix))
+	if after, ok :=strings.CutPrefix(cmd, nopPrefix); ok  {
+		return strings.TrimSpace(after)
 	}
 
 	// Shell execution: /bin/sh -c <COMMAND> -> RUN <COMMAND>
 	const shPrefix = "/bin/sh -c"
-	if strings.HasPrefix(cmd, shPrefix) {
-		cmd = strings.TrimSpace(strings.TrimPrefix(cmd, shPrefix))
+	if after, ok :=strings.CutPrefix(cmd, shPrefix); ok  {
+		cmd = strings.TrimSpace(after)
 		if !strings.HasPrefix(cmd, "RUN ") {
 			cmd = "RUN " + cmd
 		}
