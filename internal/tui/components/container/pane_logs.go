@@ -10,9 +10,9 @@ import (
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
-type LogLineMsg struct {
+type LogBatchMsg struct {
 	ContainerID string
-	Line        string
+	Lines       []string
 }
 
 type LogsPane struct {
@@ -29,8 +29,8 @@ type LogsPane struct {
 
 func NewLogsPane() LogsPane {
 	return LogsPane{
-		logs:       make([]string, 0, 1500),
-		maxLines:   1500,
+		logs:       make([]string, 0, 1000),
+		maxLines:   1000,
 		autoScroll: true,
 	}
 }
@@ -41,9 +41,28 @@ func WaitForNextLog(subCh <-chan string, containerID string) tea.Cmd {
 		if !ok {
 			return nil
 		}
-		return LogLineMsg{
+		lines := []string{line}
+		const maxBatch = 200
+		for len(lines) < maxBatch {
+			select {
+			case l, ok := <-subCh:
+				if !ok {
+					return LogBatchMsg{
+						ContainerID: containerID,
+						Lines:       lines,
+					}
+				}
+				lines = append(lines, l)
+			default:
+				return LogBatchMsg{
+					ContainerID: containerID,
+					Lines:       lines,
+				}
+			}
+		}
+		return LogBatchMsg{
 			ContainerID: containerID,
-			Line:        line,
+			Lines:       lines,
 		}
 	}
 }
@@ -69,13 +88,18 @@ func (p *LogsPane) SetSize(w, h int) {
 	p.setContent()
 }
 
-// AppendLine adds a new log line. When full, the oldest line is discarded in-place.
-func (p *LogsPane) AppendLine(line string) {
-	if len(p.logs) < p.maxLines {
-		p.logs = append(p.logs, line)
-	} else {
-		copy(p.logs, p.logs[1:])
-		p.logs[len(p.logs)-1] = line
+// AppendLines adds a batch of log lines and updates the viewport once.
+func (p *LogsPane) AppendLines(lines []string) {
+	if len(lines) == 0 {
+		return
+	}
+	for _, line := range lines {
+		if len(p.logs) < p.maxLines {
+			p.logs = append(p.logs, line)
+		} else {
+			copy(p.logs, p.logs[1:])
+			p.logs[len(p.logs)-1] = line
+		}
 	}
 	p.count = len(p.logs)
 	if p.ready {
@@ -128,6 +152,7 @@ func (p LogsPane) Update(msg tea.Msg) (LogsPane, tea.Cmd) {
 	return p, cmd
 }
 
+// setContent rebuilds the viewport content using SetContentLines directly.
 func (p *LogsPane) setContent() {
 	if !p.ready {
 		return
