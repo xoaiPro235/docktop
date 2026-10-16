@@ -10,11 +10,6 @@ import (
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
-type LogBatchMsg struct {
-	ContainerID string
-	Lines       []string
-}
-
 type LogsPane struct {
 	viewport viewport.Model
 	logs     []string
@@ -32,38 +27,6 @@ func NewLogsPane() LogsPane {
 		logs:       make([]string, 0, 1000),
 		maxLines:   1000,
 		autoScroll: true,
-	}
-}
-
-func WaitForNextLog(subCh <-chan string, containerID string) tea.Cmd {
-	return func() tea.Msg {
-		line, ok := <-subCh
-		if !ok {
-			return nil
-		}
-		lines := []string{line}
-		const maxBatch = 200
-		for len(lines) < maxBatch {
-			select {
-			case l, ok := <-subCh:
-				if !ok {
-					return LogBatchMsg{
-						ContainerID: containerID,
-						Lines:       lines,
-					}
-				}
-				lines = append(lines, l)
-			default:
-				return LogBatchMsg{
-					ContainerID: containerID,
-					Lines:       lines,
-				}
-			}
-		}
-		return LogBatchMsg{
-			ContainerID: containerID,
-			Lines:       lines,
-		}
 	}
 }
 
