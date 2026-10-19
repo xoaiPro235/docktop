@@ -27,7 +27,7 @@ type CommonHelpKeyMap struct {
 	HelpSubpane    key.Binding
 }
 
-var AppKey = AppKeyMap{
+var AppKeys = AppKeyMap{
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
 		key.WithHelp("q", "Quit"),
