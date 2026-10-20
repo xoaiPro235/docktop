@@ -1,0 +1,15 @@
+template: matryer
+dir: "{{.InterfaceDir}}/mocks"
+pkgname: mocks
+structname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}.go"
+
+packages:
+  github.com/xoaiPro235/docktop/internal/docker:
+    interfaces:
+      ContainerService:
+      ImageService:
+      VolumeService:
+      NetworkService:
+      EventService:
+      Service:
