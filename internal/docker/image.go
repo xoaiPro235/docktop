@@ -75,6 +75,10 @@ func FormatTimeAgo(t time.Time) string {
 	return units.HumanDuration(d) + " ago"
 }
 
+func FormatImageSize(size int64) string{
+	return units.HumanSize(float64(size))
+}
+
 func cleanImageID(id string) string {
 	id = strings.TrimPrefix(id, "sha256:")
 	if len(id) > 10 {

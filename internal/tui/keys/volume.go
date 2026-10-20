@@ -2,6 +2,7 @@ package keys
 
 import "charm.land/bubbles/v2/key"
 
+// VolumeKeyMap holds key bindings for the Volume view component.
 type VolumeKeyMap struct {
 	Remove key.Binding
 	Prune  key.Binding
@@ -9,9 +10,11 @@ type VolumeKeyMap struct {
 	Down   key.Binding
 	Left   key.Binding
 	Right  key.Binding
-	Focus  key.Binding
+	Focus      key.Binding
+	ToggleWrap key.Binding
 }
 
+// VolumeKeys is the default instance of VolumeKeyMap.
 var VolumeKeys = VolumeKeyMap{
 	Remove: key.NewBinding(
 		key.WithKeys("d", "D", "x", "X"),
@@ -40,5 +43,9 @@ var VolumeKeys = VolumeKeyMap{
 	Focus: key.NewBinding(
 		key.WithKeys("tab"),
 		key.WithHelp("Tab", "Focus"),
+	),
+	ToggleWrap: key.NewBinding(
+		key.WithKeys("w", "W"),
+		key.WithHelp("w", "Wrap"),
 	),
 }

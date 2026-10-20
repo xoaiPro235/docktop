@@ -3,6 +3,7 @@ package container
 import (
 	"cmp"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -20,6 +21,7 @@ const (
 type TreeNode struct {
 	Type        NodeType
 	Name        string
+	ProjectName string
 	Key         string
 	Container   *docker.ContainerInfo
 	ConfigFiles string
@@ -151,6 +153,7 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 				projNode = &TreeNode{
 					Type:        NodeProject,
 					Name:        c.ProjectName,
+					ProjectName: c.ProjectName,
 					Key:         key,
 					ConfigFiles: c.ConfigFiles,
 					WorkingDir:  c.WorkingDir,
@@ -169,12 +172,20 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 				svcName = "other"
 			}
 			svcNode := findOrCreateChild(projNode, svcName, NodeService, stateMap)
+			if svcNode.ProjectName == "" {
+				svcNode.ProjectName = c.ProjectName
+			}
+			if svcNode.ConfigFiles == "" && c.ConfigFiles != "" {
+				svcNode.ConfigFiles = c.ConfigFiles
+				svcNode.WorkingDir = c.WorkingDir
+			}
 
 			svcNode.Children = append(svcNode.Children, &TreeNode{
-				Type:      NodeContainer,
-				Name:      c.Name,
-				Key:       "ctr:" + c.ID,
-				Container: c,
+				Type:        NodeContainer,
+				Name:        c.Name,
+				ProjectName: c.ProjectName,
+				Key:         "ctr:" + c.ID,
+				Container:   c,
 			})
 		} else {
 			if standaloneNode == nil {
@@ -256,4 +267,48 @@ func Flatten(nodes []*TreeNode, parentPrefix string) []FlatItem {
 		}
 	}
 	return list
+}
+
+// resolveComposeProject extracts ProjectName, ServiceName, WorkingDir, and ConfigFile for a TreeNode.
+func resolveComposeProject(node *TreeNode) (projectName string, serviceName string, workDir string, configFile string) {
+	if node == nil {
+		return "", "", "", ""
+	}
+	projectName = node.ProjectName
+	if projectName == "" && node.Type == NodeProject && node.Name != "__standalone__" {
+		projectName = node.Name
+	}
+	if node.Type == NodeService {
+		serviceName = node.Name
+	}
+	configFile = findComposeFile(node)
+	if configFile != "" {
+		workDir = filepath.Dir(configFile)
+	}
+	if workDir == "" {
+		workDir = node.WorkingDir
+	}
+	if workDir == "" {
+		for _, child := range node.Children {
+			if child.WorkingDir != "" {
+				workDir = child.WorkingDir
+				break
+			}
+			if child.Container != nil && child.Container.WorkingDir != "" {
+				workDir = child.Container.WorkingDir
+				break
+			}
+			for _, gc := range child.Children {
+				if gc.WorkingDir != "" {
+					workDir = gc.WorkingDir
+					break
+				}
+				if gc.Container != nil && gc.Container.WorkingDir != "" {
+					workDir = gc.Container.WorkingDir
+					break
+				}
+			}
+		}
+	}
+	return projectName, serviceName, workDir, configFile
 }

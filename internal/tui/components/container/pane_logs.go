@@ -70,6 +70,11 @@ func (p *LogsPane) AppendLines(lines []string) {
 	}
 }
 
+// AppendLine adds a single log line.
+func (p *LogsPane) AppendLine(line string) {
+	p.AppendLines([]string{line})
+}
+
 func (p *LogsPane) Reset() {
 	p.logs = p.logs[:0]
 	p.count = 0
@@ -79,12 +84,23 @@ func (p *LogsPane) Reset() {
 	}
 }
 
+func (p *LogsPane) ToggleWrap() {
+	p.viewport.SoftWrap = !p.viewport.SoftWrap
+	if p.autoScroll {
+		p.viewport.GotoBottom()
+	}
+}
+
 func (p LogsPane) Update(msg tea.Msg) (LogsPane, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
+		case key.Matches(msg, keys.ContainerKeys.ToggleWrap):
+			p.ToggleWrap()
+			return p, nil
+
 		case key.Matches(msg, keys.ContainerKeys.FollowLogs):
 			p.autoScroll = true
 			p.viewport.GotoBottom()

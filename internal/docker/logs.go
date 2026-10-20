@@ -4,10 +4,21 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"os"
+	"os/exec"
+	"syscall"
+	"time"
 
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
+type ComposeLogOpts struct {
+	WorkingDir  string
+	ConfigFile  string
+	ProjectName string
+	Service     string
+	Tail        string
+}
 
 func (c *Client) StreamContainerLogs(ctx context.Context, id string, tail string) <-chan string {
 	outCh := make(chan string, 100)
@@ -44,6 +55,78 @@ func (c *Client) StreamContainerLogs(ctx context.Context, id string, tail string
 		}()
 		scanLogs(ctx, pr, outCh)
 	}()
+	return outCh
+}
+
+func (c *Client) StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-chan string {
+	outCh := make(chan string, 100)
+
+	go func() {
+		defer close(outCh)
+
+		tail := opts.Tail
+		if tail == "" {
+			tail = "50"
+		}
+
+		args := []string{"compose", "--ansi", "always"}
+		if opts.ProjectName != "" {
+			args = append(args, "-p", opts.ProjectName)
+		}
+		if opts.ConfigFile != "" {
+			args = append(args, "-f", opts.ConfigFile)
+		}
+		if opts.WorkingDir != "" {
+			args = append(args, "--project-directory", opts.WorkingDir)
+		}
+		args = append(args, "logs", "-f", "--tail", tail)
+		if opts.Service != "" {
+			args = append(args, opts.Service)
+		}
+
+		cmd := exec.CommandContext(ctx, "docker", args...)
+		if opts.WorkingDir != "" {
+			cmd.Dir = opts.WorkingDir
+		}
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		cmd.Cancel = func() error {
+			if cmd.Process != nil {
+				return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			}
+			return nil
+		}
+		cmd.WaitDelay = 200 * time.Millisecond
+
+		pr, pw, err := os.Pipe()
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			case outCh <- "Error creating pipe: " + err.Error():
+			}
+			return
+		}
+		defer pr.Close()
+
+		cmd.Stdout = pw
+		cmd.Stderr = pw
+
+		if err := cmd.Start(); err != nil {
+			_ = pw.Close()
+			select {
+			case <-ctx.Done():
+			case outCh <- "Error starting docker compose: " + err.Error():
+			}
+			return
+		}
+		// Close parent's copy of pw so only child holds the write end.
+		// When child exits or is killed, kernel automatically closes write FD and delivers EOF to pr.
+		_ = pw.Close()
+
+		scanLogs(ctx, pr, outCh)
+
+		_ = cmd.Wait()
+	}()
+
 	return outCh
 }
 

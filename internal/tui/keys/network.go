@@ -2,6 +2,7 @@ package keys
 
 import "charm.land/bubbles/v2/key"
 
+// NetworkKeyMap holds key bindings for the Network view component.
 type NetworkKeyMap struct {
 	Delete key.Binding
 	Prune  key.Binding
@@ -9,9 +10,11 @@ type NetworkKeyMap struct {
 	Down   key.Binding
 	Left   key.Binding
 	Right  key.Binding
-	Focus  key.Binding
+	Focus      key.Binding
+	ToggleWrap key.Binding
 }
 
+// NetworkKeys is the default instance of NetworkKeyMap.
 var NetworkKeys = NetworkKeyMap{
 	Delete: key.NewBinding(
 		key.WithKeys("d", "D", "x", "X"),
@@ -40,5 +43,9 @@ var NetworkKeys = NetworkKeyMap{
 	Focus: key.NewBinding(
 		key.WithKeys("tab"),
 		key.WithHelp("Tab", "Focus"),
+	),
+	ToggleWrap: key.NewBinding(
+		key.WithKeys("w", "W"),
+		key.WithHelp("w", "Wrap"),
 	),
 }

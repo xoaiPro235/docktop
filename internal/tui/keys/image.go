@@ -2,6 +2,7 @@ package keys
 
 import "charm.land/bubbles/v2/key"
 
+// ImageKeyMap holds key bindings for the Images tab.
 type ImageKeyMap struct {
 	Remove      key.Binding
 	Prune       key.Binding
@@ -13,6 +14,7 @@ type ImageKeyMap struct {
 	ToggleWrap  key.Binding
 }
 
+// ImageKeys is the default instance of ImageKeyMap.
 var ImageKeys = ImageKeyMap{
 	Remove: key.NewBinding(
 		key.WithKeys("r", "R", "d", "D"),

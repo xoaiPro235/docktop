@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -31,13 +33,12 @@ func NewComposePane() ComposePane {
 func (p *ComposePane) SetSize(w, h int) {
 	p.width = w
 	p.height = h
-	vpHeight := max(h-2, 1)
 	if !p.ready {
-		p.viewport = viewport.New(viewport.WithWidth(w), viewport.WithHeight(vpHeight))
+		p.viewport = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))
 		p.ready = true
 	} else {
 		p.viewport.SetWidth(w)
-		p.viewport.SetHeight(vpHeight)
+		p.viewport.SetHeight(h)
 	}
 	if p.lastNode != nil {
 		p.LoadProject(p.lastNode)
@@ -94,8 +95,20 @@ func (p *ComposePane) LoadProject(node *TreeNode) {
 	p.viewport.SetContent(highlightYAML(p.content))
 }
 
+func (p *ComposePane) ToggleWrap() {
+	p.viewport.SoftWrap = !p.viewport.SoftWrap
+}
+
 func (p ComposePane) Update(msg tea.Msg) (ComposePane, tea.Cmd) {
 	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch {
+		case key.Matches(msg, keys.ContainerKeys.ToggleWrap):
+			p.ToggleWrap()
+			return p, nil
+		}
+	}
 	p.viewport, cmd = p.viewport.Update(msg)
 	return p, cmd
 }
@@ -104,17 +117,6 @@ func (p ComposePane) Render() string {
 	if !p.ready {
 		return "Initializing compose viewer..."
 	}
-
-	title := p.projectName
-	if p.filePath != "" {
-		title = fmt.Sprintf("%s (%s)", p.projectName, filepath.Base(p.filePath))
-	}
-
-	rawHeader := fmt.Sprintf("── DOCKER COMPOSE CONFIG: %s ──", title)
-	if fill := p.width - ansi.StringWidth(rawHeader) - 2; fill > 0 {
-		rawHeader += strings.Repeat("─", fill)
-	}
-	header := theme.Current.TreeProject.Render(rawHeader)
 
 	pathInfo := theme.Current.Key.Render(" Path: ") + theme.Current.Value.Render(p.filePath)
 	sep := theme.Current.LineNumber.Render(" │ ")
@@ -125,7 +127,7 @@ func (p ComposePane) Render() string {
 		MaxHeight(1).
 		Render(pathInfo + sep + scrollInfo)
 
-	return header + "\n" + p.viewport.View() + "\n" + footer
+	return p.viewport.View() + "\n" + footer
 }
 
 func findComposeFile(node *TreeNode) string {

@@ -181,6 +181,34 @@ func (m *Model) startLogStream(containerID string) tea.Cmd {
 	return WaitForNextLog(outCh, containerID)
 }
 
+func (m *Model) startComposeLogStream(node *TreeNode) tea.Cmd {
+	m.stopLogStream()
+	m.logsPane.Reset()
+	if node == nil {
+		return nil
+	}
+
+	projectName, serviceName, workDir, configFile := resolveComposeProject(node)
+	if projectName == "" {
+		m.logsPane.AppendLine("Compose project name not found.")
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	m.logCancel = cancel
+
+	outCh := m.dockerClient.StreamComposeLogs(ctx, docker.ComposeLogOpts{
+		WorkingDir:  workDir,
+		ConfigFile:  configFile,
+		ProjectName: projectName,
+		Service:     serviceName,
+		Tail:        "50",
+	})
+	m.logChan = outCh
+
+	return WaitForNextLog(outCh, node.Key)
+}
+
 func WaitForNextLog(subCh <-chan string, containerID string) tea.Cmd {
 	return func() tea.Msg {
 		line, ok := <-subCh

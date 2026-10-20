@@ -2,6 +2,7 @@ package keys
 
 import "charm.land/bubbles/v2/key"
 
+// ContainerKeyMap holds key bindings for the Container view component.
 type ContainerKeyMap struct {
 	StartStop    key.Binding
 	Start        key.Binding
@@ -23,8 +24,10 @@ type ContainerKeyMap struct {
 	TopLogs       key.Binding
 	ToggleRaw     key.Binding
 	ToggleBraille key.Binding
+	ToggleWrap    key.Binding
 }
 
+// ContainerKeys is the default instance of ContainerKeyMap.
 var ContainerKeys = ContainerKeyMap{
 	StartStop: key.NewBinding(
 		key.WithKeys("s", "S"),
@@ -105,5 +108,9 @@ var ContainerKeys = ContainerKeyMap{
 	ToggleBraille: key.NewBinding(
 		key.WithKeys("b", "B"),
 		key.WithHelp("b", "Graph Up/Down"),
+	),
+	ToggleWrap: key.NewBinding(
+		key.WithKeys("w", "W"),
+		key.WithHelp("w", "Wrap"),
 	),
 }

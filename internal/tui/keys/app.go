@@ -7,6 +7,7 @@ import (
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
+// AppKeyMap holds the global application-level key bindings.
 type AppKeyMap struct {
 	Quit          key.Binding
 	TabContainers key.Binding
@@ -16,17 +17,7 @@ type AppKeyMap struct {
 	FocusToggle   key.Binding
 }
 
-type CommonHelpKeyMap struct {
-	HelpMove       key.Binding
-	HelpMoveClick  key.Binding
-	HelpNavigate   key.Binding
-	HelpScroll     key.Binding
-	HelpScrollX    key.Binding
-	HelpScrollUp   key.Binding
-	HelpScrollBoth key.Binding
-	HelpSubpane    key.Binding
-}
-
+// AppKeys is the default instance of AppKeyMap.
 var AppKeys = AppKeyMap{
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
@@ -50,8 +41,20 @@ var AppKeys = AppKeyMap{
 	),
 	FocusToggle: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("Tab", "Toggle Focus"),
+		key.WithHelp("Tab", "Focus"),
 	),
+}
+
+// CommonHelpKeyMap holds reusable help-only bindings for rendering consistent footer hints across components.
+type CommonHelpKeyMap struct {
+	HelpMove       key.Binding
+	HelpMoveClick  key.Binding
+	HelpNavigate   key.Binding
+	HelpScroll     key.Binding
+	HelpScrollX    key.Binding
+	HelpScrollUp   key.Binding
+	HelpScrollBoth key.Binding
+	HelpSubpane    key.Binding
 }
 
 var CommonHelpKeys = CommonHelpKeyMap{
@@ -89,6 +92,7 @@ var CommonHelpKeys = CommonHelpKeyMap{
 	),
 }
 
+// RenderFooterHelp renders a beautifully styled helper line for the bottom footer.
 func RenderFooterHelp(bindings ...key.Binding) string {
 	var parts []string
 	for _, b := range bindings {
@@ -100,9 +104,10 @@ func RenderFooterHelp(bindings ...key.Binding) string {
 			continue
 		}
 
-		keyString := theme.Current.FooterKey.Render(h.Key)
-		descString := theme.Current.FooterDesc.Render(h.Desc)
-		parts = append(parts, keyString+" "+descString)
+		keyStr := theme.Current.FooterKey.Render(h.Key)
+		descStr := theme.Current.FooterDesc.Render(h.Desc)
+		parts = append(parts, keyStr+" "+descStr)
 	}
-	return " " + strings.Join(parts, " | ")
+
+	return " " + strings.Join(parts, "  │  ")
 }

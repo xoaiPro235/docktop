@@ -26,6 +26,13 @@ const (
 	FocusRightPane
 )
 
+type ComposeSubPane int
+
+const (
+	ComposeSubPaneConfig ComposeSubPane = iota
+	ComposeSubPaneLogs
+)
+
 type Model struct {
 	dockerClient docker.ContainerService
 	containers   []docker.ContainerInfo
@@ -34,15 +41,17 @@ type Model struct {
 
 	expandedState map[string]bool
 
-	selectedContainerID string
-	logCancel           context.CancelFunc
-	logChan             <-chan string
-	statsCancel         context.CancelFunc
-	statsChan           <-chan docker.ContainerMetrics
+	selectedContainerID   string
+	selectedComposeTarget string
+	logCancel             context.CancelFunc
+	logChan               <-chan string
+	statsCancel           context.CancelFunc
+	statsChan             <-chan docker.ContainerMetrics
 
-	cursorIndex int
-	focusZone   FocusZone
-	activePane  SubPane
+	cursorIndex       int
+	focusZone         FocusZone
+	activePane        SubPane
+	composeActivePane ComposeSubPane
 
 	statsPane   StatsPane
 	logsPane    LogsPane
@@ -219,17 +228,38 @@ func (m *Model) SetSize(w, h int) {
 	m.logsPane.SetSize(innerRightWidth, viewportHeight)
 	m.inspectPane.SetSize(innerRightWidth, viewportHeight)
 	m.topPane.SetSize(innerRightWidth, viewportHeight)
-	m.composePane.SetSize(innerRightWidth, innerRightHeight)
+	m.composePane.SetSize(innerRightWidth, viewportHeight)
+}
+
+func (m *Model) syncComposeNode(node *TreeNode) tea.Cmd {
+	m.selectedContainerID = ""
+	m.stopStatsStream()
+
+	if node.Name == "__standalone__" || m.composeActivePane == ComposeSubPaneConfig {
+		m.stopLogStream()
+		m.composePane.LoadProject(node)
+		return nil
+	}
+
+	// ComposeSubPaneLogs
+	if m.selectedComposeTarget != node.Key {
+		m.selectedComposeTarget = node.Key
+		m.stopLogStream()
+		m.logsPane.Reset()
+	}
+	if m.logChan == nil {
+		return m.startComposeLogStream(node)
+	}
+	return nil
 }
 
 func (m *Model) syncActivePane() tea.Cmd {
 	selectedNode := m.SelectedNode()
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
-		// Project or Service selected -> Load docker-compose.yml config
-		m.Pause()
-		m.composePane.LoadProject(selectedNode)
-		return nil
+		return m.syncComposeNode(selectedNode)
 	}
+
+	m.selectedComposeTarget = ""
 
 	selected := m.SelectedContainer()
 	var currentID string
@@ -278,3 +308,4 @@ func (m *Model) syncActivePane() tea.Cmd {
 
 	return tea.Batch(cmds...)
 }
+

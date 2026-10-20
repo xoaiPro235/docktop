@@ -25,6 +25,7 @@ type ContainerService interface {
 	PruneContainers(ctx context.Context) (container.PruneReport, error)
 	ExecShellCmd(containerID string) *exec.Cmd
 	StreamContainerLogs(ctx context.Context, containerID string, tail string) <-chan string
+	StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-chan string
 	StreamContainerStats(ctx context.Context, id string) <-chan ContainerMetrics
 }
 

@@ -62,6 +62,10 @@ func (p *InspectPane) ToggleRaw() {
 	}
 }
 
+func (p *InspectPane) ToggleWrap() {
+	p.viewport.SoftWrap = !p.viewport.SoftWrap
+}
+
 func (p *InspectPane) SetContent(inspect *container.InspectResponse) {
 	if inspect == nil {
 		p.viewport.SetContent("No inspect data available.")
@@ -94,6 +98,9 @@ func (p InspectPane) Update(msg tea.Msg) (InspectPane, tea.Cmd) {
 		switch {
 		case key.Matches(msg, keys.ContainerKeys.ToggleRaw):
 			p.ToggleRaw()
+			return p, nil
+		case key.Matches(msg, keys.ContainerKeys.ToggleWrap):
+			p.ToggleWrap()
 			return p, nil
 		}
 	}
@@ -147,10 +154,10 @@ func renderFormattedInspect(data *container.InspectResponse, width int) string {
 	fmt.Fprintf(&sb, "  %s %s\n", keyStyle.Render("Created:     "), valStyle.Render(data.Created))
 	if data.State != nil {
 		fmt.Fprintf(&sb, "  %s %s (ExitCode: %d, PID: %d)\n\n",
-	keyStyle.Render("Status:      "),
-	valStyle.Render(string(data.State.Status)),
-	data.State.ExitCode,
-	data.State.Pid)
+			keyStyle.Render("Status:      "),
+			valStyle.Render(string(data.State.Status)),
+			data.State.ExitCode,
+			data.State.Pid)
 	} else {
 		fmt.Fprintf(&sb, "  %s %s\n\n", keyStyle.Render("Status:      "), valStyle.Render("Unknown"))
 	}
@@ -267,10 +274,10 @@ func renderFormattedInspect(data *container.InspectResponse, width int) string {
 				mode = "ro"
 			}
 			fmt.Fprintf(&sb, "  [%s] %s -> %s (%s)\n",
-	accentStyle.Render(string(m.Type)),
-	valStyle.Render(m.Source),
-	accentStyle.Render(m.Destination),
-	mode)
+				accentStyle.Render(string(m.Type)),
+				valStyle.Render(m.Source),
+				accentStyle.Render(m.Destination),
+				mode)
 		}
 	}
 	sb.WriteString("\n")

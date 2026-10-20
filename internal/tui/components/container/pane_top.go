@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -103,8 +105,20 @@ func (p *TopPane) SetContent(containerID string, titles []string, processes [][]
 	}
 }
 
+func (p *TopPane) ToggleWrap() {
+	p.viewport.SoftWrap = !p.viewport.SoftWrap
+}
+
 func (p TopPane) Update(msg tea.Msg) (TopPane, tea.Cmd) {
 	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch {
+		case key.Matches(msg, keys.ContainerKeys.ToggleWrap):
+			p.ToggleWrap()
+			return p, nil
+		}
+	}
 	p.viewport, cmd = p.viewport.Update(msg)
 	return p, cmd
 }
@@ -185,7 +199,10 @@ func renderProcessesTable(titles []string, processes [][]string, totalWidth int)
 		sepLine.WriteString("  ")
 		prefixWidth += colWidths[i] + 2
 	}
-	lastColWidth := max(totalWidth - prefixWidth, 20)
+	lastColWidth := totalWidth - prefixWidth
+	if lastColWidth < 20 {
+		lastColWidth = 20
+	}
 	sepLine.WriteString(strings.Repeat("─", lastColWidth))
 	sb.WriteString(sepStyle.Render(sepLine.String()))
 	sb.WriteString("\n")

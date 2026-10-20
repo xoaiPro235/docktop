@@ -41,7 +41,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case LogBatchMsg:
-		if m.activePane == SubPaneLogs && m.selectedContainerID != "" && msg.ContainerID == m.selectedContainerID {
+		selectedNode := m.SelectedNode()
+		if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
+			if m.composeActivePane == ComposeSubPaneLogs && msg.ContainerID == selectedNode.Key {
+				m.logsPane.AppendLines(msg.Lines)
+				if m.logChan != nil {
+					cmds = append(cmds, WaitForNextLog(m.logChan, msg.ContainerID))
+				}
+			}
+		} else if m.activePane == SubPaneLogs && m.selectedContainerID != "" && msg.ContainerID == m.selectedContainerID {
 			m.logsPane.AppendLines(msg.Lines)
 			if m.logChan != nil {
 				cmds = append(cmds, WaitForNextLog(m.logChan, msg.ContainerID))
@@ -49,7 +57,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case LogStreamClosedMsg:
-		if msg.ContainerID == m.selectedContainerID {
+		selectedNode := m.SelectedNode()
+		if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
+			if msg.ContainerID == selectedNode.Key {
+				m.logChan = nil
+				m.logCancel = nil
+			}
+		} else if msg.ContainerID == m.selectedContainerID {
 			m.logChan = nil
 			m.logCancel = nil
 		}
@@ -164,12 +178,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.confirmModal.Active {
 			return m, nil
 		}
-		leftWidth := max(m.width * 35 / 100, 25)
+		leftWidth := max(m.width*35/100, 25)
 
 		if msg.X <= leftWidth {
 			m.focusZone = FocusLeftTree
 			startIdx := 0
-			maxVisibleItems := max(m.height - 4, 1)
+			maxVisibleItems := max(m.height-4, 1)
 			if m.cursorIndex >= maxVisibleItems {
 				startIdx = m.cursorIndex - maxVisibleItems + 1
 			}
@@ -203,6 +217,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						cmds = append(cmds, m.syncActivePane())
 					}
 				}
+			} else if (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != "__standalone__" {
+				if msg.Y >= 1 && msg.Y <= 3 {
+					relX := msg.X - leftWidth - 2
+					if relX >= 0 && relX < 10 {
+						m.composeActivePane = ComposeSubPaneConfig
+						cmds = append(cmds, m.syncActivePane())
+					} else if relX >= 10 && relX < 19 {
+						m.composeActivePane = ComposeSubPaneLogs
+						cmds = append(cmds, m.syncActivePane())
+					}
+				}
 			}
 		}
 
@@ -210,7 +235,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.confirmModal.Active {
 			return m, nil
 		}
-		leftWidth := max(m.width * 35 / 100, 25)
+		leftWidth := max(m.width*35/100, 25)
 
 		if msg.X <= leftWidth {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
@@ -224,7 +249,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			var cmd tea.Cmd
 			selectedNode := m.SelectedNode()
 			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
-				m.composePane, cmd = m.composePane.Update(msg)
+				if m.composeActivePane == ComposeSubPaneLogs {
+					m.logsPane, cmd = m.logsPane.Update(msg)
+				} else {
+					m.composePane, cmd = m.composePane.Update(msg)
+				}
 				cmds = append(cmds, cmd)
 			} else {
 				switch m.activePane {
@@ -338,17 +367,56 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, nil
 			}
 
+		// Toggle text soft-wrap in right pane viewports (Logs, Top, Inspect, Compose)
+		case key.Matches(msg, keys.ContainerKeys.ToggleWrap):
+			selectedNode := m.SelectedNode()
+			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
+				if m.composeActivePane == ComposeSubPaneLogs {
+					m.logsPane.ToggleWrap()
+				} else {
+					m.composePane.ToggleWrap()
+				}
+				return m, nil
+			}
+			switch m.activePane {
+			case SubPaneLogs:
+				m.logsPane.ToggleWrap()
+				return m, nil
+			case SubPaneInspect:
+				m.inspectPane.ToggleWrap()
+				return m, nil
+			case SubPaneTop:
+				m.topPane.ToggleWrap()
+				return m, nil
+			}
+
 		// Cycle subpanes: '[' and ']'
 		case key.Matches(msg, keys.ContainerKeys.NextPane):
-			m.activePane = (m.activePane + 1) % 4
-			cmds = append(cmds, m.syncActivePane())
-		case key.Matches(msg, keys.ContainerKeys.PrevPane):
-			if m.activePane == 0 {
-				m.activePane = SubPaneInspect
+			selectedNode := m.SelectedNode()
+			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != "__standalone__" {
+				m.composeActivePane = (m.composeActivePane + 1) % 2
+				cmds = append(cmds, m.syncActivePane())
 			} else {
-				m.activePane--
+				m.activePane = (m.activePane + 1) % 4
+				cmds = append(cmds, m.syncActivePane())
 			}
-			cmds = append(cmds, m.syncActivePane())
+		case key.Matches(msg, keys.ContainerKeys.PrevPane):
+			selectedNode := m.SelectedNode()
+			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != "__standalone__" {
+				if m.composeActivePane == 0 {
+					m.composeActivePane = ComposeSubPaneLogs
+				} else {
+					m.composeActivePane--
+				}
+				cmds = append(cmds, m.syncActivePane())
+			} else {
+				if m.activePane == 0 {
+					m.activePane = SubPaneInspect
+				} else {
+					m.activePane--
+				}
+				cmds = append(cmds, m.syncActivePane())
+			}
 
 		// Navigate tree (when left tree is focused)
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Up):
@@ -410,8 +478,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			var cmd tea.Cmd
 			selectedNode := m.SelectedNode()
 			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
-				m.composePane, cmd = m.composePane.Update(msg)
-				cmds = append(cmds, cmd)
+				if m.composeActivePane == ComposeSubPaneLogs {
+					m.logsPane, cmd = m.logsPane.Update(msg)
+					cmds = append(cmds, cmd)
+				} else {
+					m.composePane, cmd = m.composePane.Update(msg)
+					cmds = append(cmds, cmd)
+				}
 			} else {
 				switch m.activePane {
 				case SubPaneLogs:

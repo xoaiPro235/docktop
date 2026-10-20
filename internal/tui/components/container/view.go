@@ -9,12 +9,13 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
+	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
 func (m Model) View() string {
-	leftWidth := max(m.width * 35 / 100, 25)
-	rightWidth := max(m.width - leftWidth - 1, 20)
+	leftWidth := max(m.width*35/100, 25)
+	rightWidth := max(m.width-leftWidth-1, 20)
 
 	leftBorderColor := theme.Current.Palette.BorderNormal
 	rightBorderColor := theme.Current.Palette.BorderNormal
@@ -40,17 +41,17 @@ func (m Model) View() string {
 
 	// 1. Render tree on left (windowing scrolls with cursor)
 	var leftContent strings.Builder
-	innerLeftWidth := max(leftWidth - 2, 1)
+	innerLeftWidth := max(leftWidth-2, 1)
 	headerTitle := ansi.Truncate("PROJECT / SERVICE / CONTAINER", innerLeftWidth, "…")
 	leftContent.WriteString(theme.Current.TreeHeader.Render(headerTitle))
 	leftContent.WriteString("\n\n")
 
-	maxVisibleItems := max(m.height - 4, 1)
+	maxVisibleItems := max(m.height-4, 1)
 	startIdx := 0
 	if m.cursorIndex >= maxVisibleItems {
 		startIdx = m.cursorIndex - maxVisibleItems + 1
 	}
-	endIdx := min(len(m.flatItems), startIdx + maxVisibleItems)
+	endIdx := min(len(m.flatItems), startIdx+maxVisibleItems)
 
 	for i := startIdx; i < endIdx; i++ {
 		item := m.flatItems[i]
@@ -101,8 +102,36 @@ func (m Model) View() string {
 	var rightContent string
 
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
-		// Project/Service selected -> Render docker-compose config
-		rightContent = m.composePane.Render()
+		if selectedNode.Name == "__standalone__" {
+			headerBar := theme.Current.TreeProject.Render("── STANDALONE CONTAINERS ──")
+			rightContent = headerBar + "\n" + m.composePane.Render()
+		} else {
+			subTabs := []string{"[Config]", "[Logs]"}
+			for i := range subTabs {
+				if ComposeSubPane(i) == m.composeActivePane {
+					subTabs[i] = theme.Current.SubTabActive.Render(subTabs[i])
+				} else {
+					subTabs[i] = theme.Current.SubTabInactive.Render(subTabs[i])
+				}
+			}
+			headerBar := strings.Join(subTabs, " | ")
+			badge := ""
+			if selectedNode.Type == NodeProject {
+				badge = "  " + theme.Current.TreeProject.Render("Project: "+selectedNode.Name)
+			} else {
+				badge = "  " + theme.Current.TreeService.Render("Service: "+selectedNode.Name)
+			}
+			headerBar += badge
+
+			var rightBody string
+			switch m.composeActivePane {
+			case ComposeSubPaneConfig:
+				rightBody = m.composePane.Render()
+			case ComposeSubPaneLogs:
+				rightBody = m.logsPane.Render()
+			}
+			rightContent = headerBar + "\n" + rightBody
+		}
 	} else {
 		// Container selected -> Render sub-tab header and active subpane
 		subTabs := []string{"[Stats]", "[Logs]", "[Top]", "[Inspect]"}
@@ -146,16 +175,16 @@ func (m Model) View() string {
 		rightContent = headerBar + "\n" + rightBody
 	}
 
-	innerLeftWidth = max(leftWidth - 2, 1)
-	innerRightWidth := max(rightWidth - 2, 1)
-	maxLines := max(m.height - 2, 1)
+	innerLeftWidth = max(leftWidth-2, 1)
+	innerRightWidth := max(rightWidth-2, 1)
+	maxLines := max(m.height-2, 1)
 
 	// Clamp left pane: truncate lines that exceed the pane width and drop
 	// lines beyond maxLines.
-	leftStr := clampLines(leftContent.String(), innerLeftWidth, maxLines)
+	leftStr := layout.ClampLines(leftContent.String(), innerLeftWidth, maxLines)
 
 	// Same for right pane.
-	rightContent = clampLines(rightContent, innerRightWidth, maxLines)
+	rightContent = layout.ClampLines(rightContent, innerRightWidth, maxLines)
 
 	baseView := lipgloss.JoinHorizontal(lipgloss.Top,
 		leftStyle.Render(leftStr),
@@ -180,14 +209,20 @@ func (m Model) FooterBindings() []key.Binding {
 
 	bindings = append(bindings, keys.AppKeys.FocusToggle)
 
-	// If a project or service is selected (docker-compose config view)
+	// If a project or service is selected (docker-compose config / logs view)
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
 		bindings = append(bindings,
 			keys.CommonHelpKeys.HelpNavigate,
 			keys.ContainerKeys.ToggleExpand,
 		)
+		if selectedNode.Name != "__standalone__" {
+			bindings = append(bindings, keys.CommonHelpKeys.HelpSubpane)
+		}
 		if m.focusZone == FocusRightPane {
-			bindings = append(bindings, keys.CommonHelpKeys.HelpScrollBoth)
+			if m.composeActivePane == ComposeSubPaneLogs {
+				bindings = append(bindings, keys.ContainerKeys.FollowLogs, keys.ContainerKeys.TopLogs)
+			}
+			bindings = append(bindings, keys.CommonHelpKeys.HelpScrollBoth, keys.ContainerKeys.ToggleWrap)
 		}
 		bindings = append(bindings, keys.AppKeys.Quit)
 		return bindings
@@ -243,17 +278,20 @@ func (m Model) FooterBindings() []key.Binding {
 	case SubPaneLogs:
 		bindings = append(bindings,
 			keys.ContainerKeys.FollowLogs,
+			keys.ContainerKeys.ToggleWrap,
 			keys.CommonHelpKeys.HelpScrollUp,
 		)
 
 	case SubPaneTop:
 		bindings = append(bindings,
+			keys.ContainerKeys.ToggleWrap,
 			keys.CommonHelpKeys.HelpScroll,
 		)
 
 	case SubPaneInspect:
 		bindings = append(bindings,
 			keys.ContainerKeys.ToggleRaw,
+			keys.ContainerKeys.ToggleWrap,
 			keys.ContainerKeys.Restart,
 			keys.CommonHelpKeys.HelpScroll,
 		)
@@ -261,40 +299,4 @@ func (m Model) FooterBindings() []key.Binding {
 
 	bindings = append(bindings, keys.AppKeys.Quit)
 	return bindings
-}
-
-// clampLines truncates each line to maxWidth visible characters and drops
-// lines beyond maxLines. It avoids the Split → range → Join round-trip by
-// scanning the source string directly with IndexByte
-// and writing each accepted line to a single Builder.
-func clampLines(s string, maxWidth, maxLines int) string {
-	s = strings.TrimRight(s, "\n")
-	if s == "" {
-		return s
-	}
-
-	var b strings.Builder
-	b.Grow(len(s))
-
-	lineCount := 0
-	for len(s) > 0 && lineCount < maxLines {
-		// Find the next newline without allocating a []string.
-		idx := strings.IndexByte(s, '\n')
-		var line string
-		if idx < 0 {
-			line = s
-			s = ""
-		} else {
-			line = s[:idx]
-			s = s[idx+1:]
-		}
-
-		if lineCount > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(ansi.Truncate(line, maxWidth, ""))
-		lineCount++
-	}
-
-	return b.String()
 }
