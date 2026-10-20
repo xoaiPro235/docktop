@@ -18,7 +18,7 @@ func (c *Client) StreamEvents(ctx context.Context) (<-chan events.Message, <-cha
 }
 
 // IsContainerLifecycleEvent returns true if the event represents an actual state/lifecycle change of a container.
-func IsContainerExecEvent(action events.Action) bool {
+func IsContainerLifecycleEvent(action events.Action) bool {
 	switch action {
 	case events.ActionCreate,
 		events.ActionStart,

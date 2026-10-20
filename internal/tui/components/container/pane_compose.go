@@ -55,7 +55,7 @@ func (p *ComposePane) LoadProject(node *TreeNode) {
 	}
 
 	// Case 1: Standalone containers root
-	if node.Name == "__standalone__" {
+	if node.Name == StandaloneProjectName {
 		p.lastNode = node
 		p.projectName = node.Name
 		p.filePath = ""

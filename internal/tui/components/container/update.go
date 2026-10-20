@@ -131,7 +131,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case ContainerActionMsg:
 		targetID := msg.ContainerID
 		if msg.Action == modal.ActionPrune {
-			targetID = "all"
+			targetID = ActionTargetAll 
 		}
 		delete(m.runningActions, targetID)
 
@@ -217,7 +217,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						cmds = append(cmds, m.syncActivePane())
 					}
 				}
-			} else if (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != "__standalone__" {
+			} else if (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != StandaloneProjectName {
 				if msg.Y >= 1 && msg.Y <= 3 {
 					relX := msg.X - leftWidth - 2
 					if relX >= 0 && relX < 10 {
@@ -305,7 +305,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Lifecycle: Start / Stop toggle with confirmation modal
 		case key.Matches(msg, keys.ContainerKeys.StartStop):
 			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning("all") {
+			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
 				if selected.State == docker.StateRunning || selected.State == docker.StatePaused {
 					m.confirmModal.ShowContainerAction(modal.ActionStop, selected.ID, selected.Name)
 				} else {
@@ -317,7 +317,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Lifecycle: Pause / Unpause toggle with confirmation modal
 		case key.Matches(msg, keys.ContainerKeys.Pause):
 			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning("all") {
+			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
 				if selected.State == docker.StatePaused {
 					m.confirmModal.ShowContainerAction(modal.ActionUnpause, selected.ID, selected.Name)
 				} else {
@@ -329,7 +329,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Lifecycle: Restart with confirmation modal
 		case key.Matches(msg, keys.ContainerKeys.Restart):
 			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning("all") {
+			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
 				m.confirmModal.ShowContainerAction(modal.ActionRestart, selected.ID, selected.Name)
 				return m, nil
 			}
@@ -337,7 +337,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Lifecycle: Remove container
 		case key.Matches(msg, keys.ContainerKeys.Remove):
 			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning("all") {
+			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
 				if selected.State == docker.StateRunning || selected.State == docker.StatePaused {
 					m.confirmModal.ShowContainerAction(modal.ActionRemoveForce, selected.ID, selected.Name)
 				} else {
@@ -349,7 +349,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Lifecycle: Prune stopped containers
 		case key.Matches(msg, keys.ContainerKeys.Prune):
 			if !m.IsActionRunning() {
-				m.confirmModal.ShowContainerAction(modal.ActionPrune, "all", "all stopped containers")
+				m.confirmModal.ShowContainerAction(modal.ActionPrune, ActionTargetAll, "all stopped containers")
 				return m, nil
 			}
 
@@ -393,7 +393,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Cycle subpanes: '[' and ']'
 		case key.Matches(msg, keys.ContainerKeys.NextPane):
 			selectedNode := m.SelectedNode()
-			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != "__standalone__" {
+			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != StandaloneProjectName {
 				m.composeActivePane = (m.composeActivePane + 1) % 2
 				cmds = append(cmds, m.syncActivePane())
 			} else {
@@ -402,7 +402,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		case key.Matches(msg, keys.ContainerKeys.PrevPane):
 			selectedNode := m.SelectedNode()
-			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != "__standalone__" {
+			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != StandaloneProjectName {
 				if m.composeActivePane == 0 {
 					m.composeActivePane = ComposeSubPaneLogs
 				} else {

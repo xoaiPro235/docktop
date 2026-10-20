@@ -75,7 +75,7 @@ func (m Model) View() string {
 		case NodeContainer:
 			if item.Node.Container != nil {
 				_, isSelfAction := m.runningActions[item.Node.Container.ID]
-				isPruningThis := m.isContainerActionRunning("all") && item.Node.Container.State != docker.StateRunning
+				isPruningThis := m.isContainerActionRunning(ActionTargetAll) && item.Node.Container.State != docker.StateRunning
 
 				if isSelfAction || isPruningThis {
 					styledTitle = theme.Current.TreeSelected.Render(m.spinner.View() + " " + title)
@@ -102,7 +102,7 @@ func (m Model) View() string {
 	var rightContent string
 
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
-		if selectedNode.Name == "__standalone__" {
+		if selectedNode.Name == StandaloneProjectName {
 			headerBar := theme.Current.TreeProject.Render("── STANDALONE CONTAINERS ──")
 			rightContent = headerBar + "\n" + m.composePane.Render()
 		} else {
@@ -154,7 +154,7 @@ func (m Model) View() string {
 		case SubPaneStats:
 			var actionLoading string
 			var actionType string
-			if pruneAct, ok := m.runningActions["all"]; ok {
+			if pruneAct, ok := m.runningActions[ActionTargetAll]; ok {
 				actionLoading = m.spinner.View() + " " + theme.Current.ActionLoading.Render(pruneAct.Description)
 				actionType = pruneAct.Action.String()
 			} else if selectedContainer != nil {
@@ -215,7 +215,7 @@ func (m Model) FooterBindings() []key.Binding {
 			keys.CommonHelpKeys.HelpNavigate,
 			keys.ContainerKeys.ToggleExpand,
 		)
-		if selectedNode.Name != "__standalone__" {
+		if selectedNode.Name != StandaloneProjectName {
 			bindings = append(bindings, keys.CommonHelpKeys.HelpSubpane)
 		}
 		if m.focusZone == FocusRightPane {

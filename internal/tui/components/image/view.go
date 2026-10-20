@@ -102,7 +102,7 @@ func (m Model) View() string {
 		}
 
 		// Styled ID
-		idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, img.ID))
+		idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, docker.CleanImageID(img.ID)))
 
 		// Styled Size
 		sizeDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", sizeColWidth, docker.FormatImageSize(img.Size)))

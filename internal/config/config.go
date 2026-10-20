@@ -19,12 +19,14 @@ const (
 // Config represents the application configuration.
 type Config struct {
 	Theme string `yaml:"theme"`
+	Host  string `yaml:"host,omitempty"`
 }
 
 // Default returns a Config struct initialized with default values.
 func Default() *Config {
 	return &Config{
 		Theme: DefaultTheme,
+		Host:  "",
 	}
 }
 
@@ -68,6 +70,7 @@ func LoadFromPath(path string) (*Config, error) {
 	if cfg.Theme == "" {
 		cfg.Theme = DefaultTheme
 	}
+	cfg.Host = strings.TrimSpace(cfg.Host)
 
 	return cfg, nil
 }
@@ -84,12 +87,23 @@ func SaveTemplate(path string) error {
 
 # UI Theme:
 # Available presets:
-#   - tokyo-night : Tokyo Night theme (default)
+#   - tokyo-night : Default vibrant Tokyo Night / Neon aesthetic
 #   - terminal    : Adaptive 16 ANSI colors (automatically matches your terminal emulator theme: Kitty, Alacritty, iTerm2, WezTerm)
-#   - dracula     : Dracula dark theme
-#   - catppuccin  : Catppuccin Mocha theme
-#   - nord        : Arctic theme
+#   - dracula     : Classic Dracula dark theme
+#   - catppuccin  : Soothing Catppuccin Mocha theme
+#   - nord        : Arctic, north-bluish palette
 theme: "tokyo-night"
+
+# Docker Host:
+# Optional Docker daemon endpoint or remote socket.
+# If omitted or left empty, docktop falls back to the DOCKER_HOST environment variable,
+# or the standard local Docker daemon socket (/var/run/docker.sock).
+# Examples:
+#   host: "unix:///var/run/docker.sock"
+#   host: "unix:///run/user/1000/docker.sock" (Rootless Docker)
+#   host: "ssh://user@remote-vps:22"
+#   host: "tcp://192.168.1.100:2376"
+# host: ""
 `
 	return os.WriteFile(path, []byte(template), 0o644)
 }

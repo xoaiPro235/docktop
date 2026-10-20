@@ -79,7 +79,7 @@ func FormatImageSize(size int64) string {
 	return units.HumanSize(float64(size))
 }
 
-func cleanImageID(id string) string {
+func CleanImageID(id string) string {
 	id = strings.TrimPrefix(id, "sha256:")
 	if len(id) > 10 {
 		return id[:10]
@@ -198,7 +198,7 @@ func (c *Client) GetImageHistory(ctx context.Context, imageID string) ([]ImageLa
 	for i, item := range hist.Items {
 		layers = append(layers, ImageLayer{
 			Index:   i + 1,
-			ID:      cleanImageID(item.ID),
+			ID:      CleanImageID(item.ID),
 			Size:    item.Size,
 			Command: CleanLayerCommand(item.CreatedBy),
 			Created: time.Unix(item.Created, 0),

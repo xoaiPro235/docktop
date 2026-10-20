@@ -33,6 +33,9 @@ const (
 	ComposeSubPaneLogs
 )
 
+// ActionTargetAll represents the special target identifier when pruning all stopped containers.
+const ActionTargetAll = "all"
+
 type Model struct {
 	dockerClient docker.ContainerService
 	containers   []docker.ContainerInfo
@@ -235,7 +238,7 @@ func (m *Model) syncComposeNode(node *TreeNode) tea.Cmd {
 	m.selectedContainerID = ""
 	m.stopStatsStream()
 
-	if node.Name == "__standalone__" || m.composeActivePane == ComposeSubPaneConfig {
+	if node.Name == StandaloneProjectName || m.composeActivePane == ComposeSubPaneConfig {
 		m.stopLogStream()
 		m.composePane.LoadProject(node)
 		return nil

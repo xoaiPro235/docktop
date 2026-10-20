@@ -18,6 +18,8 @@ const (
 	NodeContainer
 )
 
+const StandaloneProjectName = "__standalone__"
+
 type TreeNode struct {
 	Type        NodeType
 	Name        string
@@ -38,7 +40,7 @@ func (n *TreeNode) DisplayTitle() string {
 
 	switch n.Type {
 	case NodeProject:
-		if n.Name == "__standalone__" {
+		if n.Name == StandaloneProjectName {
 			return fmt.Sprintf("%s Standalone (%d)", arrow, len(n.Children))
 		}
 		return fmt.Sprintf("%s %s", arrow, n.Name)
@@ -192,7 +194,7 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 				key := "standalone"
 				standaloneNode = &TreeNode{
 					Type:     NodeProject,
-					Name:     "__standalone__",
+					Name:     StandaloneProjectName,
 					Key:      key,
 					Expanded: isNodeExpanded(key, stateMap),
 				}
@@ -275,7 +277,7 @@ func resolveComposeProject(node *TreeNode) (projectName string, serviceName stri
 		return "", "", "", ""
 	}
 	projectName = node.ProjectName
-	if projectName == "" && node.Type == NodeProject && node.Name != "__standalone__" {
+	if projectName == "" && node.Type == NodeProject && node.Name != StandaloneProjectName {
 		projectName = node.Name
 	}
 	if node.Type == NodeService {
