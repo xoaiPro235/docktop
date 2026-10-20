@@ -199,10 +199,7 @@ func renderProcessesTable(titles []string, processes [][]string, totalWidth int)
 		sepLine.WriteString("  ")
 		prefixWidth += colWidths[i] + 2
 	}
-	lastColWidth := totalWidth - prefixWidth
-	if lastColWidth < 20 {
-		lastColWidth = 20
-	}
+	lastColWidth := max(totalWidth - prefixWidth, 20)
 	sepLine.WriteString(strings.Repeat("─", lastColWidth))
 	sb.WriteString(sepStyle.Render(sepLine.String()))
 	sb.WriteString("\n")
