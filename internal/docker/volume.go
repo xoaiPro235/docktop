@@ -41,7 +41,7 @@ func (c *Client) ListVolumes(ctx context.Context) ([]VolumeInfo, error) {
 	ctrRes, _ := c.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	volumeMounts := make(map[string][]VolumeContainerMount)
 	for _, ctr := range ctrRes.Items {
-		ctrName := shortID(ctr.ID)
+		ctrName := ShortID(ctr.ID)
 		if len(ctr.Names) > 0 {
 			ctrName = strings.TrimPrefix(ctr.Names[0], "/")
 		}

@@ -49,13 +49,13 @@ func cleanLayerCommand(cmd string) string {
 
 	// Dockerfile directives: /bin/sh -c #(nop)  <INSTRUCTION>
 	const nopPrefix = "/bin/sh -c #(nop)"
-	if after, ok :=strings.CutPrefix(cmd, nopPrefix); ok  {
+	if after, ok := strings.CutPrefix(cmd, nopPrefix); ok {
 		return strings.TrimSpace(after)
 	}
 
 	// Shell execution: /bin/sh -c <COMMAND> -> RUN <COMMAND>
 	const shPrefix = "/bin/sh -c"
-	if after, ok :=strings.CutPrefix(cmd, shPrefix); ok  {
+	if after, ok := strings.CutPrefix(cmd, shPrefix); ok {
 		cmd = strings.TrimSpace(after)
 		if !strings.HasPrefix(cmd, "RUN ") {
 			cmd = "RUN " + cmd
@@ -75,7 +75,7 @@ func FormatTimeAgo(t time.Time) string {
 	return units.HumanDuration(d) + " ago"
 }
 
-func FormatImageSize(size int64) string{
+func FormatImageSize(size int64) string {
 	return units.HumanSize(float64(size))
 }
 
@@ -117,7 +117,7 @@ func (c *Client) ListImages(ctx context.Context) ([]ImageInfo, error) {
 
 	usedByID := make(map[string][]string)
 	for _, ctr := range ctrResult.Items {
-		ctrName := shortID(ctr.ID)
+		ctrName := ShortID(ctr.ID)
 		if len(ctr.Names) > 0 {
 			ctrName = strings.TrimPrefix(ctr.Names[0], "/")
 		}

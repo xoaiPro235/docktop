@@ -67,7 +67,7 @@ func isConflictError(err error) bool {
 	return strings.Contains(errMsg, "container is running") || strings.Contains(errMsg, "conflict")
 }
 
-func shortID(id string) string {
+func ShortID(id string) string {
 	if len(id) > 12 {
 		return id[:12]
 	}
@@ -75,7 +75,7 @@ func shortID(id string) string {
 }
 
 func (c *ContainerInfo) ShortID() string {
-	return shortID(c.ID)
+	return ShortID(c.ID)
 }
 
 func (c *ContainerInfo) HasDetailsLoaded() bool {
@@ -90,7 +90,7 @@ func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 	}
 	var containers []ContainerInfo
 	for _, ctr := range result.Items {
-		name := shortID(ctr.ID)
+		name := ShortID(ctr.ID)
 		if len(ctr.Names) > 0 {
 			name = strings.TrimPrefix(ctr.Names[0], "/")
 		}

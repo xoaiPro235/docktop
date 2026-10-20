@@ -105,7 +105,7 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 
 			name := endpoint.Name
 			if name == "" {
-				name = shortID(ctrID)
+				name = ShortID(ctrID)
 			}
 
 			endpoints = append(endpoints, NetworkEndpointInfo{
