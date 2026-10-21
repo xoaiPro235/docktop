@@ -42,13 +42,13 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 	sb.WriteString(makeHeader("VOLUME DETAILS"))
 
 	// Volume Name
-	sb.WriteString(fmt.Sprintf("%s %s\n", theme.Current.Key.Render("Name:       "), theme.Current.AccentText.Render(selected.Name)))
+	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Name:       "), theme.Current.AccentText.Render(selected.Name))
 
 	// Driver
-	sb.WriteString(fmt.Sprintf("%s %s\n", theme.Current.Key.Render("Driver:     "), theme.Current.Value.Render(selected.Driver)))
+	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Driver:     "), theme.Current.Value.Render(selected.Driver))
 
 	// Scope
-	sb.WriteString(fmt.Sprintf("%s %s\n", theme.Current.Key.Render("Scope:      "), theme.Current.Value.Render(selected.Scope)))
+	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Scope:      "), theme.Current.Value.Render(selected.Scope))
 
 	// Created
 	var createdAt time.Time
@@ -73,7 +73,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 	}
 
 	createdDisplay := formattedTime
-	sb.WriteString(fmt.Sprintf("%s %s\n", theme.Current.Key.Render("Created:    "), theme.Current.Value.Render(createdDisplay)))
+	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Created:    "), theme.Current.Value.Render(createdDisplay))
 
 	// Size
 	var formattedSize string = "-"
@@ -83,14 +83,14 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 	}
 	sizeDisplay := formattedSize
 
-	sb.WriteString(fmt.Sprintf("%s %s\n", theme.Current.Key.Render("Size:       "), theme.Current.StatusRunning.Render(sizeDisplay)))
+	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Size:       "), theme.Current.StatusRunning.Render(sizeDisplay))
 
 	// Mountpoint
 	mountDisplay := selected.Mountpoint
 	if mountDisplay == "" {
 		mountDisplay = "-"
 	}
-	sb.WriteString(fmt.Sprintf("%s %s\n\n", theme.Current.Key.Render("Mountpoint: "), theme.Current.MutedText.Render(mountDisplay)))
+	fmt.Fprintf(&sb, "%s %s\n\n", theme.Current.Key.Render("Mountpoint: "), theme.Current.MutedText.Render(mountDisplay))
 
 	// 2. Labels Section
 	labelCount := len(selected.Labels)
@@ -117,8 +117,33 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 		}
 		sb.WriteString("\n")
 	}
+	// 3. Options
+	optionCount := len(selected.Options)
+	optionHeader := fmt.Sprintf("OPTIONS (%d)", optionCount)
+	sb.WriteString(makeHeader(optionHeader))
 
-	// 3. Mounted Containers Section
+	if optionCount == 0 {
+		sb.WriteString("  ")
+		sb.WriteString(theme.Current.MutedText.Render("(no labels)"))
+		sb.WriteString("\n\n")
+	} else {
+		// Sort keys alphabetically to guarantee 100% stable, deterministic order
+		keys := make([]string, 0, optionCount)
+		for k := range selected.Options {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+
+		for _, k := range keys {
+			val := selected.Options[k]
+			lineStr := fmt.Sprintf("  %s %s", theme.Current.AccentText.Render(k+":"), theme.Current.Value.Render(val))
+			sb.WriteString(lineStr)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	// 4. Mounted Containers Section
 	containerCount := len(selected.Containers)
 	containersHeader := fmt.Sprintf("MOUNTED BY CONTAINERS (%d)", containerCount)
 	sb.WriteString(makeHeader(containersHeader))
@@ -157,9 +182,9 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 				modeText = "Read-Only (ro)"
 			}
 
-			sb.WriteString(fmt.Sprintf("  - %s (%s)\n", theme.Current.AccentText.Render(c.ContainerName), stateBadge))
-			sb.WriteString(fmt.Sprintf("      Destination: %s\n", theme.Current.Value.Render(c.Destination)))
-			sb.WriteString(fmt.Sprintf("      Access Mode: %s\n\n", theme.Current.Key.Render(modeText)))
+			fmt.Fprintf(&sb, "  - %s (%s)\n", theme.Current.AccentText.Render(c.ContainerName), stateBadge)
+			fmt.Fprintf(&sb, "      Destination: %s\n", theme.Current.Value.Render(c.Destination))
+			fmt.Fprintf(&sb, "      Access Mode: %s\n\n", theme.Current.Key.Render(modeText))
 		}
 	}
 

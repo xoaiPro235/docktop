@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
@@ -70,7 +71,59 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 	}
 	fmt.Fprintf(&sb, "%s %s\n\n", theme.Current.Key.Render("Internal:   "), theme.Current.Value.Render(internalDesc))
 
-	// 2. Connected Endpoints Header
+	// 2. Labels
+	labelCount := len(selected.RawInspect.Labels)
+	labelsHeader := fmt.Sprintf("LABELS (%d)", labelCount)
+	sb.WriteString(makeHeader(labelsHeader))
+
+	if labelCount == 0 {
+		sb.WriteString("  ")
+		sb.WriteString(theme.Current.MutedText.Render("(no labels)"))
+		sb.WriteString("\n\n")
+	} else {
+		// Sort keys alphabetically to guarantee 100% stable, deterministic order
+		keys := make([]string, 0, labelCount)
+		for k := range selected.RawInspect.Labels {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+
+		for _, k := range keys {
+			val := selected.RawInspect.Labels[k]
+			lineStr := fmt.Sprintf("  %s %s", theme.Current.AccentText.Render(k+":"), theme.Current.Value.Render(val))
+			sb.WriteString(lineStr)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	// 3. Options
+	optionCount := len(selected.RawInspect.Options)
+	optionHeader := fmt.Sprintf("OPTIONS (%d)", optionCount)
+	sb.WriteString(makeHeader(optionHeader))
+
+	if optionCount == 0 {
+		sb.WriteString("  ")
+		sb.WriteString(theme.Current.MutedText.Render("(no labels)"))
+		sb.WriteString("\n\n")
+	} else {
+		// Sort keys alphabetically to guarantee 100% stable, deterministic order
+		keys := make([]string, 0, optionCount)
+		for k := range selected.RawInspect.Options {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+
+		for _, k := range keys {
+			val := selected.RawInspect.Options[k]
+			lineStr := fmt.Sprintf("  %s %s", theme.Current.AccentText.Render(k+":"), theme.Current.Value.Render(val))
+			sb.WriteString(lineStr)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	// 4. Connected Endpoints Header
 	endpointsTitle := fmt.Sprintf("CONNECTED ENDPOINTS (%d)", len(selected.Containers))
 	sb.WriteString(makeHeader(endpointsTitle))
 
