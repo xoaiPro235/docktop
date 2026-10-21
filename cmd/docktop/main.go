@@ -71,7 +71,7 @@ func main() {
 	defer dockerCli.Close()
 
 	// 4. Initialize Bubble Tea Root Model
-	app := ui.NewApp(dockerCli)
+	app := tui.NewApp(dockerCli)
 
 	// 5. Run application
 	p := tea.NewProgram(app)
