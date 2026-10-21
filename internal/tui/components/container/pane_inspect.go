@@ -10,7 +10,6 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/neilotoole/jsoncolor"
@@ -134,21 +133,12 @@ func (p InspectPane) Render() string {
 func renderFormattedInspect(data *container.InspectResponse, width int) string {
 	var sb strings.Builder
 
-	sectionTitle := theme.Current.SectionTitle
 	keyStyle := theme.Current.Key
 	valStyle := theme.Current.Value
 	accentStyle := theme.Current.AccentText
 
-	makeHeader := func(title string) string {
-		header := fmt.Sprintf("── %s ──", title)
-		if fill := width - ansi.StringWidth(header) - 2; fill > 0 {
-			header += strings.Repeat("─", fill)
-		}
-		return sectionTitle.Render(header) + "\n"
-	}
-
 	// 1. General & State
-	sb.WriteString(makeHeader("GENERAL & STATE"))
+	sb.WriteString(theme.Current.SectionHeader("GENERAL & STATE", width))
 	fmt.Fprintf(&sb, "  %s %s\n", keyStyle.Render("ID:          "), valStyle.Render(data.ID))
 	fmt.Fprintf(&sb, "  %s %s\n", keyStyle.Render("Name:        "), accentStyle.Render(data.Name))
 	fmt.Fprintf(&sb, "  %s %s\n", keyStyle.Render("Created:     "), valStyle.Render(data.Created))
@@ -163,7 +153,7 @@ func renderFormattedInspect(data *container.InspectResponse, width int) string {
 	}
 
 	// 2. Port Mappings & Networks
-	sb.WriteString(makeHeader("NETWORK & PORTS"))
+	sb.WriteString(theme.Current.SectionHeader("NETWORK & PORTS", width))
 	if data.NetworkSettings == nil || len(data.NetworkSettings.Ports) == 0 {
 		sb.WriteString("  No port bindings\n")
 	} else {
@@ -264,7 +254,7 @@ func renderFormattedInspect(data *container.InspectResponse, width int) string {
 	sb.WriteString("\n")
 
 	// 3. Mounts & Volumes
-	sb.WriteString(makeHeader("MOUNTS & VOLUMES"))
+	sb.WriteString(theme.Current.SectionHeader("MOUNTS & VOLUMES", width))
 	if len(data.Mounts) == 0 {
 		sb.WriteString("  No volumes/bind mounts\n")
 	} else {
@@ -283,7 +273,7 @@ func renderFormattedInspect(data *container.InspectResponse, width int) string {
 	sb.WriteString("\n")
 
 	// 4. Environment Variables
-	sb.WriteString(makeHeader("ENVIRONMENT VARIABLES"))
+	sb.WriteString(theme.Current.SectionHeader("ENVIRONMENT VARIABLES", width))
 	if data.Config != nil && len(data.Config.Env) > 0 {
 		envs := make([]string, len(data.Config.Env))
 		copy(envs, data.Config.Env)

@@ -24,6 +24,43 @@ func TestNewTheme(t *testing.T) {
 	}
 }
 
+func TestSectionHeader(t *testing.T) {
+	tests := []struct {
+		name  string
+		title string
+		width int
+		want  string
+	}{
+		{
+			name:  "fills available width",
+			title: "DETAILS",
+			width: 18,
+			want:  "── DETAILS ─────\n",
+		},
+		{
+			name:  "does not truncate long title",
+			title: "A LONG SECTION TITLE",
+			width: 10,
+			want:  "── A LONG SECTION TITLE ──\n",
+		},
+		{
+			name:  "handles empty title",
+			title: "",
+			width: 10,
+			want:  "──  ────\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := (Theme{}).SectionHeader(tt.title, tt.width)
+			if got != tt.want {
+				t.Errorf("SectionHeader(%q, %d) = %q, want %q", tt.title, tt.width, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSetTheme(t *testing.T) {
 	p := DraculaPalette()
 	SetTheme(p)

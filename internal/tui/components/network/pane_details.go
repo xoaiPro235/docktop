@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -27,16 +26,8 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 
 	var sb strings.Builder
 
-	makeHeader := func(title string) string {
-		header := fmt.Sprintf("── %s ──", title)
-		if fill := width - ansi.StringWidth(header) - 2; fill > 0 {
-			header += strings.Repeat("─", fill)
-		}
-		return theme.Current.SectionTitle.Render(header) + "\n"
-	}
-
 	// 1. Details Section Header
-	sb.WriteString(makeHeader("NETWORK TOPOLOGY & SUBNET"))
+	sb.WriteString(theme.Current.SectionHeader("NETWORK TOPOLOGY & SUBNET", width))
 
 	// Name
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Name:       "), theme.Current.AccentText.Render(selected.Name))
@@ -74,7 +65,7 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 	// 2. Labels
 	labelCount := len(selected.RawInspect.Labels)
 	labelsHeader := fmt.Sprintf("LABELS (%d)", labelCount)
-	sb.WriteString(makeHeader(labelsHeader))
+	sb.WriteString(theme.Current.SectionHeader(labelsHeader, width))
 
 	if labelCount == 0 {
 		sb.WriteString("  ")
@@ -100,7 +91,7 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 	// 3. Options
 	optionCount := len(selected.RawInspect.Options)
 	optionHeader := fmt.Sprintf("OPTIONS (%d)", optionCount)
-	sb.WriteString(makeHeader(optionHeader))
+	sb.WriteString(theme.Current.SectionHeader(optionHeader, width))
 
 	if optionCount == 0 {
 		sb.WriteString("  ")
@@ -125,7 +116,7 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 
 	// 4. Connected Endpoints Header
 	endpointsTitle := fmt.Sprintf("CONNECTED ENDPOINTS (%d)", len(selected.Containers))
-	sb.WriteString(makeHeader(endpointsTitle))
+	sb.WriteString(theme.Current.SectionHeader(endpointsTitle, width))
 
 	if len(selected.Containers) == 0 {
 		if selected.IsSystem {

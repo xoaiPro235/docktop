@@ -62,16 +62,8 @@ func FormatImageDetailsContent(selected *docker.ImageInfo, width int) string {
 
 	var sb strings.Builder
 
-	makeHeader := func(title string) string {
-		header := fmt.Sprintf("── %s ──", title)
-		if fill := width - ansi.StringWidth(header) - 2; fill > 0 {
-			header += strings.Repeat("─", fill)
-		}
-		return theme.Current.SectionTitle.Render(header) + "\n"
-	}
-
 	// 1. Details Section Header
-	sb.WriteString(makeHeader("IMAGE DETAILS"))
+	sb.WriteString(theme.Current.SectionHeader("IMAGE DETAILS", width))
 
 	// Full ID (not truncated, allows horizontal scroll)
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("ID:         "), theme.Current.Value.Render(selected.ID))
@@ -116,7 +108,7 @@ func FormatImageDetailsContent(selected *docker.ImageInfo, width int) string {
 	if len(selected.Layers) > 0 {
 		layersHeader = fmt.Sprintf("IMAGE LAYERS (HISTORY) [%d layers]", len(selected.Layers))
 	}
-	sb.WriteString(makeHeader(layersHeader))
+	sb.WriteString(theme.Current.SectionHeader(layersHeader, width))
 
 	// Table columns: # (3 or 4), SIZE (10), COMMAND
 	colNumWidth := 3

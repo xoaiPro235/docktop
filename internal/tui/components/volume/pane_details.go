@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/viewport"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/docker/go-units"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
@@ -30,16 +29,8 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 
 	var sb strings.Builder
 
-	makeHeader := func(title string) string {
-		header := fmt.Sprintf("── %s ──", title)
-		if fill := width - ansi.StringWidth(header) - 2; fill > 0 {
-			header += strings.Repeat("─", fill)
-		}
-		return theme.Current.SectionTitle.Render(header) + "\n"
-	}
-
 	// 1. Details Section
-	sb.WriteString(makeHeader("VOLUME DETAILS"))
+	sb.WriteString(theme.Current.SectionHeader("VOLUME DETAILS", width))
 
 	// Volume Name
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Name:       "), theme.Current.AccentText.Render(selected.Name))
@@ -95,7 +86,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 	// 2. Labels Section
 	labelCount := len(selected.Labels)
 	labelsHeader := fmt.Sprintf("LABELS (%d)", labelCount)
-	sb.WriteString(makeHeader(labelsHeader))
+	sb.WriteString(theme.Current.SectionHeader(labelsHeader, width))
 
 	if labelCount == 0 {
 		sb.WriteString("  ")
@@ -120,7 +111,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 	// 3. Options
 	optionCount := len(selected.Options)
 	optionHeader := fmt.Sprintf("OPTIONS (%d)", optionCount)
-	sb.WriteString(makeHeader(optionHeader))
+	sb.WriteString(theme.Current.SectionHeader(optionHeader, width))
 
 	if optionCount == 0 {
 		sb.WriteString("  ")
@@ -146,7 +137,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 	// 4. Mounted Containers Section
 	containerCount := len(selected.Containers)
 	containersHeader := fmt.Sprintf("MOUNTED BY CONTAINERS (%d)", containerCount)
-	sb.WriteString(makeHeader(containersHeader))
+	sb.WriteString(theme.Current.SectionHeader(containersHeader, width))
 
 	if containerCount == 0 {
 		sb.WriteString("  ")

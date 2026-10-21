@@ -1,9 +1,11 @@
 package theme
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Theme encapsulates all reusable Lipgloss styles built from a Palette.
@@ -179,4 +181,13 @@ func SetThemeByName(name string) bool {
 		return true
 	}
 	return false
+}
+
+// SectionHeader renders a standardized divider line with a section title (e.g. "── TITLE ──────\n").
+func (t Theme) SectionHeader(title string, width int) string {
+	header := fmt.Sprintf("── %s ──", title)
+	if fill := width - ansi.StringWidth(header) - 2; fill > 0 {
+		header += strings.Repeat("─", fill)
+	}
+	return t.SectionTitle.Render(header) + "\n"
 }
