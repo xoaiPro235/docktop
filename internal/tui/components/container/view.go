@@ -211,10 +211,14 @@ func (m Model) FooterBindings() []key.Binding {
 
 	// If a project or service is selected (docker-compose config / logs view)
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
+		if m.focusZone == FocusLeftTree {
+
+		
 		bindings = append(bindings,
 			keys.CommonHelpKeys.HelpNavigate,
 			keys.ContainerKeys.ToggleExpand,
 		)
+	}
 		if selectedNode.Name != StandaloneProjectName {
 			bindings = append(bindings, keys.CommonHelpKeys.HelpSubpane)
 		}
@@ -279,22 +283,27 @@ func (m Model) FooterBindings() []key.Binding {
 		bindings = append(bindings,
 			keys.ContainerKeys.FollowLogs,
 			keys.ContainerKeys.ToggleWrap,
-			keys.CommonHelpKeys.HelpScrollUp,
 		)
+		if m.focusZone == FocusRightPane {
+			bindings = append(bindings, keys.CommonHelpKeys.HelpScrollUp)
+		}
 
 	case SubPaneTop:
 		bindings = append(bindings,
 			keys.ContainerKeys.ToggleWrap,
-			keys.CommonHelpKeys.HelpScroll,
 		)
+		if m.focusZone == FocusRightPane {
+			bindings = append(bindings, keys.CommonHelpKeys.HelpScroll)
+		}
 
 	case SubPaneInspect:
 		bindings = append(bindings,
 			keys.ContainerKeys.ToggleRaw,
 			keys.ContainerKeys.ToggleWrap,
-			keys.ContainerKeys.Restart,
-			keys.CommonHelpKeys.HelpScroll,
 		)
+		if m.focusZone == FocusRightPane {
+			bindings = append(bindings, keys.CommonHelpKeys.HelpScroll)
+		}
 	}
 
 	bindings = append(bindings, keys.AppKeys.Quit)

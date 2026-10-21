@@ -257,16 +257,16 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, act
 	cpuDir := s.graphMode.CPUDirection()
 	memDir := s.graphMode.MemDirection()
 
-	cpuDirSymbol := "▲ Up"
+	cpuDirSymbol := "▲"
 	if cpuDir == GraphDirectionDown {
-		cpuDirSymbol = "▼ Down"
+		cpuDirSymbol = "▼"
 	}
 
 	var cpuTitle string
 	if scaleMax <= 5.0 {
-		cpuTitle = fmt.Sprintf("CPU Usage: %.2f%%  [Peak: %.2f%% | Scale: 0 - %.1f%%]  [%s 'b']", currentCPU, peakCPU, scaleMax, cpuDirSymbol)
+		cpuTitle = fmt.Sprintf("CPU: %.2f%%  [Scale: %.1f%% | Peak: %.1f%%]  [%s 'b']", currentCPU, scaleMax, peakCPU, cpuDirSymbol)
 	} else {
-		cpuTitle = fmt.Sprintf("CPU Usage: %.2f%%  [Peak: %.2f%% | Scale: 0 - %.0f%%]  [%s 'b']", currentCPU, peakCPU, scaleMax, cpuDirSymbol)
+		cpuTitle = fmt.Sprintf("CPU: %.2f%%  [Scale: %.0f%% | Peak: %.1f%%]  [%s 'b']", currentCPU, scaleMax, peakCPU, cpuDirSymbol)
 	}
 	b.WriteString(theme.Current.SectionTitle.Render(cpuTitle))
 	b.WriteString("\n")
@@ -353,28 +353,20 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, act
 		}
 	}
 
-	memDirSymbol := "▼ Down"
+	memDirSymbol := "▼"
 	if memDir == GraphDirectionUp {
-		memDirSymbol = "▲ Up"
+		memDirSymbol = "▲"
 	}
 
 	var memTitle string
 	if isDynamic {
-		if effectiveMemLimit > 0 {
-			memTitle = fmt.Sprintf("Memory: %s / %s (%.1f%%)  [Peak: %s | Scale: %s | Host: %s]  [%s 'b']",
-				units.BytesSize(currentMem), units.BytesSize(displayLimit), memPercent,
-				units.BytesSize(peakMem), units.BytesSize(displayLimit), units.BytesSize(effectiveMemLimit),
-				memDirSymbol)
-		} else {
-			memTitle = fmt.Sprintf("Memory: %s / %s (%.1f%%)  [Peak: %s | Scale: %s]  [%s 'b']",
-				units.BytesSize(currentMem), units.BytesSize(displayLimit), memPercent,
-				units.BytesSize(peakMem), units.BytesSize(displayLimit),
-				memDirSymbol)
-		}
+		memTitle = fmt.Sprintf("Memory: %s [Scale: %s | Peak: %s] [%s 'b']",
+			units.BytesSize(currentMem), units.BytesSize(displayLimit),
+			units.BytesSize(peakMem), memDirSymbol)
 	} else {
-		memTitle = fmt.Sprintf("Memory: %s / %s (%.1f%%)  [%s 'b']",
+		memTitle = fmt.Sprintf("Memory: %s / %s (%.1f%%) [Peak: %s] [%s 'b']",
 			units.BytesSize(currentMem), units.BytesSize(displayLimit), memPercent,
-			memDirSymbol)
+			units.BytesSize(peakMem), memDirSymbol)
 	}
 
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(theme.Current.Palette.Warning).Render(memTitle))
@@ -414,12 +406,12 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, act
 	b.WriteString(valStyle.Render(selected.Image))
 	b.WriteString("\n")
 	if selected.Ports != "" {
-		b.WriteString(labelStyle.Render("Ports:   "))
+		b.WriteString(labelStyle.Render("Ports:     "))
 		b.WriteString(valStyle.Render(selected.Ports))
 		b.WriteString("\n")
 	}
 	if selected.IsCompose {
-		b.WriteString(labelStyle.Render("Compose: "))
+		b.WriteString(labelStyle.Render("Compose:   "))
 		b.WriteString(valStyle.Render(selected.ProjectName + " / " + selected.Service))
 		b.WriteString("\n")
 	}

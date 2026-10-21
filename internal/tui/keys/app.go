@@ -88,7 +88,7 @@ var CommonHelpKeys = CommonHelpKeyMap{
 	),
 	HelpSubpane: key.NewBinding(
 		key.WithKeys("[", "]"),
-		key.WithHelp("[ / ]", "Subpane"),
+		key.WithHelp("[/]", "Subpane"),
 	),
 }
 
@@ -109,5 +109,5 @@ func RenderFooterHelp(bindings ...key.Binding) string {
 		parts = append(parts, keyStr+" "+descStr)
 	}
 
-	return " " + strings.Join(parts, "  │  ")
+	return " " + strings.Join(parts, " │ ")
 }

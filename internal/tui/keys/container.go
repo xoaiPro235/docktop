@@ -75,7 +75,7 @@ var ContainerKeys = ContainerKeyMap{
 	),
 	ToggleExpand: key.NewBinding(
 		key.WithKeys("space", "enter"),
-		key.WithHelp("Space/Enter", "Toggle"),
+		key.WithHelp("Space", "Toggle"),
 	),
 	Collapse: key.NewBinding(
 		key.WithKeys("left", "h"),
@@ -103,11 +103,11 @@ var ContainerKeys = ContainerKeyMap{
 	),
 	ToggleRaw: key.NewBinding(
 		key.WithKeys("t", "T"),
-		key.WithHelp("t", "Raw JSON"),
+		key.WithHelp("t", "Raw"),
 	),
 	ToggleBraille: key.NewBinding(
 		key.WithKeys("b", "B"),
-		key.WithHelp("b", "Graph Up/Down"),
+		key.WithHelp("b", "Graph"),
 	),
 	ToggleWrap: key.NewBinding(
 		key.WithKeys("w", "W"),
