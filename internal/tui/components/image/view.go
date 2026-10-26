@@ -56,6 +56,11 @@ func (m Model) View() string {
 
 	var leftSB strings.Builder
 
+	if m.searchBar.IsActive() || m.searchBar.HasFilter() {
+		leftSB.WriteString(m.searchBar.View(innerLeftWidth))
+		leftSB.WriteString("\n\n")
+	}
+
 	// Table Header
 	headerTag := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", tagColWidth, "REPOSITORY:TAG"))
 	headerID := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", idColWidth, "ID"))
@@ -64,76 +69,87 @@ func (m Model) View() string {
 
 	fmt.Fprintf(&leftSB, "  %s %s %s %s\n\n", headerTag, headerID, headerSize, headerStatus)
 
-	maxVisible := max(m.height-4, 1)
-
-	startIdx := 0
-	if m.cursorIndex >= maxVisible {
-		startIdx = m.cursorIndex - maxVisible + 1
-	}
-	endIdx := min(len(m.images), startIdx+maxVisible)
-
-	for i := startIdx; i < endIdx; i++ {
-		img := m.images[i]
-
-		var cursorMark string
-		if i == m.cursorIndex {
-			cursorMark = "> "
+	if len(m.filteredIndices) == 0 {
+		if m.searchBar.HasFilter() {
+			leftSB.WriteString("  ")
+			leftSB.WriteString(theme.Current.MutedText.Render(fmt.Sprintf("No images matching %q", m.searchBar.Value())))
+			leftSB.WriteString("\n")
 		} else {
-			cursorMark = "  "
+			leftSB.WriteString(theme.Current.MutedText.Padding(1).Render("No images found."))
+			leftSB.WriteString("\n")
 		}
+	} else {
+		startIdx, endIdx, _ := layout.ListWindow(
+			m.height,
+			m.cursorIndex,
+			len(m.filteredIndices),
+			m.searchBar.IsActive() || m.searchBar.HasFilter(),
+		)
 
-		// Styled Tag
-		var tagDisplay string
-		if img.Dangling {
-			tagDisplay = theme.Current.MutedText.Render(ansi.Truncate(img.Tag, tagColWidth, "…"))
-		} else {
-			parts := strings.SplitN(img.Tag, ":", 2)
-			if len(parts) == 2 {
-				tagDisplay = theme.Current.Title.Render(parts[0]) + theme.Current.MutedText.Render(":"+parts[1])
+		for i := startIdx; i < endIdx; i++ {
+			actualIdx := m.filteredIndices[i]
+			img := m.images[actualIdx]
+
+			var cursorMark string
+			if i == m.cursorIndex {
+				cursorMark = "> "
 			} else {
-				tagDisplay = theme.Current.Title.Render(img.Tag)
+				cursorMark = "  "
 			}
-			tagDisplay = ansi.Truncate(tagDisplay, tagColWidth, "…")
+
+			// Styled Tag
+			var tagDisplay string
+			if img.Dangling {
+				tagDisplay = theme.Current.MutedText.Render(ansi.Truncate(img.Tag, tagColWidth, "…"))
+			} else {
+				parts := strings.SplitN(img.Tag, ":", 2)
+				if len(parts) == 2 {
+					tagDisplay = theme.Current.Title.Render(parts[0]) + theme.Current.MutedText.Render(":"+parts[1])
+				} else {
+					tagDisplay = theme.Current.Title.Render(img.Tag)
+				}
+				tagDisplay = ansi.Truncate(tagDisplay, tagColWidth, "…")
+			}
+			// Pad to tagColWidth
+			tagWidth := ansi.StringWidth(tagDisplay)
+			if tagWidth < tagColWidth {
+				tagDisplay += strings.Repeat(" ", tagColWidth-tagWidth)
+			}
+
+			// Styled ID
+			idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, docker.CleanImageID(img.ID)))
+
+			// Styled Size
+			sizeDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", sizeColWidth, docker.FormatImageSize(img.Size)))
+
+			// Styled Status
+			var statusDisplay string
+			if img.InUse {
+				statusDisplay = theme.Current.StatusRunning.Render("● IN-USE")
+			} else if img.Dangling {
+				statusDisplay = theme.Current.StatusPaused.Render("⚠ DANGL.")
+			} else {
+				statusDisplay = theme.Current.MutedText.Render("○ UNUSED")
+			}
+			statusDisplay = fmt.Sprintf("%-*s", statusColWidth, statusDisplay)
+
+			// Combine row
+			rowContent := fmt.Sprintf("%s %s %s %s", tagDisplay, idDisplay, sizeDisplay, statusDisplay)
+
+			var line string
+			if m.action.IsRunning() && img.ID == m.action.TargetID {
+				line = m.spinner.View() + " " + theme.Current.TreeSelected.Render(rowContent)
+			} else if i == m.cursorIndex && m.focusZone == FocusImagesList {
+				line = theme.Current.TreeSelected.Render(cursorMark + rowContent)
+			} else if i == m.cursorIndex {
+				line = theme.Current.AccentText.Render(cursorMark) + rowContent
+			} else {
+				line = cursorMark + rowContent
+			}
+
+			leftSB.WriteString(line)
+			leftSB.WriteString("\n")
 		}
-		// Pad to tagColWidth
-		tagWidth := ansi.StringWidth(tagDisplay)
-		if tagWidth < tagColWidth {
-			tagDisplay += strings.Repeat(" ", tagColWidth-tagWidth)
-		}
-
-		// Styled ID
-		idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, docker.CleanImageID(img.ID)))
-
-		// Styled Size
-		sizeDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", sizeColWidth, docker.FormatImageSize(img.Size)))
-
-		// Styled Status
-		var statusDisplay string
-		if img.InUse {
-			statusDisplay = theme.Current.StatusRunning.Render("● IN-USE")
-		} else if img.Dangling {
-			statusDisplay = theme.Current.StatusPaused.Render("⚠ DANGL.")
-		} else {
-			statusDisplay = theme.Current.MutedText.Render("○ UNUSED")
-		}
-		statusDisplay = fmt.Sprintf("%-*s", statusColWidth, statusDisplay)
-
-		// Combine row
-		rowContent := fmt.Sprintf("%s %s %s %s", tagDisplay, idDisplay, sizeDisplay, statusDisplay)
-
-		var line string
-		if m.action.IsRunning() && img.ID == m.action.TargetID {
-			line = m.spinner.View() + " " + theme.Current.TreeSelected.Render(rowContent)
-		} else if i == m.cursorIndex && m.focusZone == FocusImagesList {
-			line = theme.Current.TreeSelected.Render(cursorMark + rowContent)
-		} else if i == m.cursorIndex {
-			line = theme.Current.AccentText.Render(cursorMark) + rowContent
-		} else {
-			line = cursorMark + rowContent
-		}
-
-		leftSB.WriteString(line)
-		leftSB.WriteString("\n")
 	}
 
 	if m.action.StatusMsg != "" {
@@ -169,6 +185,12 @@ func (m Model) FooterBindings() []key.Binding {
 		return m.confirmModal.FooterBindings()
 	}
 
+	if m.searchBar.IsActive() {
+		return []key.Binding{
+			keys.CommonHelpKeys.HelpFilterActive,
+		}
+	}
+
 	if m.focusZone == FocusLayersPane {
 		return []key.Binding{
 			keys.AppKeys.FocusToggle,
@@ -184,6 +206,7 @@ func (m Model) FooterBindings() []key.Binding {
 	return []key.Binding{
 		keys.AppKeys.FocusToggle,
 		keys.CommonHelpKeys.HelpMove,
+		keys.CommonHelpKeys.HelpFilter,
 		keys.ImageKeys.Remove,
 		keys.ImageKeys.Prune,
 		keys.AppKeys.Quit,

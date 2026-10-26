@@ -78,6 +78,7 @@ func TestAppKeys_Bindings(t *testing.T) {
 		b    key.Binding
 	}{
 		{"Quit", AppKeys.Quit},
+		{"ForceQuit", AppKeys.ForceQuit},
 		{"TabContainers", AppKeys.TabContainers},
 		{"TabImages", AppKeys.TabImages},
 		{"TabVolumes", AppKeys.TabVolumes},
@@ -111,6 +112,8 @@ func TestCommonHelpKeys_Bindings(t *testing.T) {
 		{"HelpScrollUp", CommonHelpKeys.HelpScrollUp},
 		{"HelpScrollBoth", CommonHelpKeys.HelpScrollBoth},
 		{"HelpSubpane", CommonHelpKeys.HelpSubpane},
+		{"HelpFilter", CommonHelpKeys.HelpFilter},
+		{"HelpFilterActive", CommonHelpKeys.HelpFilterActive},
 	}
 
 	for _, tc := range bindings {
@@ -121,6 +124,30 @@ func TestCommonHelpKeys_Bindings(t *testing.T) {
 			help := tc.b.Help()
 			if help.Key == "" || help.Desc == "" {
 				t.Errorf("CommonHelpKey %s has empty help: %+v", tc.name, help)
+			}
+		})
+	}
+}
+
+func TestSearchBarKeys_Bindings(t *testing.T) {
+	bindings := []struct {
+		name string
+		b    key.Binding
+	}{
+		{"Activate", SearchBarKeys.Activate},
+		{"ClearFilter", SearchBarKeys.ClearFilter},
+		{"Cancel", SearchBarKeys.Cancel},
+		{"Submit", SearchBarKeys.Submit},
+	}
+
+	for _, tc := range bindings {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.b.Enabled() {
+				t.Errorf("SearchBarKey %s is disabled", tc.name)
+			}
+			help := tc.b.Help()
+			if help.Key == "" || help.Desc == "" {
+				t.Errorf("SearchBarKey %s has empty help: %+v", tc.name, help)
 			}
 		})
 	}

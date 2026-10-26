@@ -1,10 +1,13 @@
 package volume
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -17,8 +20,10 @@ const (
 )
 
 type Model struct {
-	dockerClient docker.VolumeService
-	volumes      []docker.VolumeInfo
+	dockerClient    docker.VolumeService
+	volumes         []docker.VolumeInfo
+	filteredIndices []int
+	searchBar       searchbar.Model
 
 	cursorIndex      int
 	focusZone        FocusZone
@@ -40,12 +45,15 @@ func New(cli docker.VolumeService) Model {
 		spinner.WithStyle(theme.Current.ActionLoading),
 	)
 
-	return Model{
+	m := Model{
 		dockerClient: cli,
 		focusZone:    FocusVolumesList,
 		confirmModal: modal.NewConfirmModal(),
 		spinner:      sp,
+		searchBar:    searchbar.New("Filter volumes..."),
 	}
+	m.applyFilter()
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -58,14 +66,8 @@ func (m *Model) SetSize(w, h int) {
 
 	leftWidth := (w * 52) / 100
 	rightWidth := w - leftWidth
-	innerRightWidth := rightWidth - 2
-	if innerRightWidth < 10 {
-		innerRightWidth = 10
-	}
-	innerRightHeight := h - 2
-	if innerRightHeight < 1 {
-		innerRightHeight = 1
-	}
+	innerRightWidth := max(rightWidth-2, 10)
+	innerRightHeight := max(h-2, 1)
 
 	if !m.viewportReady {
 		m.viewport = viewport.New(viewport.WithWidth(innerRightWidth), viewport.WithHeight(innerRightHeight))
@@ -80,25 +82,26 @@ func (m *Model) SetSize(w, h int) {
 
 func (m *Model) SetVolumes(volumes []docker.VolumeInfo) tea.Cmd {
 	var prevSelectedName string
-	if m.cursorIndex >= 0 && m.cursorIndex < len(m.volumes) {
-		prevSelectedName = m.volumes[m.cursorIndex].Name
+	if sel := m.SelectedVolume(); sel != nil {
+		prevSelectedName = sel.Name
 	}
 
 	m.volumes = volumes
+	m.applyFilter()
 	if prevSelectedName != "" {
 		found := false
-		for i, v := range m.volumes {
-			if v.Name == prevSelectedName {
+		for i, idx := range m.filteredIndices {
+			if m.volumes[idx].Name == prevSelectedName {
 				m.cursorIndex = i
 				found = true
 				break
 			}
 		}
-		if !found && m.cursorIndex >= len(m.volumes) {
-			m.cursorIndex = max(0, len(m.volumes)-1)
+		if !found && m.cursorIndex >= len(m.filteredIndices) {
+			m.cursorIndex = max(0, len(m.filteredIndices)-1)
 		}
-	} else if m.cursorIndex >= len(m.volumes) {
-		m.cursorIndex = max(0, len(m.volumes)-1)
+	} else if m.cursorIndex >= len(m.filteredIndices) {
+		m.cursorIndex = max(0, len(m.filteredIndices)-1)
 	}
 
 	m.updateViewportContent()
@@ -109,15 +112,45 @@ func (m *Model) IsModalActive() bool {
 	return m.confirmModal.Active
 }
 
+func (m *Model) IsSearching() bool {
+	return m.searchBar.IsActive()
+}
+
 func (m *Model) IsActionRunning() bool {
 	return m.action.IsRunning()
 }
 
 func (m *Model) SelectedVolume() *docker.VolumeInfo {
-	if len(m.volumes) > 0 && m.cursorIndex >= 0 && m.cursorIndex < len(m.volumes) {
-		return &m.volumes[m.cursorIndex]
+	if len(m.filteredIndices) > 0 && m.cursorIndex >= 0 && m.cursorIndex < len(m.filteredIndices) {
+		actualIdx := m.filteredIndices[m.cursorIndex]
+		if actualIdx >= 0 && actualIdx < len(m.volumes) {
+			return &m.volumes[actualIdx]
+		}
 	}
 	return nil
+}
+
+func (m *Model) applyFilter() {
+	query := strings.ToLower(m.searchBar.Value())
+	m.filteredIndices = nil
+
+	if query == "" {
+		m.filteredIndices = make([]int, len(m.volumes))
+		for i := range m.volumes {
+			m.filteredIndices[i] = i
+		}
+	} else {
+		for i, v := range m.volumes {
+			if strings.Contains(strings.ToLower(v.Name), query) ||
+				strings.Contains(strings.ToLower(v.Driver), query) {
+				m.filteredIndices = append(m.filteredIndices, i)
+			}
+		}
+	}
+
+	if m.cursorIndex >= len(m.filteredIndices) {
+		m.cursorIndex = max(0, len(m.filteredIndices)-1)
+	}
 }
 
 func (m *Model) updateViewportContent() {

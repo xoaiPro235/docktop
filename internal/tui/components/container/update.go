@@ -8,7 +8,9 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
+	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
@@ -75,11 +77,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case TopLoadedMsg:
 		if msg.ContainerID == m.selectedContainerID {
-			if msg.Data != nil {
-				m.topPane.SetContent(msg.ContainerID, msg.Data.Titles, msg.Data.Processes, msg.Err)
-			} else {
-				m.topPane.SetContent(msg.ContainerID, nil, nil, msg.Err)
-			}
+			m.topPane.SetContent(msg.ContainerID, msg.Data, msg.Err)
 			// If still on SubPaneTop and container is running, schedule next poll after 3s
 			selected := m.SelectedContainer()
 			if m.activePane == SubPaneTop && selected != nil && selected.State == docker.StateRunning {
@@ -131,7 +129,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case ContainerActionMsg:
 		targetID := msg.ContainerID
 		if msg.Action == modal.ActionPrune {
-			targetID = ActionTargetAll 
+			targetID = ActionTargetAll
 		}
 		delete(m.runningActions, targetID)
 
@@ -182,20 +180,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		if msg.X <= leftWidth {
 			m.focusZone = FocusLeftTree
-			startIdx := 0
-			maxVisibleItems := max(m.height-4, 1)
-			if m.cursorIndex >= maxVisibleItems {
-				startIdx = m.cursorIndex - maxVisibleItems + 1
-			}
-
-			// Tree rows begin below header (offset 3)
-			offset := msg.Y - 3
-			if offset >= 0 {
-				targetIdx := startIdx + offset
-				if targetIdx >= 0 && targetIdx < len(m.flatItems) {
-					m.cursorIndex = targetIdx
-					cmds = append(cmds, m.syncActivePane())
-				}
+			if targetIdx, ok := layout.ListClickTarget(
+				msg.Y,
+				m.height,
+				m.cursorIndex,
+				len(m.flatItems),
+				m.searchBar.IsActive() || m.searchBar.HasFilter(),
+			); ok {
+				m.cursorIndex = targetIdx
+				cmds = append(cmds, m.syncActivePane())
 			}
 		} else {
 			m.focusZone = FocusRightPane
@@ -283,7 +276,29 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if m.searchBar.IsActive() {
+			var cmd tea.Cmd
+			var evt searchbar.Event
+			m.searchBar, cmd, evt = m.searchBar.Update(msg)
+			if evt == searchbar.EventChanged || evt == searchbar.EventCanceled || evt == searchbar.EventSubmitted {
+				m.rebuildTree()
+				cmds = append(cmds, m.syncActivePane())
+			}
+			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+		}
+
 		switch {
+		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.SearchBarKeys.Activate):
+			cmd := m.searchBar.Activate()
+			return m, cmd
+
+		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.SearchBarKeys.ClearFilter) && m.searchBar.HasFilter():
+			m.searchBar.Clear()
+			m.rebuildTree()
+			cmds = append(cmds, m.syncActivePane())
+			return m, tea.Batch(cmds...)
+
 		// Switch focus Left / Right
 		case key.Matches(msg, keys.AppKeys.FocusToggle):
 			if m.focusZone == FocusLeftTree {
@@ -349,7 +364,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Lifecycle: Prune stopped containers
 		case key.Matches(msg, keys.ContainerKeys.Prune):
 			if !m.IsActionRunning() {
-				m.confirmModal.ShowContainerAction(modal.ActionPrune, ActionTargetAll, "all stopped containers")
+				m.confirmModal.ShowContainerPrune()
 				return m, nil
 			}
 
@@ -420,56 +435,59 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		// Navigate tree (when left tree is focused)
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Up):
-			if m.cursorIndex > 0 {
+			if m.cursorIndex >= len(m.flatItems) {
+				m.cursorIndex = max(0, len(m.flatItems)-1)
+				cmds = append(cmds, m.syncActivePane())
+			} else if m.cursorIndex > 0 {
 				m.cursorIndex--
 				cmds = append(cmds, m.syncActivePane())
 			}
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Down):
-			if m.cursorIndex < len(m.flatItems)-1 {
+			if m.cursorIndex >= len(m.flatItems) {
+				m.cursorIndex = max(0, len(m.flatItems)-1)
+				cmds = append(cmds, m.syncActivePane())
+			} else if m.cursorIndex < len(m.flatItems)-1 {
 				m.cursorIndex++
 				cmds = append(cmds, m.syncActivePane())
 			}
 
 		// Space / Enter: Toggle expand/collapse
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.ToggleExpand):
-			if len(m.flatItems) > 0 {
-				selected := m.flatItems[m.cursorIndex].Node
-				if len(selected.Children) > 0 {
-					selected.Expanded = !selected.Expanded
-					m.expandedState[selected.Key] = selected.Expanded
-					m.flatItems = Flatten(m.treeRoots, "")
-					if m.cursorIndex >= len(m.flatItems) {
-						m.cursorIndex = max(0, len(m.flatItems)-1)
-					}
-					cmds = append(cmds, m.syncActivePane())
+			selected := m.SelectedNode()
+			if selected != nil && len(selected.Children) > 0 {
+				selected.Expanded = !selected.Expanded
+				m.expandedState[selected.Key] = selected.Expanded
+				m.flatItems = Flatten(m.treeRoots, "")
+				if m.cursorIndex >= len(m.flatItems) {
+					m.cursorIndex = max(0, len(m.flatItems)-1)
 				}
+				cmds = append(cmds, m.syncActivePane())
 			}
 
 		// Left / h: Collapse open node
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Collapse):
-			if len(m.flatItems) > 0 {
-				selected := m.flatItems[m.cursorIndex].Node
-				if len(selected.Children) > 0 && selected.Expanded {
-					selected.Expanded = false
-					m.expandedState[selected.Key] = false
-					m.flatItems = Flatten(m.treeRoots, "")
-					if m.cursorIndex >= len(m.flatItems) {
-						m.cursorIndex = max(0, len(m.flatItems)-1)
-					}
-					cmds = append(cmds, m.syncActivePane())
+			selected := m.SelectedNode()
+			if selected != nil && len(selected.Children) > 0 && selected.Expanded {
+				selected.Expanded = false
+				m.expandedState[selected.Key] = false
+				m.flatItems = Flatten(m.treeRoots, "")
+				if m.cursorIndex >= len(m.flatItems) {
+					m.cursorIndex = max(0, len(m.flatItems)-1)
 				}
+				cmds = append(cmds, m.syncActivePane())
 			}
 
 		// Right / l: Expand closed node
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Expand):
-			if len(m.flatItems) > 0 {
-				selected := m.flatItems[m.cursorIndex].Node
-				if len(selected.Children) > 0 && !selected.Expanded {
-					selected.Expanded = true
-					m.expandedState[selected.Key] = true
-					m.flatItems = Flatten(m.treeRoots, "")
-					cmds = append(cmds, m.syncActivePane())
+			selected := m.SelectedNode()
+			if selected != nil && len(selected.Children) > 0 && !selected.Expanded {
+				selected.Expanded = true
+				m.expandedState[selected.Key] = true
+				m.flatItems = Flatten(m.treeRoots, "")
+				if m.cursorIndex >= len(m.flatItems) {
+					m.cursorIndex = max(0, len(m.flatItems)-1)
 				}
+				cmds = append(cmds, m.syncActivePane())
 			}
 		}
 

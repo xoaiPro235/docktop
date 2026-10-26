@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	mobyimage "github.com/moby/moby/api/types/image"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
@@ -92,6 +93,38 @@ func TestModel_SetImages(t *testing.T) {
 	}
 }
 
+func TestModel_FilterImages(t *testing.T) {
+	m := New(&mocks.MockImageService{})
+	m.SetImages([]docker.ImageInfo{
+		{ID: "img-1", Tag: "nginx:latest", Details: &mobyimage.InspectResponse{ID: "img-1"}, Layers: []docker.ImageLayer{{Index: 0}}},
+		{ID: "img-2", Tag: "redis:7", Details: &mobyimage.InspectResponse{ID: "img-2"}, Layers: []docker.ImageLayer{{Index: 0}}},
+	})
+
+	sendKey := func(msg tea.Msg) {
+		m, _ = m.Update(msg)
+	}
+	sendKey(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "NGINX" {
+		sendKey(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if m.IsSearching() {
+		t.Error("search input should be inactive after submitting the filter")
+	}
+	if got := m.SelectedImage(); got == nil || got.ID != "img-1" {
+		t.Errorf("SelectedImage() after filtering = %v, want img-1", got)
+	}
+	if len(m.filteredIndices) != 1 {
+		t.Errorf("len(filteredIndices) after filtering = %d, want 1", len(m.filteredIndices))
+	}
+
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if len(m.filteredIndices) != 2 {
+		t.Errorf("len(filteredIndices) after clearing filter = %d, want 2", len(m.filteredIndices))
+	}
+}
+
 func TestModel_IsModalActive(t *testing.T) {
 	mockCli := &mocks.MockImageService{}
 	m := New(mockCli)
@@ -130,6 +163,7 @@ func TestModel_SelectedImage(t *testing.T) {
 		{ID: "img-alpha", Tag: "golang:1.24"},
 		{ID: "img-beta", Tag: "redis:7"},
 	}
+	m.applyFilter()
 	m.cursorIndex = 1
 
 	if got := m.SelectedImage(); got == nil || got.ID != "img-beta" {
@@ -160,6 +194,7 @@ func TestModel_updateViewportContent(t *testing.T) {
 			},
 		},
 	}
+	m.applyFilter()
 	m.updateViewportContent()
 }
 
@@ -170,6 +205,7 @@ func TestModel_syncDetails(t *testing.T) {
 	m.images = []docker.ImageInfo{
 		{ID: "img-1", Tag: "nginx:latest"},
 	}
+	m.applyFilter()
 
 	cmd := m.syncDetails()
 	if cmd == nil {

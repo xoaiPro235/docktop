@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
@@ -88,6 +89,47 @@ func TestModel_SetContainers(t *testing.T) {
 	}
 	if len(m.flatItems) == 0 {
 		t.Fatal("flatItems should be populated after SetContainers")
+	}
+}
+
+func TestModel_FilterContainers(t *testing.T) {
+	m := New(&mocks.MockContainerService{})
+	m.updateContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "cache", Image: "redis:7", State: docker.StateExited},
+		{ID: "c2", Name: "web", Image: "nginx:latest", State: docker.StateExited},
+	})
+
+	sendKey := func(msg tea.Msg) {
+		m, _ = m.Update(msg)
+	}
+	sendKey(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "REDIS:7" {
+		sendKey(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if m.IsSearching() {
+		t.Error("search input should be inactive after submitting the filter")
+	}
+	if got := m.SelectedContainer(); got == nil || got.ID != "c1" {
+		t.Errorf("SelectedContainer() after filtering = %v, want c1", got)
+	}
+	countContainers := func() int {
+		count := 0
+		for _, item := range m.flatItems {
+			if item.Node.Container != nil {
+				count++
+			}
+		}
+		return count
+	}
+	if got := countContainers(); got != 1 {
+		t.Errorf("number of containers after filtering = %d, want 1", got)
+	}
+
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if got := countContainers(); got != 2 {
+		t.Errorf("number of containers after clearing filter = %d, want 2", got)
 	}
 }
 

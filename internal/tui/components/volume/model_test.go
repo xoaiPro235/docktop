@@ -3,6 +3,7 @@ package volume
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/moby/moby/api/types/volume"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
@@ -84,6 +85,38 @@ func TestModel_SetVolumes(t *testing.T) {
 	}
 }
 
+func TestModel_FilterVolumes(t *testing.T) {
+	m := New(&mocks.MockVolumeService{})
+	m.SetVolumes([]docker.VolumeInfo{
+		{Volume: volume.Volume{Name: "pgdata", Driver: "local"}},
+		{Volume: volume.Volume{Name: "cache", Driver: "local"}},
+	})
+
+	sendKey := func(msg tea.Msg) {
+		m, _ = m.Update(msg)
+	}
+	sendKey(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "PGDATA" {
+		sendKey(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if m.IsSearching() {
+		t.Error("search input should be inactive after submitting the filter")
+	}
+	if got := m.SelectedVolume(); got == nil || got.Name != "pgdata" {
+		t.Errorf("SelectedVolume() after filtering = %v, want pgdata", got)
+	}
+	if len(m.filteredIndices) != 1 {
+		t.Errorf("len(filteredIndices) after filtering = %d, want 1", len(m.filteredIndices))
+	}
+
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if len(m.filteredIndices) != 2 {
+		t.Errorf("len(filteredIndices) after clearing filter = %d, want 2", len(m.filteredIndices))
+	}
+}
+
 func TestModel_IsModalActive(t *testing.T) {
 	mockCli := &mocks.MockVolumeService{}
 	m := New(mockCli)
@@ -122,6 +155,7 @@ func TestModel_SelectedVolume(t *testing.T) {
 		{Volume: volume.Volume{Name: "vol-alpha"}},
 		{Volume: volume.Volume{Name: "vol-beta"}},
 	}
+	m.applyFilter()
 	m.cursorIndex = 1
 
 	if got := m.SelectedVolume(); got == nil || got.Name != "vol-beta" {
@@ -156,5 +190,6 @@ func TestModel_updateViewportContent(t *testing.T) {
 			},
 		},
 	}
+	m.applyFilter()
 	m.updateViewportContent()
 }

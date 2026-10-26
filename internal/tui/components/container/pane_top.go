@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"github.com/moby/moby/api/types/container"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -46,6 +47,16 @@ func (p *TopPane) SetSize(w, h int) {
 	}
 }
 
+func (p *TopPane) Reset() {
+	p.loading = false
+	p.currentID = ""
+	p.contentCache = ""
+	p.titles = nil
+	p.processes = nil
+	p.err = nil
+	p.viewport.SetContent(theme.Current.MutedText.Padding(1, 2).Render("No container selected."))
+}
+
 func (p *TopPane) SetLoading(containerID string) {
 	// Only display loading message if switching to a DIFFERENT container or having no data yet
 	if p.currentID != containerID || len(p.processes) == 0 {
@@ -59,14 +70,14 @@ func (p *TopPane) SetLoading(containerID string) {
 	}
 }
 
-func (p *TopPane) SetContent(containerID string, titles []string, processes [][]string, err error) {
+func (p *TopPane) SetContent(containerID string, data *container.TopResponse, err error) {
 	p.loading = false
 	p.currentID = containerID
-	p.titles = titles
-	p.processes = processes
 	p.err = err
 
 	if err != nil {
+		p.titles = nil
+		p.processes = nil
 		errStyle := theme.Current.ErrorText
 		errMsg := err.Error()
 		var msg string
@@ -82,7 +93,9 @@ func (p *TopPane) SetContent(containerID string, titles []string, processes [][]
 		return
 	}
 
-	if len(processes) == 0 {
+	if data == nil || len(data.Processes) == 0 {
+		p.titles = nil
+		p.processes = nil
 		msg := theme.Current.MutedText.Padding(1).Render("No processes found.")
 		if p.contentCache != msg {
 			p.contentCache = msg
@@ -91,7 +104,10 @@ func (p *TopPane) SetContent(containerID string, titles []string, processes [][]
 		return
 	}
 
-	newTable := renderProcessesTable(titles, processes, p.width)
+	p.titles = data.Titles
+	p.processes = data.Processes
+
+	newTable := renderProcessesTable(p.titles, p.processes, p.width)
 	// If table content is unchanged, do NOT touch the viewport to eliminate terminal flicker
 	if p.contentCache == newTable {
 		return
@@ -199,7 +215,7 @@ func renderProcessesTable(titles []string, processes [][]string, totalWidth int)
 		sepLine.WriteString("  ")
 		prefixWidth += colWidths[i] + 2
 	}
-	lastColWidth := max(totalWidth - prefixWidth, 20)
+	lastColWidth := max(totalWidth-prefixWidth, 20)
 	sepLine.WriteString(strings.Repeat("─", lastColWidth))
 	sb.WriteString(sepStyle.Render(sepLine.String()))
 	sb.WriteString("\n")

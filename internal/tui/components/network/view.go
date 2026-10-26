@@ -55,6 +55,11 @@ func (m Model) View() string {
 
 	var leftSB strings.Builder
 
+	if m.searchBar.IsActive() || m.searchBar.HasFilter() {
+		leftSB.WriteString(m.searchBar.View(innerLeftWidth))
+		leftSB.WriteString("\n\n")
+	}
+
 	headerName := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", nameColWidth, "NETWORK NAME"))
 	headerDriver := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", driverColWidth, "DRIVER"))
 	headerScope := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", scopeColWidth, "SCOPE"))
@@ -62,19 +67,26 @@ func (m Model) View() string {
 
 	fmt.Fprintf(&leftSB, "  %s  %s  %s  %s\n\n", headerName, headerDriver, headerScope, headerConn)
 
-	if len(m.networks) == 0 {
-		leftSB.WriteString(theme.Current.MutedText.Padding(1).Render("No networks found."))
-		leftSB.WriteString("\n")
-	} else {
-		maxVisibleRows := max(m.height-4, 1)
-		startIndex := 0
-		if m.cursorIndex >= maxVisibleRows {
-			startIndex = m.cursorIndex - maxVisibleRows + 1
+	if len(m.filteredIndices) == 0 {
+		if m.searchBar.HasFilter() {
+			leftSB.WriteString("  ")
+			leftSB.WriteString(theme.Current.MutedText.Render(fmt.Sprintf("No networks matching %q", m.searchBar.Value())))
+			leftSB.WriteString("\n")
+		} else {
+			leftSB.WriteString(theme.Current.MutedText.Padding(1).Render("No networks found."))
+			leftSB.WriteString("\n")
 		}
-		endIndex := min(len(m.networks), startIndex+maxVisibleRows)
+	} else {
+		startIndex, endIndex, _ := layout.ListWindow(
+			m.height,
+			m.cursorIndex,
+			len(m.filteredIndices),
+			m.searchBar.IsActive() || m.searchBar.HasFilter(),
+		)
 
 		for i := startIndex; i < endIndex; i++ {
-			netItem := m.networks[i]
+			actualIdx := m.filteredIndices[i]
+			netItem := m.networks[actualIdx]
 
 			var cursorMark string
 			if i == m.cursorIndex {
@@ -163,6 +175,12 @@ func (m Model) FooterBindings() []key.Binding {
 		return m.confirmModal.FooterBindings()
 	}
 
+	if m.searchBar.IsActive() {
+		return []key.Binding{
+			keys.CommonHelpKeys.HelpFilterActive,
+		}
+	}
+
 	if m.focusZone == FocusDetailsPane {
 		return []key.Binding{
 			keys.AppKeys.FocusToggle,
@@ -178,6 +196,7 @@ func (m Model) FooterBindings() []key.Binding {
 	return []key.Binding{
 		keys.AppKeys.FocusToggle,
 		keys.CommonHelpKeys.HelpMove,
+		keys.CommonHelpKeys.HelpFilter,
 		keys.NetworkKeys.Delete,
 		keys.NetworkKeys.Prune,
 		keys.AppKeys.Quit,

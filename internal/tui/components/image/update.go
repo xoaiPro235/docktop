@@ -6,7 +6,10 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
+	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
@@ -48,14 +51,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		leftWidth := (m.width * 52) / 100
 		if msg.X < leftWidth {
 			m.focusZone = FocusImagesList
-			clickedRow := msg.Y - 3 // Adjust for border and header
-			maxVisible := m.height - 4
-			startIdx := 0
-			if m.cursorIndex >= maxVisible {
-				startIdx = m.cursorIndex - maxVisible + 1
-			}
-			targetIdx := startIdx + clickedRow
-			if targetIdx >= 0 && targetIdx < len(m.images) {
+			if targetIdx, ok := layout.ListClickTarget(
+				msg.Y,
+				m.height,
+				m.cursorIndex,
+				len(m.filteredIndices),
+				m.searchBar.IsActive() || m.searchBar.HasFilter(),
+			); ok {
 				m.cursorIndex = targetIdx
 				cmds = append(cmds, m.syncDetails())
 			}
@@ -71,7 +73,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
 				m.cursorIndex--
 				cmds = append(cmds, m.syncDetails())
-			} else if msg.Button == tea.MouseWheelDown && m.cursorIndex < len(m.images)-1 {
+			} else if msg.Button == tea.MouseWheelDown && m.cursorIndex < len(m.filteredIndices)-1 {
 				m.cursorIndex++
 				cmds = append(cmds, m.syncDetails())
 			}
@@ -87,18 +89,41 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if m.confirmModal.Confirmed {
 				action := m.confirmModal.Action
 				targetID := m.confirmModal.TargetID
-				m.action.Start(action, targetID, "", fmt.Sprintf("%s image...", action.Title()))
 				switch action {
 				case modal.ActionRemove:
+					m.action.Start(action, targetID, "", fmt.Sprintf("%s image...", action.Title()))
 					return m, tea.Batch(m.removeImageCmd(targetID), m.spinner.Tick)
 				case modal.ActionPrune:
+					m.action.StartPrune("Pruning dangling images...")
 					return m, tea.Batch(m.pruneImagesCmd(), m.spinner.Tick)
 				}
 			}
 			return m, nil
 		}
 
+		if m.searchBar.IsActive() {
+			var cmd tea.Cmd
+			var evt searchbar.Event
+			m.searchBar, cmd, evt = m.searchBar.Update(msg)
+			if evt == searchbar.EventChanged || evt == searchbar.EventCanceled || evt == searchbar.EventSubmitted {
+				m.applyFilter()
+				cmds = append(cmds, m.syncDetails())
+			}
+			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+		}
+
 		switch {
+		case m.focusZone == FocusImagesList && !m.action.IsRunning() && key.Matches(msg, keys.SearchBarKeys.Activate):
+			cmd := m.searchBar.Activate()
+			return m, cmd
+
+		case m.focusZone == FocusImagesList && key.Matches(msg, keys.SearchBarKeys.ClearFilter) && m.searchBar.HasFilter():
+			m.searchBar.Clear()
+			m.applyFilter()
+			cmds = append(cmds, m.syncDetails())
+			return m, tea.Batch(cmds...)
+
 		case key.Matches(msg, keys.AppKeys.FocusToggle):
 			if m.focusZone == FocusImagesList {
 				m.focusZone = FocusLayersPane
@@ -111,7 +136,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if selected != nil && !m.action.IsRunning() {
 				targetDisplay := selected.Tag
 				if targetDisplay == "<none>:<none>" {
-					targetDisplay = selected.ID
+					targetDisplay = docker.CleanImageID(selected.ID)
 				}
 				m.confirmModal.ShowImageAction(modal.ActionRemove, selected.ID, targetDisplay)
 				return m, nil
@@ -119,7 +144,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.ImageKeys.Prune):
 			if !m.action.IsRunning() {
-				m.confirmModal.ShowImageAction(modal.ActionPrune, "all-dangling", "all dangling images")
+				m.confirmModal.ShowImagePrune()
 				return m, nil
 			}
 
@@ -132,7 +157,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						cmds = append(cmds, m.syncDetails())
 					}
 				case key.Matches(msg, keys.ImageKeys.Down):
-					if m.cursorIndex < len(m.images)-1 {
+					if m.cursorIndex < len(m.filteredIndices)-1 {
 						m.cursorIndex++
 						cmds = append(cmds, m.syncDetails())
 					}

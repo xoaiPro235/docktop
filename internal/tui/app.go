@@ -202,6 +202,13 @@ func (a AppModel) isAnyModalActive() bool {
 		a.networkModel.IsModalActive()
 }
 
+func (a AppModel) isAnySearching() bool {
+	return a.containerModel.IsSearching() ||
+		a.imageModel.IsSearching() ||
+		a.volumeModel.IsSearching() ||
+		a.networkModel.IsSearching()
+}
+
 func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if a.errorModal.Active {
 		switch msg := msg.(type) {
@@ -216,6 +223,17 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		if a.isAnySearching() {
+			if key.Matches(msg, keys.AppKeys.ForceQuit) {
+				if a.eventCancel != nil {
+					a.eventCancel()
+				}
+				return a, tea.Quit
+			}
+			break
+		}
+		
+		
 		switch {
 		case key.Matches(msg, keys.AppKeys.Quit):
 			if a.eventCancel != nil {

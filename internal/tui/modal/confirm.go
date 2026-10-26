@@ -12,6 +12,7 @@ import (
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
+// Action represents the numerical action type for confirmation dialogs.
 type Action int
 
 const (
@@ -27,6 +28,10 @@ const (
 	ActionDelete
 )
 
+// TargetAll represents the special target identifier when pruning all unused/stopped resources.
+const TargetAll = "all"
+
+// Style represents the visual style/severity of the confirmation dialog.
 type Style int
 
 const (
@@ -36,6 +41,7 @@ const (
 	StyleSuccess
 )
 
+// Style returns the default visual Style associated with this Action.
 func (a Action) Style() Style {
 	switch a {
 	case ActionStop, ActionRemove, ActionRemoveForce, ActionDelete:
@@ -49,6 +55,7 @@ func (a Action) Style() Style {
 	}
 }
 
+// String returns the canonical action name string.
 func (a Action) String() string {
 	switch a {
 	case ActionStart:
@@ -74,6 +81,7 @@ func (a Action) String() string {
 	}
 }
 
+// Title returns a capitalized, human-readable title for the action.
 func (a Action) Title() string {
 	switch a {
 	case ActionStart:
@@ -117,6 +125,11 @@ func (s *ActionState) Start(action Action, targetID, targetName, desc string) {
 	s.TargetName = targetName
 	s.Desc = desc
 	s.StatusMsg = ""
+}
+
+// StartPrune marks a prune action as running across all resources of this type.
+func (s *ActionState) StartPrune(desc string) {
+	s.Start(ActionPrune, TargetAll, TargetAll, desc)
 }
 
 // Finish marks the action as finished with an optional status message.
@@ -192,12 +205,22 @@ func (m *ConfirmModal) ShowContainerAction(action Action, id, name string) {
 		question = fmt.Sprintf("Container is running! Force remove \"%s\"?", name)
 		command = fmt.Sprintf("docker rm -f %s", name)
 	case ActionPrune:
-		question = "Are you sure you want to remove all stopped containers?"
-		command = "docker container prune -f"
-		id = "all"
-		name = "all stopped containers"
+		m.ShowContainerPrune()
+		return
 	}
 	m.Show(question, command, action.Style(), action, id, name)
+}
+
+// ShowContainerPrune displays the confirmation dialog for pruning stopped containers.
+func (m *ConfirmModal) ShowContainerPrune() {
+	m.Show(
+		"Are you sure you want to remove all stopped containers?",
+		"docker container prune -f",
+		StyleWarning,
+		ActionPrune,
+		TargetAll,
+		"all stopped containers",
+	)
 }
 
 // ShowImageAction formats and shows an image confirmation dialog.
@@ -208,11 +231,22 @@ func (m *ConfirmModal) ShowImageAction(action Action, id, ref string) {
 		question = fmt.Sprintf("Are you sure you want to remove image \"%s\"?", ref)
 		command = fmt.Sprintf("docker rmi %s", id)
 	case ActionPrune:
-		question = "Are you sure you want to remove all dangling images?"
-		command = "docker image prune -f"
-		id = "all"
+		m.ShowImagePrune()
+		return
 	}
 	m.Show(question, command, action.Style(), action, id, ref)
+}
+
+// ShowImagePrune displays the confirmation dialog for pruning dangling images.
+func (m *ConfirmModal) ShowImagePrune() {
+	m.Show(
+		"Are you sure you want to remove all dangling images?",
+		"docker image prune -f",
+		StyleWarning,
+		ActionPrune,
+		TargetAll,
+		"all dangling images",
+	)
 }
 
 // ShowVolumeAction formats and shows a volume confirmation dialog.
@@ -223,11 +257,22 @@ func (m *ConfirmModal) ShowVolumeAction(action Action, name string) {
 		question = fmt.Sprintf("Are you sure you want to remove volume \"%s\"?", name)
 		command = fmt.Sprintf("docker volume rm %s", name)
 	case ActionPrune:
-		question = "Are you sure you want to remove all unused volumes?"
-		command = "docker volume prune -f"
-		name = "all"
+		m.ShowVolumePrune()
+		return
 	}
 	m.Show(question, command, action.Style(), action, name, name)
+}
+
+// ShowVolumePrune displays the confirmation dialog for pruning unused volumes.
+func (m *ConfirmModal) ShowVolumePrune() {
+	m.Show(
+		"Are you sure you want to remove all unused volumes?",
+		"docker volume prune -f",
+		StyleWarning,
+		ActionPrune,
+		TargetAll,
+		"all unused volumes",
+	)
 }
 
 // ShowNetworkAction formats and shows a network confirmation dialog.
@@ -238,12 +283,22 @@ func (m *ConfirmModal) ShowNetworkAction(action Action, id, name string) {
 		question = fmt.Sprintf("Are you sure you want to remove network \"%s\"?", name)
 		command = fmt.Sprintf("docker network rm %s", id)
 	case ActionPrune:
-		question = "Are you sure you want to remove all unused networks?"
-		command = "docker network prune -f"
-		id = "all"
-		name = "all"
+		m.ShowNetworkPrune()
+		return
 	}
 	m.Show(question, command, action.Style(), action, id, name)
+}
+
+// ShowNetworkPrune displays the confirmation dialog for pruning unused networks.
+func (m *ConfirmModal) ShowNetworkPrune() {
+	m.Show(
+		"Are you sure you want to remove all unused networks?",
+		"docker network prune -f",
+		StyleWarning,
+		ActionPrune,
+		TargetAll,
+		"all unused networks",
+	)
 }
 
 // Hide closes the modal.
@@ -252,12 +307,12 @@ func (m *ConfirmModal) Hide() {
 	m.Confirmed = false
 }
 
-// Init
+// Init returns initial command for the modal (standard Charm Bubble Tea interface).
 func (m ConfirmModal) Init() tea.Cmd {
 	return nil
 }
 
-// Update
+// Update handles keyboard navigation and confirmation inside the modal.
 func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, tea.Cmd) {
 	if !m.Active {
 		return m, nil
@@ -273,23 +328,27 @@ func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, tea.Cmd) {
 			m.Active = false
 			m.Confirmed = true
 			return m, nil
+
 		case key.Matches(msg, km.No):
 			m.Active = false
 			m.Confirmed = false
 			return m, nil
+
 		case key.Matches(msg, km.Switch):
 			m.SelectedYes = !m.SelectedYes
 			return m, nil
+
 		case key.Matches(msg, km.Enter):
 			m.Active = false
 			m.Confirmed = m.SelectedYes
 			return m, nil
 		}
 	}
+
 	return m, nil
 }
 
-// View
+// View builds the clean, minimalist styled modal dialog string (standard Charm Bubble Tea interface).
 func (m ConfirmModal) View() string {
 	boxWidth := 52
 	innerWidth := boxWidth - 6 // 52 - 2(borders) - 4(paddings) = 46 exact content space
@@ -306,11 +365,11 @@ func (m ConfirmModal) View() string {
 
 	var sb strings.Builder
 
-	// 1. Question 
+	// 1. Question (clean and centered)
 	sb.WriteString(lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(m.Question))
 	sb.WriteString("\n\n")
 
-	// 2. Command Preview Box
+	// 2. Command Preview Box (crisp, transparent, rendered only if command is provided)
 	if m.Command != "" {
 		cmdContent := theme.Current.MutedText.Render("$ ") + theme.Current.AccentText.Bold(true).Render(m.Command)
 		cmdBox := lipgloss.NewStyle().
@@ -361,7 +420,7 @@ func (m ConfirmModal) View() string {
 	hintText := "y: Yes  •  n/Esc: No  •  Tab: Switch"
 	sb.WriteString(lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Foreground(theme.Current.Palette.TextDark).Render(hintText))
 
-	// Outer Dialog Box 
+	// Outer Dialog Box (clean border, transparent background without murky tint)
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
@@ -422,6 +481,3 @@ func (m ConfirmModal) FooterBindings() []key.Binding {
 		key.NewBinding(key.WithHelp("n / Esc", "No")),
 	}
 }
-
-
-

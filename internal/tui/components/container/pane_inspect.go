@@ -65,9 +65,15 @@ func (p *InspectPane) ToggleWrap() {
 	p.viewport.SoftWrap = !p.viewport.SoftWrap
 }
 
+func (p *InspectPane) Reset() {
+	p.lastData = nil
+	p.currentID = ""
+	p.viewport.SetContent(theme.Current.MutedText.Padding(1, 2).Render("No inspect data available."))
+}
+
 func (p *InspectPane) SetContent(inspect *container.InspectResponse) {
 	if inspect == nil {
-		p.viewport.SetContent("No inspect data available.")
+		p.Reset()
 		return
 	}
 

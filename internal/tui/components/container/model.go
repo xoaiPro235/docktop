@@ -2,10 +2,12 @@ package container
 
 import (
 	"context"
+	"strings"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -34,13 +36,14 @@ const (
 )
 
 // ActionTargetAll represents the special target identifier when pruning all stopped containers.
-const ActionTargetAll = "all"
+const ActionTargetAll = modal.TargetAll
 
 type Model struct {
 	dockerClient docker.ContainerService
 	containers   []docker.ContainerInfo
 	treeRoots    []*TreeNode
 	flatItems    []FlatItem
+	searchBar    searchbar.Model
 
 	expandedState map[string]bool
 
@@ -96,6 +99,7 @@ func New(cli docker.ContainerService) Model {
 		composePane:    NewComposePane(),
 		confirmModal:   modal.NewConfirmModal(),
 		spinner:        sp,
+		searchBar:      searchbar.New("Filter containers..."),
 	}
 }
 
@@ -118,11 +122,11 @@ func (m *Model) SelectedContainer() *docker.ContainerInfo {
 	return nil
 }
 
-func (m *Model) updateContainers(newContainers []docker.ContainerInfo) {
+func (m *Model) rebuildTree() {
 	var prevSelectedID string
 	var prevName string
 
-	if m.cursorIndex < len(m.flatItems) {
+	if len(m.flatItems) > 0 && m.cursorIndex >= 0 && m.cursorIndex < len(m.flatItems) {
 		selectedNode := m.flatItems[m.cursorIndex].Node
 		prevName = selectedNode.Name
 		if selectedNode.Container != nil {
@@ -130,11 +134,30 @@ func (m *Model) updateContainers(newContainers []docker.ContainerInfo) {
 		}
 	}
 
-	m.containers = newContainers
-	m.treeRoots = BuildTree(newContainers, m.expandedState)
+	query := strings.ToLower(m.searchBar.Value())
+	if query == "" {
+		m.treeRoots = BuildTree(m.containers, m.expandedState)
+	} else {
+		var matched []docker.ContainerInfo
+		for _, c := range m.containers {
+			if strings.Contains(strings.ToLower(c.Name), query) ||
+				strings.Contains(strings.ToLower(c.Image), query) ||
+				strings.Contains(strings.ToLower(c.Service), query) ||
+				strings.Contains(strings.ToLower(c.ProjectName), query) ||
+				strings.Contains(strings.ToLower(c.ID), query) {
+				matched = append(matched, c)
+			}
+		}
+		m.treeRoots = BuildTree(matched, nil)
+	}
 	m.flatItems = Flatten(m.treeRoots, "")
 
-	// 1. Match by Container ID
+	if len(m.flatItems) == 0 {
+		m.cursorIndex = 0
+		return
+	}
+
+	// 1. Try to restore selection by Container ID
 	if prevSelectedID != "" {
 		for idx, item := range m.flatItems {
 			if item.Node.Container != nil && item.Node.Container.ID == prevSelectedID {
@@ -144,7 +167,7 @@ func (m *Model) updateContainers(newContainers []docker.ContainerInfo) {
 		}
 	}
 
-	// 2. Match by Name if Project/Service was selected
+	// 2. Try to restore selection by Node Name (project/service)
 	if prevName != "" {
 		for idx, item := range m.flatItems {
 			if item.Node.Name == prevName {
@@ -154,7 +177,7 @@ func (m *Model) updateContainers(newContainers []docker.ContainerInfo) {
 		}
 	}
 
-	// 3. Fallback: automatically select the first container found
+	// 3. Fallback: select first container if available
 	for idx, item := range m.flatItems {
 		if item.Node.Container != nil {
 			m.cursorIndex = idx
@@ -162,14 +185,24 @@ func (m *Model) updateContainers(newContainers []docker.ContainerInfo) {
 		}
 	}
 
+	// 4. Fallback: clamp cursor if out of bounds
 	if m.cursorIndex >= len(m.flatItems) {
 		m.cursorIndex = max(0, len(m.flatItems)-1)
 	}
 }
 
+func (m *Model) updateContainers(newContainers []docker.ContainerInfo) {
+	m.containers = newContainers
+	m.rebuildTree()
+}
+
 func (m *Model) SetContainers(list []docker.ContainerInfo) tea.Cmd {
 	m.updateContainers(list)
 	return m.syncActivePane()
+}
+
+func (m *Model) IsSearching() bool {
+	return m.searchBar.IsActive()
 }
 
 func (m *Model) stopLogStream() {
@@ -292,6 +325,7 @@ func (m *Model) syncActivePane() tea.Cmd {
 		if currentID != "" && m.logChan == nil {
 			cmds = append(cmds, m.startLogStream(currentID))
 		} else if currentID == "" {
+			m.stopLogStream()
 			m.logsPane.Reset()
 		}
 	case SubPaneTop:
@@ -299,16 +333,17 @@ func (m *Model) syncActivePane() tea.Cmd {
 		if currentID != "" {
 			m.topPane.SetLoading(currentID)
 			cmds = append(cmds, m.fetchTopCmd(currentID))
+		} else {
+			m.topPane.Reset()
 		}
 	case SubPaneInspect:
 		m.Pause()
 		if currentID != "" {
 			cmds = append(cmds, m.fetchInspectCmd(currentID))
 		} else {
-			m.inspectPane.SetContent(nil)
+			m.inspectPane.Reset()
 		}
 	}
 
 	return tea.Batch(cmds...)
 }
-

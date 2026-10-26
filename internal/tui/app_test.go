@@ -189,6 +189,89 @@ func TestAppModel_Update_TabKeypresses(t *testing.T) {
 	}
 }
 
+func TestAppModel_IsAnySearching(t *testing.T) {
+	tests := []struct {
+		name  string
+		start func(*AppModel)
+	}{
+		{
+			name: "containers",
+			start: func(app *AppModel) {
+				app.containerModel, _ = app.containerModel.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+			},
+		},
+		{
+			name: "images",
+			start: func(app *AppModel) {
+				app.imageModel, _ = app.imageModel.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+			},
+		},
+		{
+			name: "volumes",
+			start: func(app *AppModel) {
+				app.volumeModel, _ = app.volumeModel.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+			},
+		},
+		{
+			name: "networks",
+			start: func(app *AppModel) {
+				app.networkModel, _ = app.networkModel.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := NewApp(helperMockService())
+			if app.isAnySearching() {
+				t.Fatal("new app should not be searching")
+			}
+
+			tt.start(&app)
+			if !app.isAnySearching() {
+				t.Error("isAnySearching() = false after activating search")
+			}
+		})
+	}
+}
+
+func TestAppModel_Update_SearchingKeys(t *testing.T) {
+	app := NewApp(helperMockService())
+	app.ready = true
+
+	cancelCalled := false
+	app.eventCancel = func() { cancelCalled = true }
+	app.containerModel, _ = app.containerModel.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+
+	newModel, _ := app.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	app = newModel.(AppModel)
+	if app.activeTab != TabContainers {
+		t.Errorf("activeTab while searching = %v, want TabContainers", app.activeTab)
+	}
+	if cancelCalled {
+		t.Error("typing a tab key while searching should not cancel the app")
+	}
+
+	newModel, _ = app.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	app = newModel.(AppModel)
+	if cancelCalled {
+		t.Error("typing q while searching should not quit the app")
+	}
+
+	newModel, cmd := app.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	app = newModel.(AppModel)
+	if !cancelCalled {
+		t.Error("Ctrl+C while searching should cancel the event stream")
+	}
+	if cmd == nil {
+		t.Fatal("Ctrl+C while searching should return a quit command")
+	}
+	quitMsg := cmd()
+	if _, ok := quitMsg.(tea.QuitMsg); !ok {
+		t.Errorf("Ctrl+C command result = %T, want tea.QuitMsg", quitMsg)
+	}
+}
+
 func TestAppModel_View(t *testing.T) {
 	mockSvc := helperMockService()
 	app := NewApp(mockSvc)

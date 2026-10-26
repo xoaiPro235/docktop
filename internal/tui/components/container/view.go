@@ -42,59 +42,76 @@ func (m Model) View() string {
 	// 1. Render tree on left (windowing scrolls with cursor)
 	var leftContent strings.Builder
 	innerLeftWidth := max(leftWidth-2, 1)
+
+	if m.searchBar.IsActive() || m.searchBar.HasFilter() {
+		leftContent.WriteString(m.searchBar.View(innerLeftWidth))
+		leftContent.WriteString("\n\n")
+	}
+
 	headerTitle := ansi.Truncate("PROJECT / SERVICE / CONTAINER", innerLeftWidth, "…")
 	leftContent.WriteString(theme.Current.TreeHeader.Render(headerTitle))
 	leftContent.WriteString("\n\n")
 
-	maxVisibleItems := max(m.height-4, 1)
-	startIdx := 0
-	if m.cursorIndex >= maxVisibleItems {
-		startIdx = m.cursorIndex - maxVisibleItems + 1
-	}
-	endIdx := min(len(m.flatItems), startIdx+maxVisibleItems)
-
-	for i := startIdx; i < endIdx; i++ {
-		item := m.flatItems[i]
-
-		var cursorMark string
-		if i == m.cursorIndex {
-			cursorMark = "> "
+	if len(m.flatItems) == 0 {
+		if m.searchBar.HasFilter() {
+			leftContent.WriteString("  ")
+			leftContent.WriteString(theme.Current.MutedText.Render(fmt.Sprintf("No containers matching %q", m.searchBar.Value())))
+			leftContent.WriteString("\n")
 		} else {
-			cursorMark = "  "
+			leftContent.WriteString(theme.Current.MutedText.Padding(1).Render("No containers found."))
+			leftContent.WriteString("\n")
 		}
+	} else {
+		startIdx, endIdx, _ := layout.ListWindow(
+			m.height,
+			m.cursorIndex,
+			len(m.flatItems),
+			m.searchBar.IsActive() || m.searchBar.HasFilter(),
+		)
 
-		branch := theme.Current.TreeBranch.Render(item.Prefix)
-		title := item.Node.DisplayTitle()
+		for i := startIdx; i < endIdx; i++ {
+			item := m.flatItems[i]
 
-		var styledTitle string
-		switch item.Node.Type {
-		case NodeProject:
-			styledTitle = theme.Current.TreeProject.Render(title)
-		case NodeService:
-			styledTitle = theme.Current.TreeService.Render(title)
-		case NodeContainer:
-			if item.Node.Container != nil {
-				_, isSelfAction := m.runningActions[item.Node.Container.ID]
-				isPruningThis := m.isContainerActionRunning(ActionTargetAll) && item.Node.Container.State != docker.StateRunning
-
-				if isSelfAction || isPruningThis {
-					styledTitle = theme.Current.TreeSelected.Render(m.spinner.View() + " " + title)
-				} else if item.Node.Container.State == docker.StateRunning {
-					styledTitle = theme.Current.TreeContainerRunning.Render(title)
-				} else {
-					styledTitle = theme.Current.TreeContainerStopped.Render(title)
-				}
+			var cursorMark string
+			if i == m.cursorIndex {
+				cursorMark = "> "
+			} else {
+				cursorMark = "  "
 			}
-		default:
-			styledTitle = title
-		}
 
-		line := fmt.Sprintf("%s%s%s", cursorMark, branch, styledTitle)
-		if i == m.cursorIndex && m.focusZone == FocusLeftTree {
-			line = theme.Current.TreeSelected.Render(line)
+			branch := theme.Current.TreeBranch.Render(item.Prefix)
+			title := item.Node.DisplayTitle()
+
+			var styledTitle string
+			switch item.Node.Type {
+			case NodeProject:
+				styledTitle = theme.Current.TreeProject.Render(title)
+			case NodeService:
+				styledTitle = theme.Current.TreeService.Render(title)
+			case NodeContainer:
+				if item.Node.Container != nil {
+					_, isSelfAction := m.runningActions[item.Node.Container.ID]
+					isPruningThis := m.isContainerActionRunning(ActionTargetAll) && item.Node.Container.State != docker.StateRunning
+
+					if isSelfAction || isPruningThis {
+						styledTitle = theme.Current.TreeSelected.Render(m.spinner.View() + " " + title)
+					} else if item.Node.Container.State == docker.StateRunning {
+						styledTitle = theme.Current.TreeContainerRunning.Render(title)
+					} else {
+						styledTitle = theme.Current.TreeContainerStopped.Render(title)
+					}
+				}
+			default:
+				styledTitle = title
+			}
+
+			line := fmt.Sprintf("%s%s%s", cursorMark, branch, styledTitle)
+			if i == m.cursorIndex && m.focusZone == FocusLeftTree {
+				line = theme.Current.TreeSelected.Render(line)
+			}
+			leftContent.WriteString(line)
+			leftContent.WriteString("\n")
 		}
-		leftContent.WriteString(line)
-		leftContent.WriteString("\n")
 	}
 
 	// 2. Render Right Pane
@@ -204,6 +221,12 @@ func (m Model) FooterBindings() []key.Binding {
 		return m.confirmModal.FooterBindings()
 	}
 
+	if m.searchBar.IsActive() {
+		return []key.Binding{
+			keys.CommonHelpKeys.HelpFilterActive,
+		}
+	}
+
 	selectedNode := m.SelectedNode()
 	var bindings []key.Binding
 
@@ -213,12 +236,12 @@ func (m Model) FooterBindings() []key.Binding {
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
 		if m.focusZone == FocusLeftTree {
 
-		
-		bindings = append(bindings,
-			keys.CommonHelpKeys.HelpNavigate,
-			keys.ContainerKeys.ToggleExpand,
-		)
-	}
+			bindings = append(bindings,
+				keys.CommonHelpKeys.HelpNavigate,
+				keys.CommonHelpKeys.HelpFilter,
+				keys.ContainerKeys.ToggleExpand,
+			)
+		}
 		if selectedNode.Name != StandaloneProjectName {
 			bindings = append(bindings, keys.CommonHelpKeys.HelpSubpane)
 		}

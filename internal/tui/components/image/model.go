@@ -1,11 +1,14 @@
 package image
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	mobyimage "github.com/moby/moby/api/types/image"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -18,8 +21,10 @@ const (
 )
 
 type Model struct {
-	dockerClient docker.ImageService
-	images       []docker.ImageInfo
+	dockerClient    docker.ImageService
+	images          []docker.ImageInfo
+	filteredIndices []int
+	searchBar       searchbar.Model
 
 	cursorIndex    int
 	focusZone      FocusZone
@@ -41,12 +46,15 @@ func New(cli docker.ImageService) Model {
 		spinner.WithStyle(theme.Current.ActionLoading),
 	)
 
-	return Model{
+	m := Model{
 		dockerClient: cli,
 		focusZone:    FocusImagesList,
 		confirmModal: modal.NewConfirmModal(),
 		spinner:      sp,
+		searchBar:    searchbar.New("Filter images..."),
 	}
+	m.applyFilter()
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -97,25 +105,26 @@ func (m *Model) SetImages(images []docker.ImageInfo) tea.Cmd {
 	}
 
 	var prevSelectedID string
-	if m.cursorIndex >= 0 && m.cursorIndex < len(m.images) {
-		prevSelectedID = m.images[m.cursorIndex].ID
+	if sel := m.SelectedImage(); sel != nil {
+		prevSelectedID = sel.ID
 	}
 
 	m.images = images
+	m.applyFilter()
 	if prevSelectedID != "" {
 		found := false
-		for i, img := range m.images {
-			if img.ID == prevSelectedID {
+		for i, idx := range m.filteredIndices {
+			if m.images[idx].ID == prevSelectedID {
 				m.cursorIndex = i
 				found = true
 				break
 			}
 		}
-		if !found && m.cursorIndex >= len(m.images) {
-			m.cursorIndex = max(0, len(m.images)-1)
+		if !found && m.cursorIndex >= len(m.filteredIndices) {
+			m.cursorIndex = max(0, len(m.filteredIndices)-1)
 		}
-	} else if m.cursorIndex >= len(m.images) {
-		m.cursorIndex = max(0, len(m.images)-1)
+	} else if m.cursorIndex >= len(m.filteredIndices) {
+		m.cursorIndex = max(0, len(m.filteredIndices)-1)
 	}
 
 	m.updateViewportContent()
@@ -131,15 +140,45 @@ func (m *Model) IsModalActive() bool {
 	return m.confirmModal.Active
 }
 
+func (m *Model) IsSearching() bool {
+	return m.searchBar.IsActive()
+}
+
 func (m *Model) IsActionRunning() bool {
 	return m.action.IsRunning()
 }
 
 func (m *Model) SelectedImage() *docker.ImageInfo {
-	if len(m.images) > 0 && m.cursorIndex >= 0 && m.cursorIndex < len(m.images) {
-		return &m.images[m.cursorIndex]
+	if len(m.filteredIndices) > 0 && m.cursorIndex >= 0 && m.cursorIndex < len(m.filteredIndices) {
+		actualIdx := m.filteredIndices[m.cursorIndex]
+		if actualIdx >= 0 && actualIdx < len(m.images) {
+			return &m.images[actualIdx]
+		}
 	}
 	return nil
+}
+
+func (m *Model) applyFilter() {
+	query := strings.ToLower(m.searchBar.Value())
+	m.filteredIndices = nil
+
+	if query == "" {
+		m.filteredIndices = make([]int, len(m.images))
+		for i := range m.images {
+			m.filteredIndices[i] = i
+		}
+	} else {
+		for i, img := range m.images {
+			if strings.Contains(strings.ToLower(img.Tag), query) ||
+				strings.Contains(strings.ToLower(img.ID), query) {
+				m.filteredIndices = append(m.filteredIndices, i)
+			}
+		}
+	}
+
+	if m.cursorIndex >= len(m.filteredIndices) {
+		m.cursorIndex = max(0, len(m.filteredIndices)-1)
+	}
 }
 
 func (m *Model) updateViewportContent() {

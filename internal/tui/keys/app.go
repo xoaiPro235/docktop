@@ -10,6 +10,7 @@ import (
 // AppKeyMap holds the global application-level key bindings.
 type AppKeyMap struct {
 	Quit          key.Binding
+	ForceQuit     key.Binding
 	TabContainers key.Binding
 	TabImages     key.Binding
 	TabVolumes    key.Binding
@@ -22,6 +23,10 @@ var AppKeys = AppKeyMap{
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
 		key.WithHelp("q", "Quit"),
+	),
+	ForceQuit: key.NewBinding(
+		key.WithKeys("ctrl+c"),
+		key.WithHelp("ctrl+c", "Force Quit"),
 	),
 	TabContainers: key.NewBinding(
 		key.WithKeys("1"),
@@ -47,14 +52,16 @@ var AppKeys = AppKeyMap{
 
 // CommonHelpKeyMap holds reusable help-only bindings for rendering consistent footer hints across components.
 type CommonHelpKeyMap struct {
-	HelpMove       key.Binding
-	HelpMoveClick  key.Binding
-	HelpNavigate   key.Binding
-	HelpScroll     key.Binding
-	HelpScrollX    key.Binding
-	HelpScrollUp   key.Binding
-	HelpScrollBoth key.Binding
-	HelpSubpane    key.Binding
+	HelpMove         key.Binding
+	HelpMoveClick    key.Binding
+	HelpNavigate     key.Binding
+	HelpScroll       key.Binding
+	HelpScrollX      key.Binding
+	HelpScrollUp     key.Binding
+	HelpScrollBoth   key.Binding
+	HelpSubpane      key.Binding
+	HelpFilter       key.Binding
+	HelpFilterActive key.Binding
 }
 
 var CommonHelpKeys = CommonHelpKeyMap{
@@ -89,6 +96,14 @@ var CommonHelpKeys = CommonHelpKeyMap{
 	HelpSubpane: key.NewBinding(
 		key.WithKeys("[", "]"),
 		key.WithHelp("[/]", "Subpane"),
+	),
+	HelpFilter: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "Filter"),
+	),
+	HelpFilterActive: key.NewBinding(
+		key.WithKeys("esc", "enter"),
+		key.WithHelp("Esc/Enter", "Cancel/Done"),
 	),
 }
 

@@ -3,6 +3,8 @@ package network
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+	networktypes "github.com/moby/moby/api/types/network"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
@@ -58,9 +60,9 @@ func TestModel_SetNetworks(t *testing.T) {
 	m.SetSize(100, 30)
 
 	nets := []docker.NetworkInfo{
-		{ID: "net-1", Name: "bridge"},
-		{ID: "net-2", Name: "custom_app"},
-		{ID: "net-3", Name: "host"},
+		{ID: "net-1", Name: "bridge", RawInspect: &networktypes.Inspect{}},
+		{ID: "net-2", Name: "custom_app", RawInspect: &networktypes.Inspect{}},
+		{ID: "net-3", Name: "host", RawInspect: &networktypes.Inspect{}},
 	}
 
 	m.SetNetworks(nets)
@@ -74,12 +76,44 @@ func TestModel_SetNetworks(t *testing.T) {
 	// Move cursor to net-2 and update list
 	m.cursorIndex = 1
 	newNets := []docker.NetworkInfo{
-		{ID: "net-3", Name: "host"},
-		{ID: "net-2", Name: "custom_app"},
+		{ID: "net-3", Name: "host", RawInspect: &networktypes.Inspect{}},
+		{ID: "net-2", Name: "custom_app", RawInspect: &networktypes.Inspect{}},
 	}
 	m.SetNetworks(newNets)
 	if m.SelectedNetwork() == nil || m.SelectedNetwork().ID != "net-2" {
 		t.Errorf("SelectedNetwork after re-order = %v, want net-2", m.SelectedNetwork())
+	}
+}
+
+func TestModel_FilterNetworks(t *testing.T) {
+	m := New(&mocks.MockNetworkService{})
+	m.SetNetworks([]docker.NetworkInfo{
+		{ID: "net-1", Name: "bridge", Driver: "bridge", Subnet: "172.17.0.0/16"},
+		{ID: "net-2", Name: "app", Driver: "bridge", Subnet: "172.20.0.0/16"},
+	})
+
+	sendKey := func(msg tea.Msg) {
+		m, _ = m.Update(msg)
+	}
+	sendKey(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "172.20" {
+		sendKey(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if m.IsSearching() {
+		t.Error("search input should be inactive after submitting the filter")
+	}
+	if got := m.SelectedNetwork(); got == nil || got.ID != "net-2" {
+		t.Errorf("SelectedNetwork() after filtering = %v, want net-2", got)
+	}
+	if len(m.filteredIndices) != 1 {
+		t.Errorf("len(filteredIndices) after filtering = %d, want 1", len(m.filteredIndices))
+	}
+
+	sendKey(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if len(m.filteredIndices) != 2 {
+		t.Errorf("len(filteredIndices) after clearing filter = %d, want 2", len(m.filteredIndices))
 	}
 }
 
@@ -118,9 +152,10 @@ func TestModel_SelectedNetwork(t *testing.T) {
 	}
 
 	m.networks = []docker.NetworkInfo{
-		{ID: "net-a", Name: "bridge"},
-		{ID: "net-b", Name: "overlay"},
+		{ID: "net-a", Name: "bridge", RawInspect: &networktypes.Inspect{}},
+		{ID: "net-b", Name: "overlay", RawInspect: &networktypes.Inspect{}},
 	}
+	m.applyFilter()
 	m.cursorIndex = 1
 
 	if got := m.SelectedNetwork(); got == nil || got.ID != "net-b" {
@@ -149,6 +184,7 @@ func TestModel_updateViewportContent(t *testing.T) {
 			Subnet:         "172.20.0.0/16",
 			Gateway:        "172.20.0.1",
 			ConnectedCount: 1,
+			RawInspect:     &networktypes.Inspect{},
 			Containers: []docker.NetworkEndpointInfo{
 				{ContainerID: "cid1", Name: "web-server", IP: "172.20.0.2", Ports: "80:80"},
 			},

@@ -1,10 +1,13 @@
 package network
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -17,8 +20,10 @@ const (
 )
 
 type Model struct {
-	dockerClient docker.NetworkService
-	networks     []docker.NetworkInfo
+	dockerClient    docker.NetworkService
+	networks        []docker.NetworkInfo
+	filteredIndices []int
+	searchBar       searchbar.Model
 
 	cursorIndex     int
 	focusZone       FocusZone
@@ -40,12 +45,15 @@ func New(cli docker.NetworkService) Model {
 		spinner.WithStyle(theme.Current.ActionLoading),
 	)
 
-	return Model{
+	m := Model{
 		dockerClient: cli,
 		focusZone:    FocusNetworksList,
 		confirmModal: modal.NewConfirmModal(),
 		spinner:      sp,
+		searchBar:    searchbar.New("Filter networks..."),
 	}
+	m.applyFilter()
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -58,14 +66,8 @@ func (m *Model) SetSize(w, h int) {
 
 	leftWidth := (w * 52) / 100
 	rightWidth := w - leftWidth
-	innerRightWidth := rightWidth - 2
-	if innerRightWidth < 10 {
-		innerRightWidth = 10
-	}
-	innerRightHeight := h - 2
-	if innerRightHeight < 1 {
-		innerRightHeight = 1
-	}
+	innerRightWidth := max(rightWidth-2, 10)
+	innerRightHeight := max(h-2, 1)
 
 	if !m.viewportReady {
 		m.viewport = viewport.New(viewport.WithWidth(innerRightWidth), viewport.WithHeight(innerRightHeight))
@@ -80,25 +82,26 @@ func (m *Model) SetSize(w, h int) {
 
 func (m *Model) SetNetworks(networks []docker.NetworkInfo) tea.Cmd {
 	var prevSelectedID string
-	if m.cursorIndex >= 0 && m.cursorIndex < len(m.networks) {
-		prevSelectedID = m.networks[m.cursorIndex].ID
+	if sel := m.SelectedNetwork(); sel != nil {
+		prevSelectedID = sel.ID
 	}
 
 	m.networks = networks
+	m.applyFilter()
 	if prevSelectedID != "" {
 		found := false
-		for i, n := range m.networks {
-			if n.ID == prevSelectedID {
+		for i, idx := range m.filteredIndices {
+			if m.networks[idx].ID == prevSelectedID {
 				m.cursorIndex = i
 				found = true
 				break
 			}
 		}
-		if !found && m.cursorIndex >= len(m.networks) {
-			m.cursorIndex = max(0, len(m.networks)-1)
+		if !found && m.cursorIndex >= len(m.filteredIndices) {
+			m.cursorIndex = max(0, len(m.filteredIndices)-1)
 		}
-	} else if m.cursorIndex >= len(m.networks) {
-		m.cursorIndex = max(0, len(m.networks)-1)
+	} else if m.cursorIndex >= len(m.filteredIndices) {
+		m.cursorIndex = max(0, len(m.filteredIndices)-1)
 	}
 
 	m.updateViewportContent()
@@ -109,15 +112,47 @@ func (m *Model) IsModalActive() bool {
 	return m.confirmModal.Active
 }
 
+func (m *Model) IsSearching() bool {
+	return m.searchBar.IsActive()
+}
+
 func (m *Model) IsActionRunning() bool {
 	return m.action.IsRunning()
 }
 
 func (m *Model) SelectedNetwork() *docker.NetworkInfo {
-	if len(m.networks) > 0 && m.cursorIndex >= 0 && m.cursorIndex < len(m.networks) {
-		return &m.networks[m.cursorIndex]
+	if len(m.filteredIndices) > 0 && m.cursorIndex >= 0 && m.cursorIndex < len(m.filteredIndices) {
+		actualIdx := m.filteredIndices[m.cursorIndex]
+		if actualIdx >= 0 && actualIdx < len(m.networks) {
+			return &m.networks[actualIdx]
+		}
 	}
 	return nil
+}
+
+func (m *Model) applyFilter() {
+	query := strings.ToLower(m.searchBar.Value())
+	m.filteredIndices = nil
+
+	if query == "" {
+		m.filteredIndices = make([]int, len(m.networks))
+		for i := range m.networks {
+			m.filteredIndices[i] = i
+		}
+	} else {
+		for i, n := range m.networks {
+			if strings.Contains(strings.ToLower(n.Name), query) ||
+				strings.Contains(strings.ToLower(n.Driver), query) ||
+				strings.Contains(strings.ToLower(n.ID), query) ||
+				strings.Contains(strings.ToLower(n.Subnet), query) {
+				m.filteredIndices = append(m.filteredIndices, i)
+			}
+		}
+	}
+
+	if m.cursorIndex >= len(m.filteredIndices) {
+		m.cursorIndex = max(0, len(m.filteredIndices)-1)
+	}
 }
 
 func (m *Model) updateViewportContent() {

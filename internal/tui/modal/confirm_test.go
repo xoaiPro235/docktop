@@ -110,6 +110,21 @@ func TestActionState_Lifecycle(t *testing.T) {
 	}
 }
 
+func TestActionState_StartPrune(t *testing.T) {
+	state := ActionState{}
+	state.StartPrune("Pruning resources...")
+
+	if !state.IsRunning() {
+		t.Fatal("ActionState should be running after StartPrune")
+	}
+	if state.Action != ActionPrune || state.TargetID != TargetAll || state.TargetName != TargetAll {
+		t.Errorf("StartPrune() state = %+v, want prune action targeting all resources", state)
+	}
+	if state.Desc != "Pruning resources..." {
+		t.Errorf("Desc = %q, want %q", state.Desc, "Pruning resources...")
+	}
+}
+
 func TestNewConfirmModal(t *testing.T) {
 	m := NewConfirmModal()
 	if m.Active {
@@ -183,6 +198,67 @@ func TestConfirmModal_ShowActions(t *testing.T) {
 	m.ShowNetworkAction(ActionPrune, "net1", "bridge")
 	if !m.Active || m.Action != ActionPrune {
 		t.Errorf("ShowNetworkAction Prune failed")
+	}
+}
+
+func TestConfirmModal_ShowPruneActions(t *testing.T) {
+	tests := []struct {
+		name       string
+		show       func(*ConfirmModal)
+		question   string
+		command    string
+		targetName string
+	}{
+		{
+			name:       "containers",
+			show:       (*ConfirmModal).ShowContainerPrune,
+			question:   "Are you sure you want to remove all stopped containers?",
+			command:    "docker container prune -f",
+			targetName: "all stopped containers",
+		},
+		{
+			name:       "images",
+			show:       (*ConfirmModal).ShowImagePrune,
+			question:   "Are you sure you want to remove all dangling images?",
+			command:    "docker image prune -f",
+			targetName: "all dangling images",
+		},
+		{
+			name:       "volumes",
+			show:       (*ConfirmModal).ShowVolumePrune,
+			question:   "Are you sure you want to remove all unused volumes?",
+			command:    "docker volume prune -f",
+			targetName: "all unused volumes",
+		},
+		{
+			name:       "networks",
+			show:       (*ConfirmModal).ShowNetworkPrune,
+			question:   "Are you sure you want to remove all unused networks?",
+			command:    "docker network prune -f",
+			targetName: "all unused networks",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewConfirmModal()
+			tt.show(&m)
+
+			if !m.Active || m.Action != ActionPrune {
+				t.Fatalf("prune modal state = %+v, want active prune modal", m)
+			}
+			if m.Style != StyleWarning {
+				t.Errorf("Style = %v, want StyleWarning", m.Style)
+			}
+			if m.Question != tt.question || m.Command != tt.command {
+				t.Errorf("Question/Command = (%q, %q), want (%q, %q)",
+					m.Question, m.Command, tt.question, tt.command)
+			}
+			if m.TargetID != TargetAll || m.TargetName != tt.targetName {
+				t.Errorf("Target = (%q, %q), want (%q, %q)",
+					m.TargetID, m.TargetName, TargetAll, tt.targetName)
+			}
+		})
 	}
 }
 
