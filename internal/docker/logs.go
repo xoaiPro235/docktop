@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"syscall"
 	"time"
 
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -89,13 +88,8 @@ func (c *Client) StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-c
 		if opts.WorkingDir != "" {
 			cmd.Dir = opts.WorkingDir
 		}
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		cmd.Cancel = func() error {
-			if cmd.Process != nil {
-				return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-			}
-			return nil
-		}
+		setProcessGroup(cmd)
+
 		cmd.WaitDelay = 200 * time.Millisecond
 
 		pr, pw, err := os.Pipe()
