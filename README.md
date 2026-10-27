@@ -1,8 +1,8 @@
 # docktop
 
-A fast, lightweight, and modern Terminal UI (TUI) for Docker, built with Go, Bubble Tea, and Lipgloss.
+A fast, lightweight, and modern Terminal UI (TUI) for Docker, built with Go.
 
-Manage and monitor your Docker containers, images, volumes, and networks with keyboard-driven ease.
+Manage and monitor your Docker with keyboard-driven ease.
 
 ![docktop preview](assets/demo.gif)
 
