@@ -68,7 +68,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Hint: Make sure Docker daemon is running and reachable (check socket permissions or SSH connection).\n")
 		os.Exit(1)
 	}
-	defer dockerCli.Close()
+	defer dockerCli.Close() //nolint:errcheck
 
 	// 4. Initialize Bubble Tea Root Model
 	app := tui.NewApp(dockerCli)

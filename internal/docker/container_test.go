@@ -12,7 +12,7 @@ type mockStatusCodeError struct {
 	msg  string
 }
 
-func (m mockStatusCodeError) Error() string { return m.msg }
+func (m mockStatusCodeError) Error() string   { return m.msg }
 func (m mockStatusCodeError) StatusCode() int { return m.code }
 
 func Test_isConflictError(t *testing.T) {

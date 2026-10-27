@@ -26,6 +26,7 @@ type ImageListMsg []docker.ImageInfo
 type VolumeListMsg []docker.VolumeInfo
 type NetworkListMsg []docker.NetworkInfo
 type DockerEventMsg events.Message
+
 func waitForDockerEvent(eventCh <-chan events.Message) tea.Cmd {
 	return func() tea.Msg {
 		if eventCh == nil {
@@ -55,9 +56,9 @@ type TabDef struct {
 
 var Tabs = []TabDef{
 	{Tab: TabContainers, Title: "1: Containers"},
-	{Tab: TabImages,     Title: "2: Images"},
-	{Tab: TabVolumes,    Title: "3: Volumes"},
-	{Tab: TabNetworks,   Title: "4: Networks"},
+	{Tab: TabImages, Title: "2: Images"},
+	{Tab: TabVolumes, Title: "3: Volumes"},
+	{Tab: TabNetworks, Title: "4: Networks"},
 }
 
 type AppModel struct {
@@ -232,8 +233,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			break
 		}
-		
-		
+
 		switch {
 		case key.Matches(msg, keys.AppKeys.Quit):
 			if a.eventCancel != nil {
@@ -299,7 +299,6 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		cmds = append(cmds, waitForDockerEvent(a.eventChan))
-
 
 	case tea.WindowSizeMsg:
 		a.width = msg.Width

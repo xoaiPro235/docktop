@@ -4,12 +4,12 @@ import "charm.land/bubbles/v2/key"
 
 // VolumeKeyMap holds key bindings for the Volume view component.
 type VolumeKeyMap struct {
-	Remove key.Binding
-	Prune  key.Binding
-	Up     key.Binding
-	Down   key.Binding
-	Left   key.Binding
-	Right  key.Binding
+	Remove     key.Binding
+	Prune      key.Binding
+	Up         key.Binding
+	Down       key.Binding
+	Left       key.Binding
+	Right      key.Binding
 	Focus      key.Binding
 	ToggleWrap key.Binding
 }

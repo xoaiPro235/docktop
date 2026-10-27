@@ -67,7 +67,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string 
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Created:    "), theme.Current.Value.Render(createdDisplay))
 
 	// Size
-	var formattedSize string = "-"
+	var formattedSize = "-"
 	if selected.UsageData != nil && selected.UsageData.Size >= 0 {
 		size := selected.UsageData.Size
 		formattedSize = units.HumanSize(float64(size))

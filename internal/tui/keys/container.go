@@ -4,22 +4,22 @@ import "charm.land/bubbles/v2/key"
 
 // ContainerKeyMap holds key bindings for the Container view component.
 type ContainerKeyMap struct {
-	StartStop    key.Binding
-	Start        key.Binding
-	Stop         key.Binding
-	Pause        key.Binding
-	Unpause      key.Binding
-	Restart      key.Binding
-	Remove       key.Binding
-	Prune        key.Binding
-	Exec         key.Binding
-	NextPane     key.Binding
-	PrevPane     key.Binding
-	ToggleExpand key.Binding
-	Collapse     key.Binding
-	Expand       key.Binding
-	Up           key.Binding
-	Down         key.Binding
+	StartStop     key.Binding
+	Start         key.Binding
+	Stop          key.Binding
+	Pause         key.Binding
+	Unpause       key.Binding
+	Restart       key.Binding
+	Remove        key.Binding
+	Prune         key.Binding
+	Exec          key.Binding
+	NextPane      key.Binding
+	PrevPane      key.Binding
+	ToggleExpand  key.Binding
+	Collapse      key.Binding
+	Expand        key.Binding
+	Up            key.Binding
+	Down          key.Binding
 	FollowLogs    key.Binding
 	TopLogs       key.Binding
 	ToggleRaw     key.Binding

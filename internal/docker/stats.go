@@ -92,7 +92,7 @@ func (c *Client) StreamContainerStats(ctx context.Context, containerID string) <
 		if err != nil {
 			return
 		}
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint: errcheck
 
 		var hasMemLimit bool
 		var explicitLimit float64

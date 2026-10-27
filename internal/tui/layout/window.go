@@ -42,7 +42,7 @@ func ListWindow(height, cursorIndex, totalItems int, hasFilter bool) (startIdx, 
 		chrome = ChromeRowsWithSearch
 	}
 
-	maxVisible = max(height - chrome, 1)
+	maxVisible = max(height-chrome, 1)
 
 	if totalItems <= 0 {
 		return 0, 0, maxVisible
@@ -52,7 +52,7 @@ func ListWindow(height, cursorIndex, totalItems int, hasFilter bool) (startIdx, 
 		startIdx = cursorIndex - maxVisible + 1
 	}
 
-	endIdx = min(startIdx + maxVisible, totalItems)
+	endIdx = min(startIdx+maxVisible, totalItems)
 
 	return startIdx, endIdx, maxVisible
 }

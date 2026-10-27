@@ -4,12 +4,12 @@ import "charm.land/bubbles/v2/key"
 
 // NetworkKeyMap holds key bindings for the Network view component.
 type NetworkKeyMap struct {
-	Delete key.Binding
-	Prune  key.Binding
-	Up     key.Binding
-	Down   key.Binding
-	Left   key.Binding
-	Right  key.Binding
+	Delete     key.Binding
+	Prune      key.Binding
+	Up         key.Binding
+	Down       key.Binding
+	Left       key.Binding
+	Right      key.Binding
 	Focus      key.Binding
 	ToggleWrap key.Binding
 }

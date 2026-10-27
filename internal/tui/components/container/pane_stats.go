@@ -216,7 +216,7 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, act
 	// CPU graph
 	graphWidth := max(width-4, 10)
 	availableForGraphs := height - 14
-	graphHeight := max(availableForGraphs / 2, 3)
+	graphHeight := max(availableForGraphs/2, 3)
 
 	currentCPU := 0.0
 	peakCPU := 0.0

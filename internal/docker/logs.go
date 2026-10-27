@@ -12,6 +12,7 @@ import (
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
+
 type ComposeLogOpts struct {
 	WorkingDir  string
 	ConfigFile  string
@@ -40,7 +41,7 @@ func (c *Client) StreamContainerLogs(ctx context.Context, id string, tail string
 		if err != nil {
 			return
 		}
-		defer resp.Close()
+		defer resp.Close() //nolint: errcheck
 
 		if isTTY {
 			scanLogs(ctx, resp, outCh)
@@ -48,7 +49,7 @@ func (c *Client) StreamContainerLogs(ctx context.Context, id string, tail string
 		}
 
 		pr, pw := io.Pipe()
-		defer pr.Close()
+		defer pr.Close() //nolint:errcheck
 		go func() {
 			_, err := stdcopy.StdCopy(pw, pw, resp)
 			_ = pw.CloseWithError(err)
@@ -105,7 +106,7 @@ func (c *Client) StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-c
 			}
 			return
 		}
-		defer pr.Close()
+		defer pr.Close() //nolint: errcheck
 
 		cmd.Stdout = pw
 		cmd.Stderr = pw

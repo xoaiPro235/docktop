@@ -140,8 +140,8 @@ func (m ErrorModal) Overlay(bg string, totalWidth, totalHeight int) string {
 		}
 	}
 
-	top := max((totalHeight - modalHeight) / 2, 0)
-	left := max((totalWidth - modalWidth) / 2, 0)
+	top := max((totalHeight-modalHeight)/2, 0)
+	left := max((totalWidth-modalWidth)/2, 0)
 
 	bgLines := strings.Split(bg, "\n")
 	for len(bgLines) < totalHeight {
