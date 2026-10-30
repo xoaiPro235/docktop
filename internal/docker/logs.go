@@ -126,6 +126,12 @@ func (c *Client) StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-c
 }
 
 func scanLogs(ctx context.Context, r io.Reader, out chan<- string) {
+	if closer, ok := r.(io.Closer); ok {
+		stop := context.AfterFunc(ctx, func ()  {
+			_ = closer.Close()
+		})
+		defer stop()
+	}
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
