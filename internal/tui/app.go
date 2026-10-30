@@ -229,6 +229,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if a.eventCancel != nil {
 					a.eventCancel()
 				}
+				a.containerModel.Pause()
 				return a, tea.Quit
 			}
 			break
@@ -239,6 +240,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.eventCancel != nil {
 				a.eventCancel()
 			}
+			a.containerModel.Pause()
 			return a, tea.Quit
 
 		case key.Matches(msg, keys.AppKeys.TabContainers):
