@@ -2,6 +2,7 @@ package docker
 
 import (
 	"testing"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 )
@@ -68,6 +69,65 @@ func TestCalculateStats(t *testing.T) {
 	// Block IO
 	if metrics.BlockRead != 4096 || metrics.BlockWrite != 8192 {
 		t.Errorf("CalculateStats BlockIO Read=%d Write=%d, want 4096 and 8192", metrics.BlockRead, metrics.BlockWrite)
+	}
+}
+
+func TestCalculateStatsWindows(t *testing.T) {
+	tests := []struct {
+		name     string
+		osType   string
+		numProcs uint32
+		wantCPU  float64
+	}{
+		{name: "Windows OSType", osType: "windows", numProcs: 2, wantCPU: 20},
+		{name: "NumProcs identifies Windows", numProcs: 2, wantCPU: 20},
+		{name: "Windows OSType without processors", osType: "windows"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stats := &container.StatsResponse{
+				OSType:   tt.osType,
+				Read:     time.Unix(0, 2_000_000_000),
+				PreRead:  time.Unix(0, 1_000_000_000),
+				NumProcs: tt.numProcs,
+				CPUStats: container.CPUStats{
+					CPUUsage: container.CPUUsage{TotalUsage: 5_000_000},
+				},
+				PreCPUStats: container.CPUStats{
+					CPUUsage: container.CPUUsage{TotalUsage: 1_000_000},
+				},
+				MemoryStats: container.MemoryStats{
+					Usage:             999,
+					Limit:             1_000,
+					PrivateWorkingSet: 123,
+				},
+				StorageStats: container.StorageStats{
+					ReadSizeBytes:  7,
+					WriteSizeBytes: 11,
+				},
+				BlkioStats: container.BlkioStats{
+					IoServiceBytesRecursive: []container.BlkioStatEntry{
+						{Op: "Read", Value: 100},
+						{Op: "Write", Value: 200},
+					},
+				},
+			}
+
+			metrics := CalculateStats(stats)
+			if metrics.CPUPercent < tt.wantCPU-0.01 || metrics.CPUPercent > tt.wantCPU+0.01 {
+				t.Errorf("CPUPercent = %f, want %f", metrics.CPUPercent, tt.wantCPU)
+			}
+			if metrics.MemUsage != 123 {
+				t.Errorf("MemUsage = %f, want 123 (PrivateWorkingSet)", metrics.MemUsage)
+			}
+			if metrics.MemLimit != 1_000 {
+				t.Errorf("MemLimit = %f, want 1000", metrics.MemLimit)
+			}
+			if metrics.BlockRead != 7 || metrics.BlockWrite != 11 {
+				t.Errorf("Block I/O = (%d, %d), want (7, 11)", metrics.BlockRead, metrics.BlockWrite)
+			}
+		})
 	}
 }
 
