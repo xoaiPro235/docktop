@@ -28,7 +28,7 @@ func Test_scanLogs(t *testing.T) {
 	t.Run("cancellation closes blocking reader", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		reader, writer := io.Pipe()
-		defer writer.Close()
+		defer writer.Close() // nolint:errcheck
 		done := make(chan struct{})
 		go func() {
 			scanLogs(ctx, reader, make(chan string))

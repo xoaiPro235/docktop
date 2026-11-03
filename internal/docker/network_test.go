@@ -38,7 +38,7 @@ func TestClient_ListNetworks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cli.Close()
+	defer cli.Close() // nolint:errcheck
 
 	got, err := (&Client{cli: cli}).ListNetworks(context.Background())
 	if err != nil {

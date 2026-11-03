@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
 )
 
@@ -33,7 +32,7 @@ func TestClient_ListVolumes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cli.Close()
+	defer cli.Close() // nolint:errcheck
 
 	got, err := (&Client{cli: cli}).ListVolumes(context.Background())
 	if err != nil {
@@ -41,7 +40,7 @@ func TestClient_ListVolumes(t *testing.T) {
 	}
 	want := []VolumeInfo{
 		{
-			Volume: volume.Volume{Name: "shared", Driver: "local"},
+			Name: "shared", Driver: "local",
 			InUse:  true,
 			RefCnt: 2,
 			Containers: []VolumeContainerMount{
@@ -50,12 +49,12 @@ func TestClient_ListVolumes(t *testing.T) {
 			},
 		},
 		{
-			Volume:     volume.Volume{Name: "other", Driver: "local"},
+			Name: "other", Driver: "local",
 			InUse:      true,
 			RefCnt:     1,
 			Containers: []VolumeContainerMount{{ContainerID: "ctr-a", ContainerName: "alpha", State: "exited", Destination: "/other"}},
 		},
-		{Volume: volume.Volume{Name: "unused", Driver: "local"}},
+		{Name: "unused", Driver: "local"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ListVolumes() = %#v, want %#v", got, want)
