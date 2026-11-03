@@ -70,20 +70,20 @@ func TestTreeNode_DisplayTitle(t *testing.T) {
 
 func Test_containerStateScore(t *testing.T) {
 	tests := []struct {
-		state string
+		state docker.ContainerState
 		want  int
 	}{
-		{"running", 1},
-		{"restarting", 2},
-		{"paused", 3},
-		{"created", 4},
-		{"exited", 5},
-		{"dead", 5},
-		{"unknown", 6},
+		{docker.StateRunning, 1},
+		{docker.StateRestarting, 2},
+		{docker.StatePaused, 3},
+		{docker.StateCreated, 4},
+		{docker.StateExited, 5},
+		{docker.StateDead, 5},
+		{docker.ContainerState("unknown"), 6},
 	}
 	for _, tt := range tests {
 		if got := containerStateScore(tt.state); got != tt.want {
-			t.Errorf("containerStateScore(%q) = %d, want %d", tt.state, got, tt.want)
+			t.Errorf("containerStateScore(%q) = %d, want %d", string(tt.state), got, tt.want)
 		}
 	}
 }
@@ -233,4 +233,62 @@ func Test_resolveComposeProject(t *testing.T) {
 		t.Errorf("got dir=%q, file=%q, want dir=%q, file=%q", dir, file, tempDir, composePath)
 	}
 	_ = svc
+}
+
+func TestFindComposeFile(t *testing.T) {
+	rootDir := t.TempDir()
+	rootFile := filepath.Join(rootDir, "compose.yaml")
+	if err := os.WriteFile(rootFile, []byte("services: {}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	workingDir := t.TempDir()
+	workingFile := filepath.Join(workingDir, "docker-compose.yml")
+	if err := os.WriteFile(workingFile, []byte("services: {}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	childDir := t.TempDir()
+	childFile := filepath.Join(childDir, "compose.yml")
+	if err := os.WriteFile(childFile, []byte("services: {}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+		node *TreeNode
+		want string
+	}{
+		{
+			name: "uses first existing path in config file labels",
+			node: &TreeNode{
+				ConfigFiles: filepath.Join(rootDir, "missing.yaml") + ", " + rootFile,
+			},
+			want: rootFile,
+		},
+		{
+			name: "falls back to compose file in root working directory",
+			node: &TreeNode{WorkingDir: workingDir},
+			want: workingFile,
+		},
+		{
+			name: "finds compose file in nested container working directory",
+			node: &TreeNode{
+				Children: []*TreeNode{{
+					Children: []*TreeNode{{
+						Container: &docker.ContainerInfo{WorkingDir: childDir},
+					}},
+				}},
+			},
+			want: childFile,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := findComposeFile(tt.node); got != tt.want {
+				t.Errorf("findComposeFile() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

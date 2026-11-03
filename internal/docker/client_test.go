@@ -18,3 +18,11 @@ func TestClient_Close(t *testing.T) {
 		t.Errorf("Client.Close() on nil cli returned error: %v", err)
 	}
 }
+
+func TestClient_Host(t *testing.T) {
+	const host = "ssh://docker@example.com"
+	c := &Client{host: host}
+	if got := c.Host(); got != host {
+		t.Errorf("Client.Host() = %q, want %q", got, host)
+	}
+}

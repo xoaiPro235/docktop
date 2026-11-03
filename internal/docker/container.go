@@ -14,6 +14,8 @@ import (
 
 var ErrMustStopContainer = errors.New("container must be stopped before removal")
 
+type ContainerState = container.ContainerState
+
 const (
 	StateCreated    = container.StateCreated
 	StateRunning    = container.StateRunning
@@ -200,5 +202,11 @@ func (c *Client) PruneContainers(ctx context.Context) (container.PruneReport, er
 }
 
 func (c *Client) ExecShellCmd(containerID string) *exec.Cmd {
-	return exec.Command("docker", "exec", "-it", containerID, "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh")
+	var args []string
+	if c.host != "" {
+		args = append(args, "-H", c.host)
+	}
+	args = append(args, "exec", "-it", containerID, "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh")
+	return exec.Command("docker", args...)
 }
+

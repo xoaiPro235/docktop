@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -130,30 +131,78 @@ func (p ComposePane) Render() string {
 	return p.viewport.View() + "\n" + footer
 }
 
-func findComposeFile(node *TreeNode) string {
-	if node.ConfigFiles != "" {
-		// Can be multiple comma-separated files
-		files := strings.Split(node.ConfigFiles, ",")
-		if len(files) > 0 {
-			first := strings.TrimSpace(files[0])
-			if _, err := os.Stat(first); err == nil {
-				return first
+func resolveExistingFile(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+
+	// On Windows, paths from containers running in WSL2 often look like /mnt/c/... or //wsl$/...
+	if runtime.GOOS == "windows" {
+		// Pattern 1: Normalize forward-slash UNC paths (e.g. //wsl$/... or //wsl.localhost/...)
+		if strings.HasPrefix(path, "//") || strings.HasPrefix(path, `\\`) {
+			winUNC := filepath.FromSlash(path)
+			if _, err := os.Stat(winUNC); err == nil {
+				return winUNC
+			}
+		}
+
+		// Pattern 2: Convert /mnt/c/... to C:\...
+		if strings.HasPrefix(path, "/mnt/") && len(path) > 6 && path[6] == '/' {
+			ch := path[5]
+			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+				driveLetter := strings.ToUpper(string(ch))
+				winPath := driveLetter + `:\` + filepath.FromSlash(path[7:])
+				if _, err := os.Stat(winPath); err == nil {
+					return winPath
+				}
 			}
 		}
 	}
+	return ""
+}
 
-	// Try working dir
-	if node.WorkingDir != "" {
-		candidates := []string{
-			filepath.Join(node.WorkingDir, "docker-compose.yml"),
-			filepath.Join(node.WorkingDir, "docker-compose.yaml"),
-			filepath.Join(node.WorkingDir, "compose.yml"),
-			filepath.Join(node.WorkingDir, "compose.yaml"),
+func checkConfigFiles(configFiles string) string {
+	for f := range strings.SplitSeq(configFiles, ",") {
+		if resolved := resolveExistingFile(f); resolved != "" {
+			return resolved
 		}
-		for _, c := range candidates {
-			if _, err := os.Stat(c); err == nil {
-				return c
-			}
+	}
+	return ""
+}
+
+func checkWorkingDir(dir string) string {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return ""
+	}
+	candidates := []string{
+		filepath.Join(dir, "docker-compose.yml"),
+		filepath.Join(dir, "docker-compose.yaml"),
+		filepath.Join(dir, "compose.yml"),
+		filepath.Join(dir, "compose.yaml"),
+	}
+	for _, c := range candidates {
+		if resolved := resolveExistingFile(c); resolved != "" {
+			return resolved
+		}
+	}
+	return ""
+}
+
+func findComposeFile(node *TreeNode) string {
+	if node.ConfigFiles != "" {
+		if f := checkConfigFiles(node.ConfigFiles); f != "" {
+			return f
+		}
+	}
+
+	if node.WorkingDir != "" {
+		if f := checkWorkingDir(node.WorkingDir); f != "" {
+			return f
 		}
 	}
 
@@ -161,35 +210,26 @@ func findComposeFile(node *TreeNode) string {
 	for _, child := range node.Children {
 		if child.Container != nil {
 			if child.Container.ConfigFiles != "" {
-				files := strings.Split(child.Container.ConfigFiles, ",")
-				if len(files) > 0 {
-					first := strings.TrimSpace(files[0])
-					if _, err := os.Stat(first); err == nil {
-						return first
-					}
+				if f := checkConfigFiles(child.Container.ConfigFiles); f != "" {
+					return f
 				}
 			}
 			if child.Container.WorkingDir != "" {
-				candidates := []string{
-					filepath.Join(child.Container.WorkingDir, "docker-compose.yml"),
-					filepath.Join(child.Container.WorkingDir, "docker-compose.yaml"),
-					filepath.Join(child.Container.WorkingDir, "compose.yml"),
-					filepath.Join(child.Container.WorkingDir, "compose.yaml"),
-				}
-				for _, c := range candidates {
-					if _, err := os.Stat(c); err == nil {
-						return c
-					}
+				if f := checkWorkingDir(child.Container.WorkingDir); f != "" {
+					return f
 				}
 			}
 		}
 		for _, grandchild := range child.Children {
-			if grandchild.Container != nil && grandchild.Container.ConfigFiles != "" {
-				files := strings.Split(grandchild.Container.ConfigFiles, ",")
-				if len(files) > 0 {
-					first := strings.TrimSpace(files[0])
-					if _, err := os.Stat(first); err == nil {
-						return first
+			if grandchild.Container != nil {
+				if grandchild.Container.ConfigFiles != "" {
+					if f := checkConfigFiles(grandchild.Container.ConfigFiles); f != "" {
+						return f
+					}
+				}
+				if grandchild.Container.WorkingDir != "" {
+					if f := checkWorkingDir(grandchild.Container.WorkingDir); f != "" {
+						return f
 					}
 				}
 			}
@@ -199,11 +239,11 @@ func findComposeFile(node *TreeNode) string {
 	// Fallback: check current directory
 	candidates := []string{"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
 	for _, c := range candidates {
-		if _, err := os.Stat(c); err == nil {
-			if abs, err := filepath.Abs(c); err == nil {
+		if resolved := resolveExistingFile(c); resolved != "" {
+			if abs, err := filepath.Abs(resolved); err == nil {
 				return abs
 			}
-			return c
+			return resolved
 		}
 	}
 

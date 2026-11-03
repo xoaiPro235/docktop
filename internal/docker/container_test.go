@@ -2,6 +2,7 @@ package docker
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/moby/moby/api/types/container"
@@ -73,5 +74,32 @@ func TestContainerInfo_HasDetailsLoaded(t *testing.T) {
 	c2 := &ContainerInfo{Details: &container.InspectResponse{}}
 	if !c2.HasDetailsLoaded() {
 		t.Error("HasDetailsLoaded() should be true when Details is non-nil")
+	}
+}
+
+func TestClient_ExecShellCmd(t *testing.T) {
+	tests := []struct {
+		name string
+		host string
+		want []string
+	}{
+		{
+			name: "configured host",
+			host: "ssh://docker@example.com",
+			want: []string{"docker", "-H", "ssh://docker@example.com", "exec", "-it", "container-id", "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh"},
+		},
+		{
+			name: "default host",
+			want: []string{"docker", "exec", "-it", "container-id", "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := (&Client{host: tt.host}).ExecShellCmd("container-id").Args
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ExecShellCmd().Args = %#v, want %#v", got, tt.want)
+			}
+		})
 	}
 }

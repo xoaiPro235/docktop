@@ -2,36 +2,66 @@ package docker
 
 import (
 	"context"
-	"reflect"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
-	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 func TestClient_ListNetworks(t *testing.T) {
-	type args struct {
-		ctx context.Context
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/networks"):
+			_, _ = w.Write([]byte(`[
+				{"Id":"system-id","Name":"bridge","Driver":"bridge","Scope":"local"},
+				{"Id":"empty-id","Name":"unused","Driver":"bridge","Scope":"local"},
+				{"Id":"used-id","Name":"app","Driver":"bridge","Scope":"local"}
+			]`))
+		case strings.HasSuffix(r.URL.Path, "/containers/json"):
+			_, _ = w.Write([]byte(`[]`))
+		case strings.HasSuffix(r.URL.Path, "/networks/system-id"):
+			_, _ = w.Write([]byte(`{"Id":"system-id","Name":"bridge","Driver":"bridge","Scope":"local","IPAM":{"Config":[]},"Containers":{}}`))
+		case strings.HasSuffix(r.URL.Path, "/networks/empty-id"):
+			_, _ = w.Write([]byte(`{"Id":"empty-id","Name":"unused","Driver":"bridge","Scope":"local","IPAM":{"Config":[]},"Containers":{}}`))
+		case strings.HasSuffix(r.URL.Path, "/networks/used-id"):
+			_, _ = w.Write([]byte(`{"Id":"used-id","Name":"app","Driver":"bridge","Scope":"local","IPAM":{"Config":[]},"Containers":{"container-id":{"Name":"web"}}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	cli, err := client.New(client.WithHost(server.URL), client.WithAPIVersion("1.52"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		want    []NetworkInfo
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	defer cli.Close()
+
+	got, err := (&Client{cli: cli}).ListNetworks(context.Background())
+	if err != nil {
+		t.Fatalf("ListNetworks() error = %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.c.ListNetworks(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Client.ListNetworks() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Client.ListNetworks() = %v, want %v", got, tt.want)
-			}
-		})
+	if len(got) != 3 {
+		t.Fatalf("ListNetworks() returned %d networks, want 3", len(got))
+	}
+	if got[0].Name != "app" || got[1].Name != "unused" || got[2].Name != "bridge" {
+		t.Errorf("network order = [%q, %q, %q], want [app, unused, bridge]", got[0].Name, got[1].Name, got[2].Name)
+	}
+	if got[0].ConnectedCount != 1 || got[0].IsSystem || got[0].RawInspect == nil {
+		t.Errorf("connected user network metadata = %+v, want one endpoint, non-system, and raw inspect data", got[0])
+	}
+	wantEndpoint := NetworkEndpointInfo{ContainerID: "container-id", Name: "web", IP: "-", MacAddress: "-", Ports: "-"}
+	if len(got[0].Containers) != 1 || got[0].Containers[0] != wantEndpoint {
+		t.Errorf("connected network endpoints = %+v, want [%+v]", got[0].Containers, wantEndpoint)
+	}
+	if got[1].ConnectedCount != 0 || got[1].IsSystem {
+		t.Errorf("unused user network metadata = %+v, want no endpoints and non-system", got[1])
+	}
+	if got[2].ConnectedCount != 0 || !got[2].IsSystem {
+		t.Errorf("system network metadata = %+v, want no endpoints and system", got[2])
 	}
 }
 
@@ -61,83 +91,6 @@ func Test_networkScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := networkScore(tt.n); got != tt.want {
 				t.Errorf("networkScore() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestClient_InspectNetwork(t *testing.T) {
-	type args struct {
-		ctx       context.Context
-		networkID string
-	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		want    *network.Inspect
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.c.InspectNetwork(tt.args.ctx, tt.args.networkID)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Client.InspectNetwork() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Client.InspectNetwork() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestClient_RemoveNetwork(t *testing.T) {
-	type args struct {
-		ctx       context.Context
-		networkID string
-	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.c.RemoveNetwork(tt.args.ctx, tt.args.networkID); (err != nil) != tt.wantErr {
-				t.Errorf("Client.RemoveNetwork() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestClient_PruneNetworks(t *testing.T) {
-	type args struct {
-		ctx context.Context
-	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		want    network.PruneReport
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.c.PruneNetworks(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Client.PruneNetworks() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Client.PruneNetworks() = %v, want %v", got, tt.want)
 			}
 		})
 	}

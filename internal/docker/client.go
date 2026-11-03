@@ -2,6 +2,8 @@ package docker
 
 import (
 	"context"
+	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -9,7 +11,13 @@ import (
 )
 
 type Client struct {
-	cli *client.Client
+	cli  *client.Client
+	host string
+}
+
+// Host returns the configured Docker host endpoint, if any.
+func (c *Client) Host() string {
+	return c.host
 }
 
 // NewClient initializes a Docker API client.
@@ -23,6 +31,12 @@ func NewClient(hosts ...string) (*Client, error) {
 	if len(hosts) > 0 {
 		targetHost = strings.TrimSpace(hosts[0])
 	}
+	if targetHost == "" && runtime.GOOS == "windows" && os.Getenv("DOCKER_HOST") == "" {
+		// Modern Docker Desktop on Windows (WSL 2 backend) exposes named pipe at dockerDesktopLinuxEngine
+		if _, err := os.Stat(`\\.\pipe\dockerDesktopLinuxEngine`); err == nil {
+			targetHost = "npipe:////./pipe/dockerDesktopLinuxEngine"
+		}
+	}
 	if targetHost != "" {
 		opts = append(opts, client.WithHost(targetHost))
 	}
@@ -32,7 +46,10 @@ func NewClient(hosts ...string) (*Client, error) {
 		return nil, err
 	}
 
-	c := &Client{cli: cli}
+	c := &Client{
+		cli:  cli,
+		host: targetHost,
+	}
 
 	// Negotiate API version immediately upon connection.
 	// 5-second timeout handles potential network/SSH latency to remote hosts.

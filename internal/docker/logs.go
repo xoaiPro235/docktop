@@ -69,7 +69,11 @@ func (c *Client) StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-c
 			tail = "50"
 		}
 
-		args := []string{"compose", "--ansi", "always"}
+		var args []string
+		if c.host != "" {
+			args = append(args, "-H", c.host)
+		}
+		args = append(args, "compose", "--ansi", "always")
 		if opts.ProjectName != "" {
 			args = append(args, "-p", opts.ProjectName)
 		}
@@ -127,7 +131,7 @@ func (c *Client) StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-c
 
 func scanLogs(ctx context.Context, r io.Reader, out chan<- string) {
 	if closer, ok := r.(io.Closer); ok {
-		stop := context.AfterFunc(ctx, func ()  {
+		stop := context.AfterFunc(ctx, func() {
 			_ = closer.Close()
 		})
 		defer stop()

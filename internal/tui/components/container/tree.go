@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/xoaiPro235/docktop/internal/docker"
 )
@@ -66,17 +65,17 @@ type FlatItem struct {
 	Prefix string
 }
 
-func containerStateScore(state string) int {
-	switch strings.ToLower(state) {
-	case string(docker.StateRunning):
+func containerStateScore(state docker.ContainerState) int {
+	switch state {
+	case docker.StateRunning:
 		return 1
-	case string(docker.StateRestarting):
+	case docker.StateRestarting:
 		return 2
-	case string(docker.StatePaused):
+	case docker.StatePaused:
 		return 3
-	case string(docker.StateCreated):
+	case docker.StateCreated:
 		return 4
-	case string(docker.StateExited), string(docker.StateDead):
+	case docker.StateExited, docker.StateDead:
 		return 5
 	default:
 		return 6
@@ -87,11 +86,11 @@ func compareContainerNodes(a, b *TreeNode) int {
 	scoreA := 99
 	scoreB := 99
 	if a.Container != nil {
-		scoreA = containerStateScore(string(a.Container.State))
+		scoreA = containerStateScore(a.Container.State)
 	}
 
 	if b.Container != nil {
-		scoreB = containerStateScore(string(b.Container.State))
+		scoreB = containerStateScore(b.Container.State)
 	}
 
 	if c := cmp.Compare(scoreA, scoreB); c != 0 {

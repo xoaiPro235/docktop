@@ -132,3 +132,23 @@ func Test_displayTag(t *testing.T) {
 		})
 	}
 }
+
+func Test_imageStatusScore(t *testing.T) {
+	tests := []struct {
+		name string
+		img  ImageInfo
+		want int
+	}{
+		{name: "in-use image", img: ImageInfo{InUse: true}, want: 1},
+		{name: "unused image", img: ImageInfo{}, want: 2},
+		{name: "dangling image", img: ImageInfo{Dangling: true}, want: 3},
+		{name: "in-use dangling image is prioritized as in-use", img: ImageInfo{InUse: true, Dangling: true}, want: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := imageStatusScore(tt.img); got != tt.want {
+				t.Errorf("imageStatusScore() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}

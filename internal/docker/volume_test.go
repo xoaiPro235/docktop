@@ -2,113 +2,62 @@ package docker
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 func TestClient_ListVolumes(t *testing.T) {
-	type args struct {
-		ctx context.Context
-	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		want    []VolumeInfo
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.c.ListVolumes(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Client.ListVolumes() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Client.ListVolumes() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/volumes"):
+			_, _ = w.Write([]byte(`{"Volumes":[{"Name":"unused","Driver":"local"},{"Name":"shared","Driver":"local"},{"Name":"other","Driver":"local"}]}`))
+		case strings.HasSuffix(r.URL.Path, "/containers/json"):
+			_, _ = w.Write([]byte(`[
+				{"Id":"ctr-z","Names":["/zulu"],"State":"running","Mounts":[{"Type":"volume","Name":"shared","Destination":"/data","Mode":"rw","RW":true}]},
+				{"Id":"ctr-a","Names":["/alpha"],"State":"exited","Mounts":[{"Type":"volume","Name":"shared","Destination":"/cache","Mode":"ro","RW":false},{"Type":"volume","Name":"other","Destination":"/other"}]}
+			]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
 
-func TestClient_InspectVolume(t *testing.T) {
-	type args struct {
-		ctx  context.Context
-		name string
+	cli, err := client.New(client.WithHost(server.URL), client.WithAPIVersion("1.52"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		want    *volume.Volume
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.c.InspectVolume(tt.args.ctx, tt.args.name)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Client.InspectVolume() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Client.InspectVolume() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+	defer cli.Close()
 
-func TestClient_RemoveVolume(t *testing.T) {
-	type args struct {
-		ctx   context.Context
-		name  string
-		force bool
+	got, err := (&Client{cli: cli}).ListVolumes(context.Background())
+	if err != nil {
+		t.Fatalf("ListVolumes() error = %v", err)
 	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	want := []VolumeInfo{
+		{
+			Volume: volume.Volume{Name: "shared", Driver: "local"},
+			InUse:  true,
+			RefCnt: 2,
+			Containers: []VolumeContainerMount{
+				{ContainerID: "ctr-a", ContainerName: "alpha", State: "exited", Destination: "/cache", Mode: "ro", RW: false},
+				{ContainerID: "ctr-z", ContainerName: "zulu", State: "running", Destination: "/data", Mode: "rw", RW: true},
+			},
+		},
+		{
+			Volume:     volume.Volume{Name: "other", Driver: "local"},
+			InUse:      true,
+			RefCnt:     1,
+			Containers: []VolumeContainerMount{{ContainerID: "ctr-a", ContainerName: "alpha", State: "exited", Destination: "/other"}},
+		},
+		{Volume: volume.Volume{Name: "unused", Driver: "local"}},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.c.RemoveVolume(tt.args.ctx, tt.args.name, tt.args.force); (err != nil) != tt.wantErr {
-				t.Errorf("Client.RemoveVolume() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestClient_PruneVolumes(t *testing.T) {
-	type args struct {
-		ctx context.Context
-	}
-	tests := []struct {
-		name    string
-		c       *Client
-		args    args
-		want    volume.PruneReport
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.c.PruneVolumes(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Client.PruneVolumes() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Client.PruneVolumes() = %v, want %v", got, tt.want)
-			}
-		})
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ListVolumes() = %#v, want %#v", got, want)
 	}
 }
