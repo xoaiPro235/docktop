@@ -73,7 +73,7 @@ theme: "terminal"
 - **[btop](https://github.com/aristocratos/btop)** by aristocratos – Visual inspiration for Braille graph resource monitoring and mirrored layouts.
 - **[lazydocker](https://github.com/jesseduffield/lazydocker)** by Jesse Duffield – Workflow inspiration for container lifecycle management and compose tree structure.
 - **[Charmbracelet (Bubble Tea & Lipgloss)](https://github.com/charmbracelet)** – The wonderful TUI framework and styling toolkit powering this project.
-
+- Container statistics calculation logic adapted from [docker/cli](https://github.com/docker/cli) (Apache-2.0 License).
 ---
 
 ## 📄 License
