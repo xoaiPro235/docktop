@@ -209,4 +209,3 @@ func (c *Client) ExecShellCmd(containerID string) *exec.Cmd {
 	args = append(args, "exec", "-it", containerID, "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh")
 	return exec.Command("docker", args...)
 }
-

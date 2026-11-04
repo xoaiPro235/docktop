@@ -63,7 +63,7 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 	fmt.Fprintf(&sb, "%s %s\n\n", theme.Current.Key.Render("Internal:   "), theme.Current.Value.Render(internalDesc))
 
 	// 2. Labels
-	labelCount := len(selected.RawInspect.Labels)
+	labelCount := len(selected.Labels)
 	labelsHeader := fmt.Sprintf("LABELS (%d)", labelCount)
 	sb.WriteString(theme.Current.SectionHeader(labelsHeader, width))
 
@@ -74,13 +74,13 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 	} else {
 		// Sort keys alphabetically to guarantee 100% stable, deterministic order
 		keys := make([]string, 0, labelCount)
-		for k := range selected.RawInspect.Labels {
+		for k := range selected.Labels {
 			keys = append(keys, k)
 		}
 		slices.Sort(keys)
 
 		for _, k := range keys {
-			val := selected.RawInspect.Labels[k]
+			val := selected.Labels[k]
 			lineStr := fmt.Sprintf("  %s %s", theme.Current.AccentText.Render(k+":"), theme.Current.Value.Render(val))
 			sb.WriteString(lineStr)
 			sb.WriteString("\n")
@@ -89,7 +89,7 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 	}
 
 	// 3. Options
-	optionCount := len(selected.RawInspect.Options)
+	optionCount := len(selected.Options)
 	optionHeader := fmt.Sprintf("OPTIONS (%d)", optionCount)
 	sb.WriteString(theme.Current.SectionHeader(optionHeader, width))
 
@@ -100,13 +100,13 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 	} else {
 		// Sort keys alphabetically to guarantee 100% stable, deterministic order
 		keys := make([]string, 0, optionCount)
-		for k := range selected.RawInspect.Options {
+		for k := range selected.Options {
 			keys = append(keys, k)
 		}
 		slices.Sort(keys)
 
 		for _, k := range keys {
-			val := selected.RawInspect.Options[k]
+			val := selected.Options[k]
 			lineStr := fmt.Sprintf("  %s %s", theme.Current.AccentText.Render(k+":"), theme.Current.Value.Render(val))
 			sb.WriteString(lineStr)
 			sb.WriteString("\n")

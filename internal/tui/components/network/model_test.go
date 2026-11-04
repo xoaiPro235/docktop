@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	networktypes "github.com/moby/moby/api/types/network"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
@@ -60,9 +59,9 @@ func TestModel_SetNetworks(t *testing.T) {
 	m.SetSize(100, 30)
 
 	nets := []docker.NetworkInfo{
-		{ID: "net-1", Name: "bridge", RawInspect: &networktypes.Inspect{}},
-		{ID: "net-2", Name: "custom_app", RawInspect: &networktypes.Inspect{}},
-		{ID: "net-3", Name: "host", RawInspect: &networktypes.Inspect{}},
+		{ID: "net-1", Name: "bridge"},
+		{ID: "net-2", Name: "custom_app"},
+		{ID: "net-3", Name: "host"},
 	}
 
 	m.SetNetworks(nets)
@@ -76,8 +75,8 @@ func TestModel_SetNetworks(t *testing.T) {
 	// Move cursor to net-2 and update list
 	m.cursorIndex = 1
 	newNets := []docker.NetworkInfo{
-		{ID: "net-3", Name: "host", RawInspect: &networktypes.Inspect{}},
-		{ID: "net-2", Name: "custom_app", RawInspect: &networktypes.Inspect{}},
+		{ID: "net-3", Name: "host"},
+		{ID: "net-2", Name: "custom_app"},
 	}
 	m.SetNetworks(newNets)
 	if m.SelectedNetwork() == nil || m.SelectedNetwork().ID != "net-2" {
@@ -152,8 +151,8 @@ func TestModel_SelectedNetwork(t *testing.T) {
 	}
 
 	m.networks = []docker.NetworkInfo{
-		{ID: "net-a", Name: "bridge", RawInspect: &networktypes.Inspect{}},
-		{ID: "net-b", Name: "overlay", RawInspect: &networktypes.Inspect{}},
+		{ID: "net-a", Name: "bridge"},
+		{ID: "net-b", Name: "overlay"},
 	}
 	m.applyFilter()
 	m.cursorIndex = 1
@@ -184,7 +183,6 @@ func TestModel_updateViewportContent(t *testing.T) {
 			Subnet:         "172.20.0.0/16",
 			Gateway:        "172.20.0.1",
 			ConnectedCount: 1,
-			RawInspect:     &networktypes.Inspect{},
 			Containers: []docker.NetworkEndpointInfo{
 				{ContainerID: "cid1", Name: "web-server", IP: "172.20.0.2", Ports: "80:80"},
 			},

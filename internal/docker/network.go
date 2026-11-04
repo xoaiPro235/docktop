@@ -21,17 +21,12 @@ type NetworkEndpointInfo struct {
 }
 
 type NetworkInfo struct {
-	ID             string
-	Name           string
-	Driver         string
-	Scope          string
+	network.Summary
 	Subnet         string
 	Gateway        string
-	Internal       bool
 	IsSystem       bool
 	ConnectedCount int
 	Containers     []NetworkEndpointInfo
-	RawInspect     *network.Inspect
 }
 
 // ListNetworks retrieves all Docker networks with detailed endpoint metadata
@@ -42,8 +37,13 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 	}
 
 	ctrRes, _ := c.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
-	containerPortsMap := make(map[string]string)
+	endpointsByNet := make(map[string][]NetworkEndpointInfo)
+
 	for _, ctr := range ctrRes.Items {
+		if ctr.State != StateRunning && ctr.State != StatePaused {
+			continue
+		}
+
 		var portStrs []string
 		for _, p := range ctr.Ports {
 			if p.PublicPort > 0 {
@@ -56,25 +56,64 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 				portStrs = append(portStrs, fmt.Sprintf("%d", p.PrivatePort))
 			}
 		}
+		ports := "-"
 		if len(portStrs) > 0 {
-			containerPortsMap[ctr.ID] = strings.Join(portStrs, ", ")
+			ports = strings.Join(portStrs, ", ")
+		}
+
+		ctrName := ShortID(ctr.ID)
+		if len(ctr.Names) > 0 {
+			ctrName = strings.TrimPrefix(ctr.Names[0], "/")
+		}
+
+		if ctr.NetworkSettings != nil {
+			for netName, ep := range ctr.NetworkSettings.Networks {
+				if ep == nil {
+					continue
+				}
+				ip := "-"
+				if ep.IPAddress.IsValid() && !ep.IPAddress.IsUnspecified() {
+					if ep.IPPrefixLen > 0 {
+						ip = fmt.Sprintf("%s/%d", ep.IPAddress.String(), ep.IPPrefixLen)
+					} else {
+						ip = ep.IPAddress.String()
+					}
+				} else if ep.GlobalIPv6Address.IsValid() && !ep.GlobalIPv6Address.IsUnspecified() {
+					if ep.GlobalIPv6PrefixLen > 0 {
+						ip = fmt.Sprintf("%s/%d", ep.GlobalIPv6Address.String(), ep.GlobalIPv6PrefixLen)
+					} else {
+						ip = ep.GlobalIPv6Address.String()
+					}
+				}
+
+				mac := "-"
+				if len(ep.MacAddress) > 0 {
+					mac = ep.MacAddress.String()
+				}
+
+				endpointInfo := NetworkEndpointInfo{
+					ContainerID: ctr.ID,
+					Name:        ctrName,
+					IP:          ip,
+					MacAddress:  mac,
+					Ports:       ports,
+				}
+
+				if ep.NetworkID != "" {
+					endpointsByNet[ep.NetworkID] = append(endpointsByNet[ep.NetworkID], endpointInfo)
+				} else {
+					endpointsByNet[netName] = append(endpointsByNet[netName], endpointInfo)
+				}
+			}
 		}
 	}
 
-	var networks []NetworkInfo
+	networks := make([]NetworkInfo, 0, len(listRes.Items))
 	for _, netSummary := range listRes.Items {
-		// Deep inspect each network to retrieve connected containers
-		inspectRes, err := c.cli.NetworkInspect(ctx, netSummary.ID, client.NetworkInspectOptions{Verbose: true})
-		if err != nil {
-			continue
-		}
-
-		netInspect := inspectRes.Network
-
 		var subnet string
 		var gateway string
-		if len(netInspect.IPAM.Config) > 0 {
-			cfg := netInspect.IPAM.Config[0]
+		if len(netSummary.IPAM.Config) > 0 {
+			cfg := netSummary.IPAM.Config[0]
 			if cfg.Subnet.IsValid() {
 				subnet = cfg.Subnet.String()
 			}
@@ -83,58 +122,24 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 			}
 		}
 
-		isSystem := netInspect.Name == "bridge" || netInspect.Name == "host" || netInspect.Name == "none"
+		isSystem := netSummary.Name == "bridge" || netSummary.Name == "host" || netSummary.Name == "none"
 
-		var endpoints []NetworkEndpointInfo
-		for ctrID, endpoint := range netInspect.Containers {
-			ip := "-"
-			if endpoint.IPv4Address.IsValid() {
-				ip = endpoint.IPv4Address.String()
-			} else if endpoint.IPv6Address.IsValid() {
-				ip = endpoint.IPv6Address.String()
-			}
-			mac := "-"
-			if len(endpoint.MacAddress) > 0 {
-				mac = endpoint.MacAddress.String()
-			}
-
-			ports := containerPortsMap[ctrID]
-			if ports == "" {
-				ports = "-"
-			}
-
-			name := endpoint.Name
-			if name == "" {
-				name = ShortID(ctrID)
-			}
-
-			endpoints = append(endpoints, NetworkEndpointInfo{
-				ContainerID: ctrID,
-				Name:        name,
-				IP:          ip,
-				MacAddress:  mac,
-				Ports:       ports,
-			})
+		endpoints := endpointsByNet[netSummary.ID]
+		if len(endpoints) == 0 {
+			endpoints = endpointsByNet[netSummary.Name]
 		}
 
-		// Sort endpoints by name
 		slices.SortStableFunc(endpoints, func(a, b NetworkEndpointInfo) int {
 			return cmp.Compare(a.Name, b.Name)
 		})
 
-		connectedCount := len(endpoints)
 		networks = append(networks, NetworkInfo{
-			ID:             netInspect.ID,
-			Name:           netInspect.Name,
-			Driver:         netInspect.Driver,
-			Scope:          netInspect.Scope,
+			Summary:        netSummary,
 			Subnet:         subnet,
 			Gateway:        gateway,
-			Internal:       netInspect.Internal,
 			IsSystem:       isSystem,
-			ConnectedCount: connectedCount,
+			ConnectedCount: len(endpoints),
 			Containers:     endpoints,
-			RawInspect:     &netInspect,
 		})
 	}
 

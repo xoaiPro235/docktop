@@ -21,13 +21,22 @@ func TestClient_ListNetworks(t *testing.T) {
 				{"Id":"used-id","Name":"app","Driver":"bridge","Scope":"local"}
 			]`))
 		case strings.HasSuffix(r.URL.Path, "/containers/json"):
-			_, _ = w.Write([]byte(`[]`))
-		case strings.HasSuffix(r.URL.Path, "/networks/system-id"):
-			_, _ = w.Write([]byte(`{"Id":"system-id","Name":"bridge","Driver":"bridge","Scope":"local","IPAM":{"Config":[]},"Containers":{}}`))
-		case strings.HasSuffix(r.URL.Path, "/networks/empty-id"):
-			_, _ = w.Write([]byte(`{"Id":"empty-id","Name":"unused","Driver":"bridge","Scope":"local","IPAM":{"Config":[]},"Containers":{}}`))
-		case strings.HasSuffix(r.URL.Path, "/networks/used-id"):
-			_, _ = w.Write([]byte(`{"Id":"used-id","Name":"app","Driver":"bridge","Scope":"local","IPAM":{"Config":[]},"Containers":{"container-id":{"Name":"web"}}}`))
+			_, _ = w.Write([]byte(`[
+				{
+					"Id":"container-id",
+					"Names":["/web"],
+					"State":"running",
+					"Ports":[],
+					"NetworkSettings":{"Networks":{
+						"app":{
+							"NetworkID":"used-id",
+							"IPAddress":"172.18.0.2",
+							"IPPrefixLen":16,
+							"MacAddress":"02:42:ac:12:00:02"
+						}
+					}}
+				}
+			]`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -50,10 +59,16 @@ func TestClient_ListNetworks(t *testing.T) {
 	if got[0].Name != "app" || got[1].Name != "unused" || got[2].Name != "bridge" {
 		t.Errorf("network order = [%q, %q, %q], want [app, unused, bridge]", got[0].Name, got[1].Name, got[2].Name)
 	}
-	if got[0].ConnectedCount != 1 || got[0].IsSystem || got[0].RawInspect == nil {
-		t.Errorf("connected user network metadata = %+v, want one endpoint, non-system, and raw inspect data", got[0])
+	if got[0].ConnectedCount != 1 || got[0].IsSystem {
+		t.Errorf("connected user network metadata = %+v, want one endpoint and non-system", got[0])
 	}
-	wantEndpoint := NetworkEndpointInfo{ContainerID: "container-id", Name: "web", IP: "-", MacAddress: "-", Ports: "-"}
+	wantEndpoint := NetworkEndpointInfo{
+		ContainerID: "container-id",
+		Name:        "web",
+		IP:          "172.18.0.2/16",
+		MacAddress:  "02:42:ac:12:00:02",
+		Ports:       "-",
+	}
 	if len(got[0].Containers) != 1 || got[0].Containers[0] != wantEndpoint {
 		t.Errorf("connected network endpoints = %+v, want [%+v]", got[0].Containers, wantEndpoint)
 	}
