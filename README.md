@@ -37,13 +37,21 @@ make build
 
 ## Configuration & Themes
 
-`docktop` reads its configuration from `~/.config/docktop/config.yaml` (or the equivalent OS config directory). If the file does not exist, `docktop` automatically creates one with default settings upon first launch.
+`docktop` reads its configuration from the standard OS configuration directory:
+- **Linux/Unix:** `~/.config/docktop/config.yaml`
+- **macOS:** `~/Library/Application Support/docktop/config.yaml`
+- **Windows:** `%APPDATA%\docktop\config.yaml`
 
-### Example `~/.config/docktop/config.yaml`:
+If the file does not exist, `docktop` automatically creates one with default settings upon first launch.
+
+### Example `config.yaml`:
 
 ```yaml
 # docktop configuration file
-# Location: ~/.config/docktop/config.yaml
+# Default locations:
+#   - Linux/Unix : ~/.config/docktop/config.yaml
+#   - macOS      : ~/Library/Application Support/docktop/config.yaml
+#   - Windows    : %APPDATA%\docktop\config.yaml
 
 # UI Theme:
 # Available presets:
@@ -56,7 +64,15 @@ theme: "terminal"
 
 # Docker Host:
 # Optional Docker daemon endpoint or remote socket.
-# host: "ssh://user@remote-vps:22"
+# If omitted or left empty, docktop falls back to the DOCKER_HOST environment variable,
+# or the standard OS Docker daemon socket / named pipe.
+# Examples:
+#   host: "unix:///var/run/docker.sock"
+#   host: "unix:///run/user/1000/docker.sock" (Rootless Docker)
+#   host: "npipe:////./pipe/dockerDesktopLinuxEngine" (Windows Docker Desktop)
+#   host: "ssh://user@remote-vps:22"
+#   host: "tcp://192.168.1.100:2376"
+# host: ""
 ```
 
 > **Tip:** Setting `theme: "terminal"` will make `docktop` automatically inherit whatever colors your terminal emulator (Kitty, Alacritty, iTerm2, WezTerm) is configured with!

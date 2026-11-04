@@ -30,7 +30,9 @@ func Default() *Config {
 	}
 }
 
-// GetConfigPath returns the absolute path to ~/.config/docktop/config.yaml (or OS equivalent).
+// GetConfigPath returns the absolute path to the configuration file
+// (~/.config/docktop/config.yaml on Linux, %APPDATA%\docktop\config.yaml on Windows,
+// or ~/Library/Application Support/docktop/config.yaml on macOS).
 func GetConfigPath() (string, error) {
 	baseDir, err := os.UserConfigDir()
 	if err != nil {
@@ -83,7 +85,10 @@ func SaveTemplate(path string) error {
 	}
 
 	template := `# docktop configuration file
-# Location: ~/.config/docktop/config.yaml
+# Default locations:
+#   - Linux/Unix : ~/.config/docktop/config.yaml
+#   - macOS      : ~/Library/Application Support/docktop/config.yaml
+#   - Windows    : %APPDATA%\docktop\config.yaml
 
 # UI Theme:
 # Available presets:
@@ -97,10 +102,11 @@ theme: "tokyo-night"
 # Docker Host:
 # Optional Docker daemon endpoint or remote socket.
 # If omitted or left empty, docktop falls back to the DOCKER_HOST environment variable,
-# or the standard local Docker daemon socket (/var/run/docker.sock).
+# or the standard OS Docker daemon socket / named pipe.
 # Examples:
 #   host: "unix:///var/run/docker.sock"
 #   host: "unix:///run/user/1000/docker.sock" (Rootless Docker)
+#   host: "npipe:////./pipe/dockerDesktopLinuxEngine" (Windows Docker Desktop)
 #   host: "ssh://user@remote-vps:22"
 #   host: "tcp://192.168.1.100:2376"
 # host: ""
