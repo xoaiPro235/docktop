@@ -21,7 +21,7 @@ type AppKeyMap struct {
 // AppKeys is the default instance of AppKeyMap.
 var AppKeys = AppKeyMap{
 	Quit: key.NewBinding(
-		key.WithKeys("q", "ctrl+c"),
+		key.WithKeys("q", "Q", "ctrl+c"),
 		key.WithHelp("q", "Quit"),
 	),
 	ForceQuit: key.NewBinding(

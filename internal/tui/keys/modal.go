@@ -34,7 +34,7 @@ type ErrorModalKeyMap struct {
 
 var ErrorModalKeys = ErrorModalKeyMap{
 	Dismiss: key.NewBinding(
-		key.WithKeys("y", "Y", "enter", "esc", "space", "q"),
+		key.WithKeys("y", "Y", "enter", "esc", "space", "q", "Q"),
 		key.WithHelp("y / Enter / Esc", "Dismiss Error"),
 	),
 }

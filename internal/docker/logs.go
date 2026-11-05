@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -139,10 +140,11 @@ func scanLogs(ctx context.Context, r io.Reader, out chan<- string) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
+		text := strings.ReplaceAll(scanner.Text(), "\r", "")
 		select {
 		case <-ctx.Done():
 			return
-		case out <- scanner.Text():
+		case out <- text:
 		}
 	}
 	_ = scanner.Err()
