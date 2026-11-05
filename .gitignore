@@ -7,6 +7,11 @@
 *.dll
 *.so
 *.dylib
+/docktop
+
+# GoReleaser artifacts
+dist/
+
 
 # Test binary, built with `go test -c`
 *.test

@@ -11,13 +11,22 @@ Manage and monitor your Docker with keyboard-driven ease.
 
 ## Installation
 
-### Option 1: Download Pre-built Binary
-Download the latest binary for your operating system (Linux, macOS, Windows) from the [Releases](https://github.com/xoaiPro235/docktop/releases) page.
+### Option 1: Download Pre-built Package or Binary
+Download the latest package or binary for your operating system (Linux, macOS, Windows) from the [Releases](https://github.com/xoaiPro235/docktop/releases) page.
 
 ```bash
-# Example for Linux (x86_64)
+# Debian / Ubuntu (.deb)
+sudo dpkg -i docktop_*_linux_amd64.deb
+
+# Fedora / RHEL (.rpm)
+sudo rpm -i docktop_*_linux_amd64.rpm
+
+# Or extract standalone binary (Linux / macOS)
 tar -xzf docktop_*_linux_amd64.tar.gz
 sudo mv docktop /usr/local/bin/
+
+# Windows
+# Extract the .zip archive and add docktop.exe to your PATH
 ```
 
 ### Option 2: Using `go install`

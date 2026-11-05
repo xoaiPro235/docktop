@@ -282,7 +282,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case DockerEventMsg:
 		// Clean event-driven dispatch: Only trigger refreshes for actual lifecycle changes
-		switch events.Type(msg.Type) {
+		switch msg.Type {
 		case events.ContainerEventType:
 			if docker.IsContainerLifecycleEvent(msg.Action) {
 				cmds = append(cmds, a.fetchContainersCmd())

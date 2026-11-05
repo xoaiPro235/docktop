@@ -1,0 +1,49 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+    - bodyclose
+    - errorlint
+    - unconvert
+  settings:
+    errcheck:
+      check-blank: false
+      check-type-assertions: false
+      exclude-functions:
+        - fmt.Print
+        - fmt.Println
+        - fmt.Printf
+        - fmt.Fprint
+        - fmt.Fprintln
+        - fmt.Fprintf
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+    staticcheck:
+      checks:
+        - "SA*"
+  exclusions:
+    rules:
+      - linters:
+          - errcheck
+        source: "^\\s*defer "
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
