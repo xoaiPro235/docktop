@@ -65,6 +65,7 @@ func (m Model) View() string {
 		startIdx, endIdx, _ := layout.ListWindow(
 			m.height,
 			m.cursorIndex,
+			m.scrollOffset,
 			len(m.flatItems),
 			m.searchBar.IsActive() || m.searchBar.HasFilter(),
 		)

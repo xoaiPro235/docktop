@@ -82,6 +82,7 @@ func (m Model) View() string {
 		startIdx, endIdx, _ := layout.ListWindow(
 			m.height,
 			m.cursorIndex,
+			m.scrollOffset,
 			len(m.filteredIndices),
 			m.searchBar.IsActive() || m.searchBar.HasFilter(),
 		)
@@ -102,13 +103,32 @@ func (m Model) View() string {
 			if img.Dangling {
 				tagDisplay = theme.Current.MutedText.Render(ansi.Truncate(img.Tag, tagColWidth, "…"))
 			} else {
-				parts := strings.SplitN(img.Tag, ":", 2)
-				if len(parts) == 2 {
-					tagDisplay = theme.Current.Title.Render(parts[0]) + theme.Current.MutedText.Render(":"+parts[1])
-				} else {
-					tagDisplay = theme.Current.Title.Render(img.Tag)
+				extraTags := 0
+				for _, t := range img.RepoTags {
+					if t != "<none>:<none>" && t != img.Tag {
+						extraTags++
+					}
 				}
-				tagDisplay = ansi.Truncate(tagDisplay, tagColWidth, "…")
+
+				badge := ""
+				badgeWidth := 0
+				if extraTags > 0 {
+					badgeStr := fmt.Sprintf(" (+%d)", extraTags)
+					badge = theme.Current.AccentText.Render(badgeStr)
+					badgeWidth = len(badgeStr)
+				}
+
+				availableForTag := max(tagColWidth-badgeWidth, 6)
+
+				parts := strings.SplitN(img.Tag, ":", 2)
+				var baseTag string
+				if len(parts) == 2 {
+					baseTag = theme.Current.Title.Render(parts[0]) + theme.Current.MutedText.Render(":"+parts[1])
+				} else {
+					baseTag = theme.Current.Title.Render(img.Tag)
+				}
+				baseTag = ansi.Truncate(baseTag, availableForTag, "…")
+				tagDisplay = baseTag + badge
 			}
 			// Pad to tagColWidth
 			tagWidth := ansi.StringWidth(tagDisplay)
@@ -150,12 +170,6 @@ func (m Model) View() string {
 			leftSB.WriteString(line)
 			leftSB.WriteString("\n")
 		}
-	}
-
-	if m.action.StatusMsg != "" {
-		leftSB.WriteString("\n")
-		leftSB.WriteString(theme.Current.ErrorText.Render(m.action.StatusMsg))
-		leftSB.WriteString("\n")
 	}
 
 	// --- 2. Render Right Details & Layers ---

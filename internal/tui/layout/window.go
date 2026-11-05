@@ -30,29 +30,64 @@ const (
 	ChromeRowsWithSearch = 6
 )
 
-// ListWindow calculates the visible slice range [startIdx, endIdx) and maxVisible items
-// for a vertically scrollable list with a moving cursor.
-//
-// It guarantees:
-//   - 0 <= startIdx <= cursorIndex < endIdx <= totalItems (when totalItems > 0).
-//   - maxVisible >= 1 even in cramped terminal windows to avoid zero-division or out-of-bounds slicing.
-func ListWindow(height, cursorIndex, totalItems int, hasFilter bool) (startIdx, endIdx, maxVisible int) {
+// CalcMaxVisible calculates the maximum number of items visible vertically.
+func CalcMaxVisible(height int, hasFilter bool) int {
 	chrome := ChromeRowsDefault
 	if hasFilter {
 		chrome = ChromeRowsWithSearch
 	}
+	maxVisible := height - chrome
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+	return maxVisible
+}
 
-	maxVisible = max(height-chrome, 1)
+// AdjustOffset adjusts scrollOffset so that cursorIndex remains visible within [offset, offset + maxVisible).
+// When moving within the viewport, scrollOffset stays stable so the cursor moves naturally.
+func AdjustOffset(height, cursorIndex, scrollOffset, totalItems int, hasFilter bool) int {
+	maxVisible := CalcMaxVisible(height, hasFilter)
+	if totalItems <= 0 {
+		return 0
+	}
 
+	startIdx := scrollOffset
+	if cursorIndex < startIdx {
+		startIdx = cursorIndex
+	} else if cursorIndex >= startIdx+maxVisible {
+		startIdx = cursorIndex - maxVisible + 1
+	}
+
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	maxStart := totalItems - maxVisible
+	if maxStart < 0 {
+		maxStart = 0
+	}
+	if startIdx > maxStart {
+		startIdx = maxStart
+	}
+	return startIdx
+}
+
+// ListWindow calculates the visible slice range [startIdx, endIdx) and maxVisible items
+// using the current scrollOffset, cursorIndex, and totalItems.
+// It ensures:
+//   - 0 <= startIdx <= cursorIndex < endIdx <= totalItems (when totalItems > 0).
+//   - maxVisible >= 1 even in cramped terminal windows to avoid zero-division or out-of-bounds slicing.
+func ListWindow(height, cursorIndex, scrollOffset, totalItems int, hasFilter bool) (startIdx, endIdx, maxVisible int) {
+	maxVisible = CalcMaxVisible(height, hasFilter)
 	if totalItems <= 0 {
 		return 0, 0, maxVisible
 	}
 
-	if cursorIndex >= maxVisible {
-		startIdx = cursorIndex - maxVisible + 1
-	}
+	startIdx = AdjustOffset(height, cursorIndex, scrollOffset, totalItems, hasFilter)
 
-	endIdx = min(startIdx+maxVisible, totalItems)
+	endIdx = startIdx + maxVisible
+	if endIdx > totalItems {
+		endIdx = totalItems
+	}
 
 	return startIdx, endIdx, maxVisible
 }
@@ -62,7 +97,7 @@ func ListWindow(height, cursorIndex, totalItems int, hasFilter bool) (startIdx, 
 //
 // It returns (targetIdx, true) if the click landed on an actual visible item row.
 // It returns (-1, false) if the click landed on borders, headers, blank padding lines, or beyond items.
-func ListClickTarget(mouseY, height, cursorIndex, totalItems int, hasFilter bool) (int, bool) {
+func ListClickTarget(mouseY, height, cursorIndex, scrollOffset, totalItems int, hasFilter bool) (int, bool) {
 	if totalItems <= 0 {
 		return -1, false
 	}
@@ -77,7 +112,7 @@ func ListClickTarget(mouseY, height, cursorIndex, totalItems int, hasFilter bool
 		return -1, false
 	}
 
-	startIdx, endIdx, _ := ListWindow(height, cursorIndex, totalItems, hasFilter)
+	startIdx, endIdx, _ := ListWindow(height, cursorIndex, scrollOffset, totalItems, hasFilter)
 	targetIdx := startIdx + clickedRow
 	if targetIdx >= startIdx && targetIdx < endIdx && targetIdx < totalItems {
 		return targetIdx, true

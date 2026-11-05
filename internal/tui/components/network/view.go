@@ -80,6 +80,7 @@ func (m Model) View() string {
 		startIndex, endIndex, _ := layout.ListWindow(
 			m.height,
 			m.cursorIndex,
+			m.scrollOffset,
 			len(m.filteredIndices),
 			m.searchBar.IsActive() || m.searchBar.HasFilter(),
 		)
@@ -139,12 +140,6 @@ func (m Model) View() string {
 			leftSB.WriteString(line)
 			leftSB.WriteString("\n")
 		}
-	}
-
-	if m.action.StatusMsg != "" {
-		leftSB.WriteString("\n")
-		leftSB.WriteString(m.action.StatusMsg)
-		leftSB.WriteString("\n")
 	}
 
 	// 2. Render Right Details

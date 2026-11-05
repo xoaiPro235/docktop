@@ -17,6 +17,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case ImageActionMsg:
+		m.action.Finish()
+		return m, nil
+
 	case spinner.TickMsg:
 		if m.action.IsRunning() {
 			var cmd tea.Cmd
@@ -39,48 +43,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		selected := m.SelectedImage()
 		if selected != nil && selected.ID == msg.ImageID {
 			m.updateViewportContent()
-		}
-
-	case ImageActionMsg:
-		m.action.Finish("")
-
-	case tea.MouseClickMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
-		leftWidth := (m.width * 52) / 100
-		if msg.X < leftWidth {
-			m.focusZone = FocusImagesList
-			if targetIdx, ok := layout.ListClickTarget(
-				msg.Y,
-				m.height,
-				m.cursorIndex,
-				len(m.filteredIndices),
-				m.searchBar.IsActive() || m.searchBar.HasFilter(),
-			); ok {
-				m.cursorIndex = targetIdx
-				cmds = append(cmds, m.syncDetails())
-			}
-		} else {
-			m.focusZone = FocusLayersPane
-		}
-
-	case tea.MouseWheelMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
-		if m.focusZone == FocusImagesList {
-			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
-				m.cursorIndex--
-				cmds = append(cmds, m.syncDetails())
-			} else if msg.Button == tea.MouseWheelDown && m.cursorIndex < len(m.filteredIndices)-1 {
-				m.cursorIndex++
-				cmds = append(cmds, m.syncDetails())
-			}
-		} else {
-			var cmd tea.Cmd
-			m.layersViewport, cmd = m.layersViewport.Update(msg)
-			cmds = append(cmds, cmd)
 		}
 
 	case tea.KeyPressMsg:
@@ -130,6 +92,49 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			} else {
 				m.focusZone = FocusImagesList
 			}
+			return m, nil
+
+		case key.Matches(msg, keys.ImageKeys.Up):
+			if m.focusZone == FocusImagesList {
+				if m.cursorIndex > 0 {
+					m.cursorIndex--
+					m.syncScroll()
+					cmds = append(cmds, m.syncDetails())
+				}
+			} else {
+				m.layersViewport.ScrollUp(1)
+			}
+			return m, tea.Batch(cmds...)
+
+		case key.Matches(msg, keys.ImageKeys.Down):
+			if m.focusZone == FocusImagesList {
+				if m.cursorIndex < len(m.filteredIndices)-1 {
+					m.cursorIndex++
+					m.syncScroll()
+					cmds = append(cmds, m.syncDetails())
+				}
+			} else {
+				m.layersViewport.ScrollDown(1)
+			}
+			return m, tea.Batch(cmds...)
+
+		case key.Matches(msg, keys.ImageKeys.Left):
+			if m.focusZone == FocusLayersPane {
+				m.layersViewport.ScrollLeft(4)
+				return m, nil
+			}
+
+		case key.Matches(msg, keys.ImageKeys.Right):
+			if m.focusZone == FocusLayersPane {
+				m.layersViewport.ScrollRight(4)
+				return m, nil
+			}
+
+		case key.Matches(msg, keys.ImageKeys.ToggleWrap):
+			if m.focusZone == FocusLayersPane {
+				m.layersViewport.SoftWrap = !m.layersViewport.SoftWrap
+				return m, nil
+			}
 
 		case key.Matches(msg, keys.ImageKeys.Remove):
 			selected := m.SelectedImage()
@@ -149,36 +154,54 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 
 		default:
-			if m.focusZone == FocusImagesList {
-				switch {
-				case key.Matches(msg, keys.ImageKeys.Up):
-					if m.cursorIndex > 0 {
-						m.cursorIndex--
-						cmds = append(cmds, m.syncDetails())
-					}
-				case key.Matches(msg, keys.ImageKeys.Down):
-					if m.cursorIndex < len(m.filteredIndices)-1 {
-						m.cursorIndex++
-						cmds = append(cmds, m.syncDetails())
-					}
-				}
-			} else {
-				switch {
-				case key.Matches(msg, keys.ImageKeys.ToggleWrap):
-					m.layersViewport.SoftWrap = !m.layersViewport.SoftWrap
-					return m, nil
-				case key.Matches(msg, keys.ImageKeys.Left):
-					m.layersViewport.ScrollLeft(4)
-					return m, nil
-				case key.Matches(msg, keys.ImageKeys.Right):
-					m.layersViewport.ScrollRight(4)
-					return m, nil
-				default:
-					var cmd tea.Cmd
-					m.layersViewport, cmd = m.layersViewport.Update(msg)
-					cmds = append(cmds, cmd)
-				}
+			if m.focusZone == FocusLayersPane {
+				var cmd tea.Cmd
+				m.layersViewport, cmd = m.layersViewport.Update(msg)
+				cmds = append(cmds, cmd)
 			}
+		}
+
+	case tea.MouseClickMsg:
+		if m.confirmModal.Active {
+			return m, nil
+		}
+		leftWidth := (m.width * 52) / 100
+		if msg.X < leftWidth {
+			m.focusZone = FocusImagesList
+			if targetIdx, ok := layout.ListClickTarget(
+				msg.Y,
+				m.height,
+				m.cursorIndex,
+				m.scrollOffset,
+				len(m.filteredIndices),
+				m.searchBar.IsActive() || m.searchBar.HasFilter(),
+			); ok {
+				m.cursorIndex = targetIdx
+				m.syncScroll()
+				cmds = append(cmds, m.syncDetails())
+			}
+		} else {
+			m.focusZone = FocusLayersPane
+		}
+
+	case tea.MouseWheelMsg:
+		if m.confirmModal.Active {
+			return m, nil
+		}
+		if m.focusZone == FocusImagesList {
+			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
+				m.cursorIndex--
+				m.syncScroll()
+				cmds = append(cmds, m.syncDetails())
+			} else if msg.Button == tea.MouseWheelDown && m.cursorIndex < len(m.filteredIndices)-1 {
+				m.cursorIndex++
+				m.syncScroll()
+				cmds = append(cmds, m.syncDetails())
+			}
+		} else {
+			var cmd tea.Cmd
+			m.layersViewport, cmd = m.layersViewport.Update(msg)
+			cmds = append(cmds, cmd)
 		}
 	}
 

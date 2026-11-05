@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
+	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -55,6 +56,7 @@ type Model struct {
 	statsChan             <-chan docker.ContainerMetrics
 
 	cursorIndex       int
+	scrollOffset      int
 	focusZone         FocusZone
 	activePane        SubPane
 	composeActivePane ComposeSubPane
@@ -123,6 +125,8 @@ func (m *Model) SelectedContainer() *docker.ContainerInfo {
 }
 
 func (m *Model) rebuildTree() {
+	defer m.syncScroll()
+
 	var prevSelectedID string
 	var prevName string
 
@@ -265,6 +269,7 @@ func (m *Model) SetSize(w, h int) {
 	m.inspectPane.SetSize(innerRightWidth, viewportHeight)
 	m.topPane.SetSize(innerRightWidth, viewportHeight)
 	m.composePane.SetSize(innerRightWidth, viewportHeight)
+	m.syncScroll()
 }
 
 func (m *Model) syncComposeNode(node *TreeNode) tea.Cmd {
@@ -346,4 +351,8 @@ func (m *Model) syncActivePane() tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
+}
+
+func (m *Model) syncScroll() {
+	m.scrollOffset = layout.AdjustOffset(m.height, m.cursorIndex, m.scrollOffset, len(m.flatItems), m.searchBar.IsActive() || m.searchBar.HasFilter())
 }

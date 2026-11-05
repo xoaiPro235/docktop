@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
+	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -26,6 +27,7 @@ type Model struct {
 	searchBar       searchbar.Model
 
 	cursorIndex      int
+	scrollOffset     int
 	focusZone        FocusZone
 	viewport         viewport.Model
 	viewportReady    bool
@@ -151,6 +153,7 @@ func (m *Model) applyFilter() {
 	if m.cursorIndex >= len(m.filteredIndices) {
 		m.cursorIndex = max(0, len(m.filteredIndices)-1)
 	}
+	m.syncScroll()
 }
 
 func (m *Model) updateViewportContent() {
@@ -176,4 +179,8 @@ func (m *Model) updateViewportContent() {
 		m.viewport.GotoTop()
 		m.viewport.SetXOffset(0)
 	}
+}
+
+func (m *Model) syncScroll() {
+	m.scrollOffset = layout.AdjustOffset(m.height, m.cursorIndex, m.scrollOffset, len(m.filteredIndices), m.searchBar.IsActive() || m.searchBar.HasFilter())
 }

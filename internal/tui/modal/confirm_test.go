@@ -98,15 +98,12 @@ func TestActionState_Lifecycle(t *testing.T) {
 		t.Errorf("Unexpected ActionState after Start: %+v", state)
 	}
 
-	state.Finish("Successfully restarted")
+	state.Finish()
 	if state.IsRunning() {
 		t.Error("ActionState should not be running after Finish")
 	}
-	if state.StatusMsg != "Successfully restarted" {
-		t.Errorf("StatusMsg = %q, want 'Successfully restarted'", state.StatusMsg)
-	}
-	if state.Action != ActionNone {
-		t.Errorf("Action = %v, want ActionNone", state.Action)
+	if state.Action != ActionNone || state.TargetID != "" || state.TargetName != "" || state.Desc != "" {
+		t.Errorf("ActionState after Finish = %+v, want cleared state", state)
 	}
 }
 

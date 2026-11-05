@@ -65,11 +65,11 @@ func TestClampLines(t *testing.T) {
 
 func TestListWindow(t *testing.T) {
 	tests := []struct {
-		name                  string
-		height, cursor, total int
-		hasFilter             bool
-		wantStart, wantEnd    int
-		wantMaxVisible        int
+		name                                string
+		height, cursor, scrollOffset, total int
+		hasFilter                           bool
+		wantStart, wantEnd                  int
+		wantMaxVisible                      int
 	}{
 		{
 			name:           "default window starts at first item",
@@ -87,6 +87,16 @@ func TestListWindow(t *testing.T) {
 			total:          20,
 			wantStart:      4,
 			wantEnd:        10,
+			wantMaxVisible: 6,
+		},
+		{
+			name:           "window keeps offset while cursor is visible",
+			height:         10,
+			cursor:         7,
+			scrollOffset:   3,
+			total:          20,
+			wantStart:      3,
+			wantEnd:        9,
 			wantMaxVisible: 6,
 		},
 		{
@@ -121,7 +131,7 @@ func TestListWindow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			start, end, maxVisible := ListWindow(tt.height, tt.cursor, tt.total, tt.hasFilter)
+			start, end, maxVisible := ListWindow(tt.height, tt.cursor, tt.scrollOffset, tt.total, tt.hasFilter)
 			if start != tt.wantStart || end != tt.wantEnd || maxVisible != tt.wantMaxVisible {
 				t.Errorf("ListWindow() = (%d, %d, %d), want (%d, %d, %d)",
 					start, end, maxVisible, tt.wantStart, tt.wantEnd, tt.wantMaxVisible)
@@ -136,6 +146,7 @@ func TestListClickTarget(t *testing.T) {
 		mouseY        int
 		height        int
 		cursor        int
+		scrollOffset  int
 		total         int
 		hasFilter     bool
 		wantIndex     int
@@ -175,6 +186,16 @@ func TestListClickTarget(t *testing.T) {
 			wantClickable: true,
 		},
 		{
+			name:          "click maps using current scroll offset",
+			mouseY:        HeaderRowsDefault + 2,
+			height:        10,
+			cursor:        8,
+			scrollOffset:  5,
+			total:         20,
+			wantIndex:     7,
+			wantClickable: true,
+		},
+		{
 			name:      "click beyond visible items is not clickable",
 			mouseY:    HeaderRowsDefault + 6,
 			height:    10,
@@ -193,7 +214,7 @@ func TestListClickTarget(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotIndex, gotClickable := ListClickTarget(
-				tt.mouseY, tt.height, tt.cursor, tt.total, tt.hasFilter,
+				tt.mouseY, tt.height, tt.cursor, tt.scrollOffset, tt.total, tt.hasFilter,
 			)
 			if gotIndex != tt.wantIndex || gotClickable != tt.wantClickable {
 				t.Errorf("ListClickTarget() = (%d, %v), want (%d, %v)",

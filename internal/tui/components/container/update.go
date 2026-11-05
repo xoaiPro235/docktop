@@ -7,11 +7,13 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
+	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -184,10 +186,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				msg.Y,
 				m.height,
 				m.cursorIndex,
+				m.scrollOffset,
 				len(m.flatItems),
 				m.searchBar.IsActive() || m.searchBar.HasFilter(),
 			); ok {
 				m.cursorIndex = targetIdx
+				m.syncScroll()
 				cmds = append(cmds, m.syncActivePane())
 			}
 		} else {
@@ -196,29 +200,57 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if selectedNode == nil || selectedNode.Type == NodeContainer {
 				if msg.Y >= 1 && msg.Y <= 3 {
 					relX := msg.X - leftWidth - 2
-					if relX >= 0 && relX < 9 {
-						m.activePane = SubPaneStats
-						cmds = append(cmds, m.syncActivePane())
-					} else if relX >= 10 && relX < 18 {
-						m.activePane = SubPaneLogs
-						cmds = append(cmds, m.syncActivePane())
-					} else if relX >= 19 && relX < 26 {
-						m.activePane = SubPaneTop
-						cmds = append(cmds, m.syncActivePane())
-					} else if relX >= 27 && relX < 39 {
-						m.activePane = SubPaneInspect
-						cmds = append(cmds, m.syncActivePane())
+					subTabs := []struct {
+						pane SubPane
+						name string
+					}{
+						{SubPaneStats, "[Stats]"},
+						{SubPaneLogs, "[Logs]"},
+						{SubPaneTop, "[Top]"},
+						{SubPaneInspect, "[Inspect]"},
+					}
+
+					currX := 0
+					sepWidth := ansi.StringWidth(" | ")
+					for _, tab := range subTabs {
+						style := theme.Current.SubTabInactive
+						if tab.pane == m.activePane {
+							style = theme.Current.SubTabActive
+						}
+						w := ansi.StringWidth(style.Render(tab.name))
+						if relX >= currX && relX < currX+w {
+							m.activePane = tab.pane
+							cmds = append(cmds, m.syncActivePane())
+							break
+						}
+						currX += w + sepWidth
 					}
 				}
 			} else if (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != StandaloneProjectName {
 				if msg.Y >= 1 && msg.Y <= 3 {
 					relX := msg.X - leftWidth - 2
-					if relX >= 0 && relX < 10 {
-						m.composeActivePane = ComposeSubPaneConfig
-						cmds = append(cmds, m.syncActivePane())
-					} else if relX >= 10 && relX < 19 {
-						m.composeActivePane = ComposeSubPaneLogs
-						cmds = append(cmds, m.syncActivePane())
+					composeTabs := []struct {
+						pane ComposeSubPane
+						name string
+					}{
+						{ComposeSubPaneConfig, "[Config]"},
+						{ComposeSubPaneLogs, "[Logs]"},
+					}
+
+					currX := 0
+					sepWidth := ansi.StringWidth(" | ")
+					for _, tab := range composeTabs {
+						style := theme.Current.SubTabInactive
+						if tab.pane == m.composeActivePane {
+							style = theme.Current.SubTabActive
+						}
+						w := ansi.StringWidth(style.Render(tab.name))
+						if relX >= currX && relX < currX+w {
+							m.composeActivePane = tab.pane
+							cmds = append(cmds, m.syncActivePane())
+							break
+						}
+						currX += w + sepWidth
 					}
 				}
 			}
@@ -233,9 +265,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.X <= leftWidth {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
 				m.cursorIndex--
+				m.syncScroll()
 				cmds = append(cmds, m.syncActivePane())
 			} else if msg.Button == tea.MouseWheelDown && m.cursorIndex < len(m.flatItems)-1 {
 				m.cursorIndex++
+				m.syncScroll()
 				cmds = append(cmds, m.syncActivePane())
 			}
 		} else {
@@ -437,17 +471,21 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Up):
 			if m.cursorIndex >= len(m.flatItems) {
 				m.cursorIndex = max(0, len(m.flatItems)-1)
+				m.syncScroll()
 				cmds = append(cmds, m.syncActivePane())
 			} else if m.cursorIndex > 0 {
 				m.cursorIndex--
+				m.syncScroll()
 				cmds = append(cmds, m.syncActivePane())
 			}
 		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Down):
 			if m.cursorIndex >= len(m.flatItems) {
 				m.cursorIndex = max(0, len(m.flatItems)-1)
+				m.syncScroll()
 				cmds = append(cmds, m.syncActivePane())
 			} else if m.cursorIndex < len(m.flatItems)-1 {
 				m.cursorIndex++
+				m.syncScroll()
 				cmds = append(cmds, m.syncActivePane())
 			}
 

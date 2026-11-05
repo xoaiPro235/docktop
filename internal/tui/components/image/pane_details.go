@@ -89,6 +89,30 @@ func FormatImageDetailsContent(selected *docker.ImageInfo, width int) string {
 	sizeStr := fmt.Sprintf("%s (%d bytes)", docker.FormatImageSize(selected.Size), selected.Size)
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Size:       "), theme.Current.Value.Render(sizeStr))
 
+	// Tags
+	var validTags []string
+	for _, t := range selected.RepoTags {
+		if t != "<none>:<none>" {
+			validTags = append(validTags, t)
+		}
+	}
+	if len(validTags) == 0 && selected.Tag != "" {
+		validTags = []string{selected.Tag}
+	}
+
+	if len(validTags) <= 1 {
+		tagVal := "<none>"
+		if len(validTags) == 1 {
+			tagVal = validTags[0]
+		}
+		fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Tag:        "), theme.Current.Value.Render(tagVal))
+	} else {
+		fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Tags:       "), theme.Current.MutedText.Render(fmt.Sprintf("(%d tags)", len(validTags))))
+		for _, tag := range validTags {
+			fmt.Fprintf(&sb, "  %s %s\n", theme.Current.TreeBranch.Render("-"), theme.Current.Value.Render(tag))
+		}
+	}
+
 	// Containers using this
 	sb.WriteString(theme.Current.Key.Render("Containers using this:"))
 	sb.WriteString("\n")

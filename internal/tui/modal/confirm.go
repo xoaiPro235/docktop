@@ -114,7 +114,6 @@ type ActionState struct {
 	TargetID   string
 	TargetName string
 	Desc       string
-	StatusMsg  string
 }
 
 // Start marks the action as running with the given parameters.
@@ -124,7 +123,6 @@ func (s *ActionState) Start(action Action, targetID, targetName, desc string) {
 	s.TargetID = targetID
 	s.TargetName = targetName
 	s.Desc = desc
-	s.StatusMsg = ""
 }
 
 // StartPrune marks a prune action as running across all resources of this type.
@@ -132,14 +130,13 @@ func (s *ActionState) StartPrune(desc string) {
 	s.Start(ActionPrune, TargetAll, TargetAll, desc)
 }
 
-// Finish marks the action as finished with an optional status message.
-func (s *ActionState) Finish(statusMsg string) {
+// Finish marks the action as finished.
+func (s *ActionState) Finish() {
 	s.Running = false
 	s.Action = ActionNone
 	s.TargetID = ""
 	s.TargetName = ""
 	s.Desc = ""
-	s.StatusMsg = statusMsg
 }
 
 // IsRunning returns whether an action is currently active.

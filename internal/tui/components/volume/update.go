@@ -17,11 +17,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case VolumeActionMsg:
-		statusMsg := ""
-		if msg.Err == nil {
-			statusMsg = fmt.Sprintf("Successfully executed %s!", msg.Action.Title())
-		}
-		m.action.Finish(statusMsg)
+		m.action.Finish()
 		return m, nil
 
 	case spinner.TickMsg:
@@ -167,10 +163,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				msg.Y,
 				m.height,
 				m.cursorIndex,
+				m.scrollOffset,
 				len(m.filteredIndices),
 				m.searchBar.IsActive() || m.searchBar.HasFilter(),
 			); ok {
 				m.cursorIndex = targetIdx
+				m.syncScroll()
 				m.updateViewportContent()
 			}
 		} else {
@@ -181,7 +179,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.confirmModal.Active {
 			return m, nil
 		}
-		if m.focusZone == FocusDetailsPane {
+		if m.focusZone == FocusVolumesList {
+			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
+				m.cursorIndex--
+				m.syncScroll()
+				m.updateViewportContent()
+			} else if msg.Button == tea.MouseWheelDown && m.cursorIndex < len(m.filteredIndices)-1 {
+				m.cursorIndex++
+				m.syncScroll()
+				m.updateViewportContent()
+			}
+		} else {
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(msg)
 			cmds = append(cmds, cmd)
