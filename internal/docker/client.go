@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -20,10 +19,20 @@ func (c *Client) Host() string {
 	return c.host
 }
 
-// NewClient initializes a Docker API client.
-// An optional host endpoint can be provided (e.g. "unix:///var/run/docker.sock", "ssh://user@remote", "tcp://ip:2376").
-// If no host is provided (or empty), client.FromEnv automatically inspects the DOCKER_HOST environment variable
-// or falls back to the default OS Docker socket.
+// NewClient initializes a Docker API client using intelligent multi-tier host resolution.
+//
+// The optional hosts parameter allows callers to pass an explicit endpoint (e.g. from CLI flag
+// -H/--host or config file). If multiple hosts are provided, only the first non-empty one is used.
+//
+// Host resolution precedence:
+//  1. Explicit host argument passed to NewClient (if non-empty)
+//  2. DOCKER_HOST environment variable (if set and non-empty)
+//  3. Active Docker context from ~/.docker/config.json or $DOCKER_CONTEXT
+//  4. Probed local daemon sockets (macOS user sockets, Windows WSL2 named pipe, Linux rootless)
+//  5. Standard Moby default socket (/var/run/docker.sock)
+//
+// Upon successful client initialization, NewClient immediately executes a Ping with a 5-second
+// timeout to negotiate the API version and ensure daemon reachability before returning.
 func NewClient(hosts ...string) (*Client, error) {
 	opts := []client.Opt{client.FromEnv}
 
@@ -31,10 +40,11 @@ func NewClient(hosts ...string) (*Client, error) {
 	if len(hosts) > 0 {
 		targetHost = strings.TrimSpace(hosts[0])
 	}
-	if targetHost == "" && runtime.GOOS == "windows" && os.Getenv("DOCKER_HOST") == "" {
-		// Modern Docker Desktop on Windows (WSL 2 backend) exposes named pipe at dockerDesktopLinuxEngine
-		if _, err := os.Stat(`\\.\pipe\dockerDesktopLinuxEngine`); err == nil {
-			targetHost = "npipe:////./pipe/dockerDesktopLinuxEngine"
+	if targetHost == "" {
+		if envHost := strings.TrimSpace(os.Getenv("DOCKER_HOST")); envHost != "" {
+			targetHost = envHost
+		} else {
+			targetHost = resolveDefaultHost()
 		}
 	}
 	if targetHost != "" {
@@ -51,8 +61,6 @@ func NewClient(hosts ...string) (*Client, error) {
 		host: targetHost,
 	}
 
-	// Negotiate API version immediately upon connection.
-	// 5-second timeout handles potential network/SSH latency to remote hosts.
 	if err := c.Ping(); err != nil {
 		_ = cli.Close()
 		return nil, err
