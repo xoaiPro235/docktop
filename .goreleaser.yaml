@@ -74,7 +74,7 @@ release:
     ### ❤️ Contributors
     Thank you to all contributors for helping make this release possible!
 
-    **Full Changelog**: [{{ .PreviousTag }}...{{ .Tag }}](https://github.com/xoaiPro235/docktop/compare/{{ .PreviousTag }}...{{ .Tag }})
+    **Full Changelog**: [`{{ .PreviousTag }}...{{ .Tag }}`](https://github.com/xoaiPro235/docktop/compare/{{ .PreviousTag }}...{{ .Tag }})
 
 changelog:
   sort: asc

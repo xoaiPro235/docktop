@@ -27,6 +27,18 @@ func parseFlags() cliOptions {
 		printVersion()
 	}
 
+	args := flag.Args()
+	if len(args) > 0 {
+		switch args[0] {
+		case "version":
+			printVersion()
+		default:
+			fmt.Fprintf(os.Stderr, "docktop: unknown command %q\n\n", args[0])
+			printUsage()
+			os.Exit(1)
+		}
+	}
+
 	return opts
 }
 

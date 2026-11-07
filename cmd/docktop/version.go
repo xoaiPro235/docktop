@@ -20,22 +20,15 @@ func printVersion() {
 			if info.Main.Version != "" && info.Main.Version != "(devel)" && !strings.HasPrefix(info.Main.Version, "v0.0.0-") {
 				version = info.Main.Version
 			}
-			for _, setting := range info.Settings {
-				switch setting.Key {
-				case "vcs.revision":
-					commit = setting.Value
-					if len(commit) > 7 {
-						commit = commit[:7]
-					}
-				case "vcs.time":
-					date = setting.Value
-				}
-			}
 		}
 	}
 
-	fmt.Printf("docktop %s\n\n", version)
-	fmt.Printf("%16s %s\n", "Commit:", commit)
-	fmt.Printf("%16s %s\n", "Built at:", date)
+	fmt.Printf("docktop %s\n", version)
+	if commit != "none" && commit != "" {
+		fmt.Printf("  Commit:   %s\n", commit)
+	}
+	if date != "unknown" && date != "" {
+		fmt.Printf("  Built at: %s\n", date)
+	}
 	os.Exit(0)
 }
