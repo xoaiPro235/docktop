@@ -64,15 +64,22 @@ snapshot:
 
 release:
   header: |
-    ## Welcome to docktop {{ .Tag }}!
+    ## 🚀 Welcome to docktop {{ .Tag }}!
 
     > [!NOTE]
-    > This is the initial public release. There might still be some bugs (especially on Windows).
     > If you encounter any issues, please report them on [GitHub Issues](https://github.com/xoaiPro235/docktop/issues)! Feedback is warmly welcomed ❤️
+
+  footer: |
+    ---
+    ### ❤️ Contributors
+    Thank you to all contributors for helping make this release possible!
+
+    **Full Changelog**: [{{ .PreviousTag }}...{{ .Tag }}](https://github.com/xoaiPro235/docktop/compare/{{ .PreviousTag }}...{{ .Tag }})
 
 changelog:
   sort: asc
-  use: git
+  use: github
+  format: "{{ .SHA }}: {{ .Message }}{{ if .Logins }} (by {{ .Logins | englishJoin }}){{ end }}"
   filters:
     exclude:
       - "(?i)^docs:"

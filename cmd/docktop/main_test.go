@@ -2,40 +2,106 @@ package main
 
 import (
 	"flag"
+	"io"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 )
 
-func TestFlagDefaults(t *testing.T) {
-	// Ensure flags can be defined and parsed without crashing
-	fs := flag.NewFlagSet("docktop", flag.ContinueOnError)
-	var showVersion bool
-	fs.BoolVar(&showVersion, "v", false, "Show version and exit")
-	var host string
-	fs.StringVar(&host, "H", "", "Docker daemon host")
-
-	err := fs.Parse([]string{"-H", "unix:///var/run/docker.sock"})
-	if err != nil {
-		t.Fatalf("Failed to parse flags: %v", err)
+func TestParseFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		host string
+	}{
+		{name: "defaults"},
+		{name: "short host flag", args: []string{"-H", "unix:///var/run/docker.sock"}, host: "unix:///var/run/docker.sock"},
+		{name: "long host flag", args: []string{"--host", "ssh://user@host"}, host: "ssh://user@host"},
 	}
-	if host != "unix:///var/run/docker.sock" {
-		t.Errorf("host = %q, want 'unix:///var/run/docker.sock'", host)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := parseFlagsForTest(t, tt.args...)
+			if opts.host != tt.host {
+				t.Errorf("host = %q, want %q", opts.host, tt.host)
+			}
+		})
 	}
 }
 
 func TestVersionVariables(t *testing.T) {
-	if version == "" {
-		t.Error("version variable should not be empty")
+	if version == "" || commit == "" || date == "" {
+		t.Errorf("version metadata should not be empty: version=%q commit=%q date=%q", version, commit, date)
 	}
 }
 
 func TestUsagePrint(t *testing.T) {
-	// Verify Usage function does not panic
-	origUsage := flag.Usage
-	defer func() { flag.Usage = origUsage }()
-
-	flag.Usage = func() {
-		_ = os.Stderr
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
 	}
-	flag.Usage()
+	originalStderr := os.Stderr
+	os.Stderr = write
+	printUsage()
+	os.Stderr = originalStderr
+	if err := write.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := io.ReadAll(read)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := read.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"docktop - A fast, modern terminal UI for Docker", "-H, --host <endpoint>", "-v, --version", "-h, --help"} {
+		if !strings.Contains(string(output), want) {
+			t.Errorf("usage output %q does not contain %q", output, want)
+		}
+	}
+}
+
+func TestVersionFlagExitsBeforeDocker(t *testing.T) {
+	if os.Getenv("DOCKTOP_VERSION_TEST") == "1" {
+		parseFlagsForTest(t, os.Getenv("DOCKTOP_VERSION_FLAG"))
+		t.Fatal("version flag did not exit")
+	}
+
+	for _, versionFlag := range []string{"-v", "--version"} {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestVersionFlagExitsBeforeDocker$")
+		cmd.Env = append(os.Environ(),
+			"DOCKTOP_VERSION_TEST=1",
+			"DOCKTOP_VERSION_FLAG="+versionFlag,
+		)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Errorf("%s exited with error: %v\n%s", versionFlag, err, output)
+			continue
+		}
+		for _, want := range []string{"docktop ", "Commit:", "Built at:"} {
+			if !strings.Contains(string(output), want) {
+				t.Errorf("%s output %q does not contain %q", versionFlag, output, want)
+			}
+		}
+	}
+}
+
+func parseFlagsForTest(t *testing.T, args ...string) cliOptions {
+	t.Helper()
+
+	originalArgs := os.Args
+	originalCommandLine := flag.CommandLine
+	originalUsage := flag.Usage
+	t.Cleanup(func() {
+		os.Args = originalArgs
+		flag.CommandLine = originalCommandLine
+		flag.Usage = originalUsage
+	})
+
+	flag.CommandLine = flag.NewFlagSet("docktop", flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
+	os.Args = append([]string{"docktop"}, args...)
+	return parseFlags()
 }
