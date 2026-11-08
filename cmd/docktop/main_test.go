@@ -80,7 +80,14 @@ func TestVersionFlagExitsBeforeDocker(t *testing.T) {
 			t.Errorf("%s exited with error: %v\n%s", versionFlag, err, output)
 			continue
 		}
-		for _, want := range []string{"docktop ", "Commit:", "Built at:"} {
+		wantOutput := []string{"docktop "}
+		if commit != "none" && commit != "" {
+			wantOutput = append(wantOutput, "Commit:")
+		}
+		if date != "unknown" && date != "" {
+			wantOutput = append(wantOutput, "Built at:")
+		}
+		for _, want := range wantOutput {
 			if !strings.Contains(string(output), want) {
 				t.Errorf("%s output %q does not contain %q", versionFlag, output, want)
 			}
