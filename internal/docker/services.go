@@ -67,6 +67,7 @@ type Service interface {
 	VolumeService
 	NetworkService
 	EventService
+	Host() string
 	Close() error
 	Ping() error
 }

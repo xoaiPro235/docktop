@@ -26,18 +26,43 @@ type ImageListMsg []docker.ImageInfo
 type VolumeListMsg []docker.VolumeInfo
 type NetworkListMsg []docker.NetworkInfo
 type DockerEventMsg events.Message
+type DockerEventStreamClosedMsg struct{}
+type DockerReconnectTickMsg struct{}
+type DockerManualReconnectResultMsg struct {
+	Err error
+}
 
-func waitForDockerEvent(eventCh <-chan events.Message) tea.Cmd {
+const maxReconnectAttempts = 5
+
+func (a AppModel) attemptReconnectCmd() tea.Cmd {
 	return func() tea.Msg {
-		if eventCh == nil {
-			return nil
-		}
-		msg, ok := <-eventCh
-		if !ok {
-			return nil
-		}
-		return DockerEventMsg(msg)
+		err := a.dockerClient.Ping()
+		return DockerManualReconnectResultMsg{Err: err}
 	}
+}
+func waitForDockerEvent(eventCh <-chan events.Message, errCh <-chan error) tea.Cmd {
+	return func() tea.Msg {
+		if eventCh == nil && errCh == nil {
+			return DockerEventStreamClosedMsg{}
+		}
+		select {
+		case msg, ok := <-eventCh:
+			if !ok {
+				return DockerEventStreamClosedMsg{}
+			}
+			return DockerEventMsg(msg)
+		case _, ok := <-errCh:
+			// When Docker daemon disconnects or exits, moby client sends error to errCh and closes it.
+			_ = ok
+			return DockerEventStreamClosedMsg{}
+		}
+	}
+}
+
+func scheduleReconnectTick() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		return DockerReconnectTickMsg{}
+	})
 }
 
 type Tab int
@@ -62,34 +87,42 @@ var Tabs = []TabDef{
 }
 
 type AppModel struct {
-	dockerClient   docker.Service
-	containerModel container.Model
-	imageModel     image.Model
-	volumeModel    volume.Model
-	networkModel   network.Model
-	errorModal     modal.ErrorModal
-	activeTab      Tab
-	eventCancel    context.CancelFunc
-	eventChan      <-chan events.Message
-	width          int
-	height         int
-	ready          bool
+	dockerClient      docker.Service
+	containerModel    container.Model
+	imageModel        image.Model
+	volumeModel       volume.Model
+	networkModel      network.Model
+	errorModal        modal.ErrorModal
+	activeTab         Tab
+	eventCancel       context.CancelFunc
+	eventChan         <-chan events.Message
+	eventErrChan      <-chan error
+	daemonConnected   bool
+	reconnecting      bool
+	reconnectAttempts int
+	width             int
+	height            int
+	ready             bool
 }
 
 func NewApp(cli docker.Service) AppModel {
 	ctx, cancel := context.WithCancel(context.Background())
-	eventCh, _ := cli.StreamEvents(ctx)
+	eventCh, errCh := cli.StreamEvents(ctx)
 
 	return AppModel{
-		dockerClient:   cli,
-		containerModel: container.New(cli),
-		imageModel:     image.New(cli),
-		volumeModel:    volume.New(cli),
-		networkModel:   network.New(cli),
-		errorModal:     modal.NewErrorModal(),
-		activeTab:      TabContainers,
-		eventCancel:    cancel,
-		eventChan:      eventCh,
+		dockerClient:      cli,
+		containerModel:    container.New(cli),
+		imageModel:        image.New(cli),
+		volumeModel:       volume.New(cli),
+		networkModel:      network.New(cli),
+		errorModal:        modal.NewErrorModal(),
+		activeTab:         TabContainers,
+		eventCancel:       cancel,
+		eventChan:         eventCh,
+		eventErrChan:      errCh,
+		daemonConnected:   true,
+		reconnecting:      false,
+		reconnectAttempts: 0,
 	}
 }
 
@@ -181,6 +214,32 @@ func (a AppModel) fetchActiveTabCmd() tea.Cmd {
 	}
 }
 
+func (a *AppModel) handleDaemonReconnect() []tea.Cmd {
+	if a.daemonConnected {
+		return nil
+	}
+	a.daemonConnected = true
+	a.reconnecting = false
+	a.reconnectAttempts = 0
+
+	if a.eventCancel != nil {
+		a.eventCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	newEventCh, newErrCh := a.dockerClient.StreamEvents(ctx)
+	a.eventCancel = cancel
+	a.eventChan = newEventCh
+	a.eventErrChan = newErrCh
+
+	return []tea.Cmd{
+		waitForDockerEvent(a.eventChan, a.eventErrChan),
+		a.fetchContainersCmd(),
+		a.fetchImagesCmd(),
+		a.fetchVolumesCmd(),
+		a.fetchNetworksCmd(),
+	}
+}
+
 func (a AppModel) Init() tea.Cmd {
 	return tea.Batch(
 		a.containerModel.Init(),
@@ -191,7 +250,7 @@ func (a AppModel) Init() tea.Cmd {
 		a.fetchImagesCmd(),
 		a.fetchVolumesCmd(),
 		a.fetchNetworksCmd(),
-		waitForDockerEvent(a.eventChan),
+		waitForDockerEvent(a.eventChan, a.eventErrChan),
 	)
 }
 
@@ -242,6 +301,14 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.containerModel.Pause()
 			return a, tea.Quit
+
+		case key.Matches(msg, keys.AppKeys.Reconnect):
+			if !a.isAnyModalActive() {
+				a.reconnecting = true
+				a.daemonConnected = false
+				a.reconnectAttempts = 0
+				return a, a.attemptReconnectCmd()
+			}
 
 		case key.Matches(msg, keys.AppKeys.TabContainers):
 			if !a.isAnyModalActive() {
@@ -300,7 +367,52 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, a.fetchNetworksCmd())
 			}
 		}
-		cmds = append(cmds, waitForDockerEvent(a.eventChan))
+		cmds = append(cmds, waitForDockerEvent(a.eventChan, a.eventErrChan))
+
+	case DockerEventStreamClosedMsg:
+		if !a.reconnecting {
+			a.daemonConnected = false
+			a.reconnecting = true
+			a.reconnectAttempts = 1
+			cmds = append(cmds, scheduleReconnectTick())
+		}
+		return a, tea.Batch(cmds...)
+
+	case DockerReconnectTickMsg:
+		if !a.reconnecting {
+			return a, nil
+		}
+		if err := a.dockerClient.Ping(); err != nil {
+			a.reconnectAttempts++
+			if a.reconnectAttempts > maxReconnectAttempts {
+				a.reconnecting = false
+				a.daemonConnected = false
+				a.reconnectAttempts = 0
+				return a, nil
+			}
+			return a, scheduleReconnectTick()
+		}
+
+		// Reconnect successful! Daemon is back online.
+		cmds = append(cmds, a.handleDaemonReconnect()...)
+		return a, tea.Batch(cmds...)
+
+	case DockerManualReconnectResultMsg:
+		if msg.Err != nil {
+			a.reconnecting = false
+			a.daemonConnected = false
+			a.reconnectAttempts = 0
+			rawHost := a.dockerClient.Host()
+			a.errorModal.Show(
+				"Docker Connection Failed",
+				fmt.Sprintf("%s\n\nError: %v", rawHost, msg.Err),
+			)
+			return a, nil
+		}
+
+		// Manual reconnect successful! Daemon is back online.
+		cmds = append(cmds, a.handleDaemonReconnect()...)
+		return a, tea.Batch(cmds...)
 
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
@@ -314,25 +426,34 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case ContainerListMsg:
+		if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
+		}
 		if cmd := a.containerModel.SetContainers(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
 	case ImageListMsg:
-		cmd := a.imageModel.SetImages(msg)
-		if cmd != nil {
+		if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
+		}
+		if cmd := a.imageModel.SetImages(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
 	case VolumeListMsg:
-		cmd := a.volumeModel.SetVolumes(msg)
-		if cmd != nil {
+		if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
+		}
+		if cmd := a.volumeModel.SetVolumes(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
 	case NetworkListMsg:
-		cmd := a.networkModel.SetNetworks(msg)
-		if cmd != nil {
+		if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
+		}
+		if cmd := a.networkModel.SetNetworks(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
@@ -343,6 +464,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case container.ContainerActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Container %s Failed", msg.Action.Title()), msg.Err.Error())
+		} else if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
 			cmds = append(cmds, a.fetchContainersCmd())
 		}
@@ -356,6 +479,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case image.ImageActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Image %s Failed", msg.Action.Title()), msg.Err.Error())
+		} else if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
 			cmds = append(cmds, a.fetchImagesCmd())
 		}
@@ -369,6 +494,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case volume.VolumeActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Volume %s Failed", msg.Action.Title()), msg.Err.Error())
+		} else if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
 			cmds = append(cmds, a.fetchVolumesCmd())
 		}
@@ -382,6 +509,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case network.NetworkActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Network %s Failed", msg.Action.Title()), msg.Err.Error())
+		} else if !a.daemonConnected {
+			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
 			cmds = append(cmds, a.fetchNetworksCmd())
 		}
@@ -499,6 +628,30 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, tea.Batch(cmds...)
 }
 
+func (a AppModel) FooterBindings() []key.Binding {
+	if a.errorModal.Active {
+		return a.errorModal.FooterBindings()
+	}
+
+	var bindings []key.Binding
+	switch a.activeTab {
+	case TabContainers:
+		bindings = a.containerModel.FooterBindings()
+	case TabImages:
+		bindings = a.imageModel.FooterBindings()
+	case TabVolumes:
+		bindings = a.volumeModel.FooterBindings()
+	case TabNetworks:
+		bindings = a.networkModel.FooterBindings()
+	}
+
+	if !a.daemonConnected && !a.reconnecting {
+		bindings = append([]key.Binding{keys.AppKeys.Reconnect}, bindings...)
+	}
+
+	return bindings
+}
+
 func (a AppModel) View() tea.View {
 	if !a.ready {
 		v := tea.NewView("Initializing docktop...")
@@ -517,32 +670,60 @@ func (a AppModel) View() tea.View {
 		tabViews = append(tabViews, style.Render(t.Title))
 	}
 	headerTabs := lipgloss.JoinHorizontal(lipgloss.Top, tabViews...)
-	header := lipgloss.NewStyle().Width(a.width).Render(headerTabs)
 
-	// 2. Tab content and contextual footer
+	var statusBadge string
+	if a.reconnecting {
+		if a.reconnectAttempts > 0 {
+			statusBadge = theme.Current.StatusPaused.Render(fmt.Sprintf("○ RECONNECTING (%d/%d)...", a.reconnectAttempts, maxReconnectAttempts))
+		} else {
+			statusBadge = theme.Current.StatusPaused.Render("○ RECONNECTING...")
+		}
+	} else if a.daemonConnected {
+		statusBadge = theme.Current.StatusRunning.Render("● CONNECTED")
+	} else {
+		statusBadge = theme.Current.StatusStopped.Render("○ DISCONNECTED")
+	}
+
+	rawHost := a.dockerClient.Host()
+	hostLabel := theme.Current.Key.Render("Host: ")
+	hostValue := theme.Current.Value.Render(rawHost)
+	fullRight := hostLabel + hostValue + "  " + statusBadge
+
+	leftWidth := ansi.StringWidth(headerTabs)
+	rightWidth := a.width - leftWidth
+
+	var rightView string
+	if rightWidth > 0 {
+		var rightContent string
+		if rightWidth >= ansi.StringWidth(fullRight)+2 {
+			rightContent = fullRight
+		} else if rightWidth >= ansi.StringWidth(statusBadge)+2 {
+			rightContent = statusBadge
+		}
+		rightView = lipgloss.NewStyle().
+			Width(rightWidth).
+			Align(lipgloss.Right).
+			PaddingRight(1).
+			Render(rightContent)
+	}
+
+	header := lipgloss.JoinHorizontal(lipgloss.Top, headerTabs, rightView)
+
+	// 2. Tab content
 	var body string
-	var footerBindings []key.Binding
-
 	switch a.activeTab {
 	case TabContainers:
 		body = a.containerModel.View()
-		footerBindings = a.containerModel.FooterBindings()
 	case TabImages:
 		body = a.imageModel.View()
-		footerBindings = a.imageModel.FooterBindings()
 	case TabVolumes:
 		body = a.volumeModel.View()
-		footerBindings = a.volumeModel.FooterBindings()
 	case TabNetworks:
 		body = a.networkModel.View()
-		footerBindings = a.networkModel.FooterBindings()
 	}
 
 	// 3. Dynamic Footer Bar based on active tab & subpane
-	if a.errorModal.Active {
-		footerBindings = a.errorModal.FooterBindings()
-	}
-	footerHelp := keys.RenderFooterHelp(footerBindings...)
+	footerHelp := keys.RenderFooterHelp(a.FooterBindings()...)
 	footer := theme.Current.Footer.Width(a.width).Render(footerHelp)
 
 	out := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)

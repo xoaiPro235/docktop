@@ -11,6 +11,7 @@ import (
 type AppKeyMap struct {
 	Quit          key.Binding
 	ForceQuit     key.Binding
+	Reconnect     key.Binding
 	TabContainers key.Binding
 	TabImages     key.Binding
 	TabVolumes    key.Binding
@@ -27,6 +28,10 @@ var AppKeys = AppKeyMap{
 	ForceQuit: key.NewBinding(
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "Force Quit"),
+	),
+	Reconnect: key.NewBinding(
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "Reconnect"),
 	),
 	TabContainers: key.NewBinding(
 		key.WithKeys("1"),

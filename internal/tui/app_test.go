@@ -2,9 +2,11 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/moby/moby/api/types/events"
 	"github.com/xoaiPro235/docktop/internal/docker"
@@ -19,6 +21,9 @@ func init() {
 func helperMockService() *mocks.MockService {
 	eventCh := make(chan events.Message)
 	return &mocks.MockService{
+		HostFunc: func() string {
+			return "test-docker-host"
+		},
 		StreamEventsFunc: func(ctx context.Context) (<-chan events.Message, <-chan error) {
 			return eventCh, nil
 		},
@@ -38,27 +43,35 @@ func helperMockService() *mocks.MockService {
 }
 
 func Test_waitForDockerEvent(t *testing.T) {
-	// 1. Nil channel returns nil
-	cmdNil := waitForDockerEvent(nil)
-	if msg := cmdNil(); msg != nil {
-		t.Errorf("waitForDockerEvent(nil)() = %v, want nil", msg)
+	// 1. Nil channel signals that the event stream is closed
+	cmdNil := waitForDockerEvent(nil, nil)
+	if msg := cmdNil(); msg != (DockerEventStreamClosedMsg{}) {
+		t.Errorf("waitForDockerEvent(nil)() = %v, want DockerEventStreamClosedMsg", msg)
 	}
 
 	// 2. Active channel with event
 	ch := make(chan events.Message, 1)
 	ch <- events.Message{Action: "start", Type: "container"}
-	cmd := waitForDockerEvent(ch)
+	cmd := waitForDockerEvent(ch, nil)
 	msg := cmd()
 	dockerMsg, ok := msg.(DockerEventMsg)
 	if !ok || dockerMsg.Action != "start" {
 		t.Errorf("Expected DockerEventMsg with action start, got %v", msg)
 	}
 
-	// 3. Closed channel returns nil
+	// 3. Closed channel signals that the event stream is closed
 	close(ch)
-	cmdClosed := waitForDockerEvent(ch)
-	if msg := cmdClosed(); msg != nil {
-		t.Errorf("waitForDockerEvent(closed)() = %v, want nil", msg)
+	cmdClosed := waitForDockerEvent(ch, nil)
+	if msg := cmdClosed(); msg != (DockerEventStreamClosedMsg{}) {
+		t.Errorf("waitForDockerEvent(closed)() = %v, want DockerEventStreamClosedMsg", msg)
+	}
+
+	// 4. An error from the event stream signals that it is closed
+	errCh := make(chan error, 1)
+	errCh <- context.DeadlineExceeded
+	cmdError := waitForDockerEvent(nil, errCh)
+	if msg := cmdError(); msg != (DockerEventStreamClosedMsg{}) {
+		t.Errorf("waitForDockerEvent(error)() = %v, want DockerEventStreamClosedMsg", msg)
 	}
 }
 
@@ -72,8 +85,168 @@ func TestNewApp(t *testing.T) {
 	if app.activeTab != TabContainers {
 		t.Errorf("activeTab = %v, want TabContainers", app.activeTab)
 	}
+	if !app.daemonConnected {
+		t.Error("daemonConnected = false, want true")
+	}
+	if app.reconnecting {
+		t.Error("reconnecting = true, want false")
+	}
+	if app.reconnectAttempts != 0 {
+		t.Errorf("reconnectAttempts = %d, want 0", app.reconnectAttempts)
+	}
 	if app.isAnyModalActive() {
 		t.Error("No modal should be active initially")
+	}
+}
+
+func TestAppModel_ManualReconnect(t *testing.T) {
+	tests := []struct {
+		name        string
+		pingErr     error
+		wantModal   bool
+		wantOnline  bool
+		wantMessage string
+	}{
+		{
+			name:       "success",
+			wantOnline: true,
+		},
+		{
+			name:        "failure",
+			pingErr:     errors.New("daemon unavailable"),
+			wantModal:   true,
+			wantMessage: "daemon unavailable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSvc := helperMockService()
+			mockSvc.PingFunc = func() error { return tt.pingErr }
+			app := NewApp(mockSvc)
+
+			model, cmd := app.Update(tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+			app = model.(AppModel)
+			if !app.reconnecting || app.daemonConnected {
+				t.Fatalf("after Ctrl+R: reconnecting=%v, daemonConnected=%v; want true, false",
+					app.reconnecting, app.daemonConnected)
+			}
+			if app.reconnectAttempts != 0 {
+				t.Errorf("reconnectAttempts = %d, want 0 for manual reconnect", app.reconnectAttempts)
+			}
+			if cmd == nil {
+				t.Fatal("Ctrl+R should return a reconnect command")
+			}
+
+			msg := cmd()
+			result, ok := msg.(DockerManualReconnectResultMsg)
+			if !ok {
+				t.Fatalf("reconnect command returned %T, want DockerManualReconnectResultMsg", msg)
+			}
+			model, _ = app.Update(result)
+			app = model.(AppModel)
+
+			if app.daemonConnected != tt.wantOnline {
+				t.Errorf("daemonConnected = %v, want %v", app.daemonConnected, tt.wantOnline)
+			}
+			if app.reconnecting {
+				t.Error("reconnecting should be false after the manual attempt completes")
+			}
+			if app.errorModal.Active != tt.wantModal {
+				t.Errorf("errorModal.Active = %v, want %v", app.errorModal.Active, tt.wantModal)
+			}
+			if tt.wantMessage != "" && !strings.Contains(app.errorModal.Message, tt.wantMessage) {
+				t.Errorf("error modal message %q does not contain %q", app.errorModal.Message, tt.wantMessage)
+			}
+			if tt.wantOnline && len(mockSvc.StreamEventsCalls()) != 2 {
+				t.Errorf("StreamEvents called %d times, want 2 after reconnect", len(mockSvc.StreamEventsCalls()))
+			}
+		})
+	}
+}
+
+func TestAppModel_AutomaticReconnectRetriesAreLimited(t *testing.T) {
+	mockSvc := helperMockService()
+	mockSvc.PingFunc = func() error { return errors.New("daemon unavailable") }
+	app := NewApp(mockSvc)
+	app.reconnecting = true
+	app.reconnectAttempts = maxReconnectAttempts
+
+	model, cmd := app.Update(DockerReconnectTickMsg{})
+	app = model.(AppModel)
+
+	if app.reconnecting {
+		t.Error("reconnecting should stop after maxReconnectAttempts is exceeded")
+	}
+	if app.daemonConnected {
+		t.Error("daemonConnected should remain false after retries are exhausted")
+	}
+	if app.reconnectAttempts != 0 {
+		t.Errorf("reconnectAttempts = %d, want 0 after retries are exhausted", app.reconnectAttempts)
+	}
+	if cmd != nil {
+		t.Error("no further retry command should be scheduled after retries are exhausted")
+	}
+	if got := len(mockSvc.PingCalls()); got != 1 {
+		t.Errorf("Ping called %d times, want 1", got)
+	}
+}
+
+func TestAppModel_AutomaticReconnectAfterEventStreamCloses(t *testing.T) {
+	mockSvc := helperMockService()
+	mockSvc.PingFunc = func() error { return nil }
+	app := NewApp(mockSvc)
+
+	model, cmd := app.Update(DockerEventStreamClosedMsg{})
+	app = model.(AppModel)
+	if app.daemonConnected || !app.reconnecting {
+		t.Fatalf("after event stream closes: daemonConnected=%v, reconnecting=%v; want false, true",
+			app.daemonConnected, app.reconnecting)
+	}
+	if app.reconnectAttempts != 1 {
+		t.Errorf("reconnectAttempts = %d, want 1", app.reconnectAttempts)
+	}
+	if cmd == nil {
+		t.Fatal("event stream closure should schedule a reconnect tick")
+	}
+
+	model, cmd = app.Update(DockerReconnectTickMsg{})
+	app = model.(AppModel)
+	if !app.daemonConnected || app.reconnecting {
+		t.Errorf("after successful retry: daemonConnected=%v, reconnecting=%v; want true, false",
+			app.daemonConnected, app.reconnecting)
+	}
+	if app.reconnectAttempts != 0 {
+		t.Errorf("reconnectAttempts = %d, want 0 after successful retry", app.reconnectAttempts)
+	}
+	if cmd == nil {
+		t.Error("successful retry should restart event listening and refresh data")
+	}
+	if got := len(mockSvc.StreamEventsCalls()); got != 2 {
+		t.Errorf("StreamEvents called %d times, want 2", got)
+	}
+}
+
+func TestAppModel_FooterBindingsShowsReconnectWhenDisconnected(t *testing.T) {
+	app := NewApp(helperMockService())
+	app.daemonConnected = false
+
+	hasReconnect := func(bindings []key.Binding) bool {
+		for _, binding := range bindings {
+			if binding.Help().Key == "ctrl+r" {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !hasReconnect(app.FooterBindings()) {
+		t.Fatal("FooterBindings should include Ctrl+R when disconnected")
+	}
+
+	app.daemonConnected = true
+	if hasReconnect(app.FooterBindings()) {
+		t.Error("FooterBindings should not include Ctrl+R when connected")
 	}
 }
 

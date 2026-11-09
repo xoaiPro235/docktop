@@ -39,6 +39,9 @@ var _ docker.Service = &MockService{}
 //			GetImageHistoryFunc: func(ctx context.Context, id string) ([]docker.ImageLayer, error) {
 //				panic("mock out the GetImageHistory method")
 //			},
+//			HostFunc: func() string {
+//				panic("mock out the Host method")
+//			},
 //			InspectContainerFunc: func(ctx context.Context, containerID string) (*container.InspectResponse, error) {
 //				panic("mock out the InspectContainer method")
 //			},
@@ -135,6 +138,9 @@ type MockService struct {
 
 	// GetImageHistoryFunc mocks the GetImageHistory method.
 	GetImageHistoryFunc func(ctx context.Context, id string) ([]docker.ImageLayer, error)
+
+	// HostFunc mocks the Host method.
+	HostFunc func() string
 
 	// InspectContainerFunc mocks the InspectContainer method.
 	InspectContainerFunc func(ctx context.Context, containerID string) (*container.InspectResponse, error)
@@ -237,6 +243,9 @@ type MockService struct {
 			Ctx context.Context
 			// ID is the id argument value.
 			ID string
+		}
+		// Host holds details about calls to the Host method.
+		Host []struct {
 		}
 		// InspectContainer holds details about calls to the InspectContainer method.
 		InspectContainer []struct {
@@ -411,6 +420,7 @@ type MockService struct {
 	lockContainerTop         sync.RWMutex
 	lockExecShellCmd         sync.RWMutex
 	lockGetImageHistory      sync.RWMutex
+	lockHost                 sync.RWMutex
 	lockInspectContainer     sync.RWMutex
 	lockInspectImage         sync.RWMutex
 	lockInspectNetwork       sync.RWMutex
@@ -567,6 +577,33 @@ func (mock *MockService) GetImageHistoryCalls() []struct {
 	mock.lockGetImageHistory.RLock()
 	calls = mock.calls.GetImageHistory
 	mock.lockGetImageHistory.RUnlock()
+	return calls
+}
+
+// Host calls HostFunc.
+func (mock *MockService) Host() string {
+	if mock.HostFunc == nil {
+		panic("MockService.HostFunc: method is nil but Service.Host was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockHost.Lock()
+	mock.calls.Host = append(mock.calls.Host, callInfo)
+	mock.lockHost.Unlock()
+	return mock.HostFunc()
+}
+
+// HostCalls gets all the calls that were made to Host.
+// Check the length with:
+//
+//	len(mockedService.HostCalls())
+func (mock *MockService) HostCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockHost.RLock()
+	calls = mock.calls.Host
+	mock.lockHost.RUnlock()
 	return calls
 }
 

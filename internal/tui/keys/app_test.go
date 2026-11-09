@@ -79,6 +79,7 @@ func TestAppKeys_Bindings(t *testing.T) {
 	}{
 		{"Quit", AppKeys.Quit},
 		{"ForceQuit", AppKeys.ForceQuit},
+		{"Reconnect", AppKeys.Reconnect},
 		{"TabContainers", AppKeys.TabContainers},
 		{"TabImages", AppKeys.TabImages},
 		{"TabVolumes", AppKeys.TabVolumes},
