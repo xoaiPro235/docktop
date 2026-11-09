@@ -25,7 +25,7 @@ func TestTreeNode_DisplayTitle(t *testing.T) {
 		Type:     NodeProject,
 		Name:     StandaloneProjectName,
 		Expanded: false,
-		Children: []*TreeNode{{Name: "c1"}},
+		Children: []*TreeNode{{Type: NodeContainer, Name: "c1"}},
 	}
 	if title := standaloneNode.DisplayTitle(); !strings.Contains(title, "▶") || !strings.Contains(title, "Standalone (1)") {
 		t.Errorf("Standalone DisplayTitle() = %q", title)
@@ -36,7 +36,10 @@ func TestTreeNode_DisplayTitle(t *testing.T) {
 		Type:     NodeService,
 		Name:     "web",
 		Expanded: true,
-		Children: []*TreeNode{{Name: "c1"}, {Name: "c2"}},
+		Children: []*TreeNode{
+			{Type: NodeContainer, Name: "c1"},
+			{Type: NodeContainer, Name: "c2"},
+		},
 	}
 	if title := svcNode.DisplayTitle(); !strings.Contains(title, "web (2)") {
 		t.Errorf("Service DisplayTitle() = %q", title)

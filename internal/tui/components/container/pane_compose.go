@@ -194,6 +194,9 @@ func checkWorkingDir(dir string) string {
 }
 
 func findComposeFile(node *TreeNode) string {
+	if node == nil {
+		return ""
+	}
 	if node.ConfigFiles != "" {
 		if f := checkConfigFiles(node.ConfigFiles); f != "" {
 			return f
@@ -311,6 +314,9 @@ func highlightYAML(content string) string {
 }
 
 func renderProjectSummary(node *TreeNode, extraNote string, width int) string {
+	if node == nil {
+		return ""
+	}
 	var sb strings.Builder
 	titleStyle := theme.Current.TreeProject
 	labelStyle := theme.Current.Key
@@ -345,6 +351,9 @@ func renderProjectSummary(node *TreeNode, extraNote string, width int) string {
 }
 
 func renderStandaloneSummary(node *TreeNode, width int) string {
+	if node == nil {
+		return ""
+	}
 	var sb strings.Builder
 	titleStyle := theme.Current.TreeProject
 	valStyle := theme.Current.Title

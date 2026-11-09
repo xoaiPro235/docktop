@@ -31,7 +31,25 @@ type TreeNode struct {
 	Children    []*TreeNode
 }
 
+func (n *TreeNode) CountContainers() int {
+	if n == nil {
+		return 0
+	}
+
+	if n.Type == NodeContainer {
+		return 1
+	}
+	count := 0
+	for _, child := range n.Children {
+		count += child.CountContainers()
+	}
+	return count
+}
+
 func (n *TreeNode) DisplayTitle() string {
+	if n == nil {
+		return ""
+	}
 	arrow := "▼"
 	if !n.Expanded {
 		arrow = "▶"
@@ -40,11 +58,11 @@ func (n *TreeNode) DisplayTitle() string {
 	switch n.Type {
 	case NodeProject:
 		if n.Name == StandaloneProjectName {
-			return fmt.Sprintf("%s Standalone (%d)", arrow, len(n.Children))
+			return fmt.Sprintf("%s Standalone (%d)", arrow, n.CountContainers())
 		}
-		return fmt.Sprintf("%s %s", arrow, n.Name)
+		return fmt.Sprintf("%s %s (%d)", arrow, n.Name, n.CountContainers())
 	case NodeService:
-		return fmt.Sprintf("%s %s (%d)", arrow, n.Name, len(n.Children))
+		return fmt.Sprintf("%s %s (%d)", arrow, n.Name, n.CountContainers())
 	case NodeContainer:
 		statusDot := "●"
 		if n.Container != nil && n.Container.State != docker.StateRunning {
@@ -118,6 +136,9 @@ func isNodeExpanded(key string, stateMap map[string]bool) bool {
 }
 
 func findOrCreateChild(parent *TreeNode, name string, nodeType NodeType, stateMap map[string]bool) *TreeNode {
+	if parent == nil {
+		return nil
+	}
 	for _, child := range parent.Children {
 		if child.Name == name {
 			return child
@@ -232,6 +253,10 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 func Flatten(nodes []*TreeNode, parentPrefix string) []FlatItem {
 	var list []FlatItem
 	for i, node := range nodes {
+		if node == nil {
+			continue
+		}
+
 		isLast := (i == len(nodes)-1)
 
 		var currentPrefix string
@@ -288,28 +313,6 @@ func resolveComposeProject(node *TreeNode) (projectName string, serviceName stri
 	}
 	if workDir == "" {
 		workDir = node.WorkingDir
-	}
-	if workDir == "" {
-		for _, child := range node.Children {
-			if child.WorkingDir != "" {
-				workDir = child.WorkingDir
-				break
-			}
-			if child.Container != nil && child.Container.WorkingDir != "" {
-				workDir = child.Container.WorkingDir
-				break
-			}
-			for _, gc := range child.Children {
-				if gc.WorkingDir != "" {
-					workDir = gc.WorkingDir
-					break
-				}
-				if gc.Container != nil && gc.Container.WorkingDir != "" {
-					workDir = gc.Container.WorkingDir
-					break
-				}
-			}
-		}
 	}
 	return projectName, serviceName, workDir, configFile
 }
