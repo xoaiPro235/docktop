@@ -81,7 +81,7 @@ func (p *ComposePane) LoadProject(node *TreeNode) {
 
 	if configPath == "" {
 		p.content = ""
-		p.viewport.SetContent(renderProjectSummary(node, "Compose file path not found in container labels.", p.width))
+		p.viewport.SetContent(renderProjectSummary(node, "Compose file path not found in container labels or on local disk.", p.width))
 		return
 	}
 
@@ -236,17 +236,6 @@ func findComposeFile(node *TreeNode) string {
 					}
 				}
 			}
-		}
-	}
-
-	// Fallback: check current directory
-	candidates := []string{"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
-	for _, c := range candidates {
-		if resolved := resolveExistingFile(c); resolved != "" {
-			if abs, err := filepath.Abs(resolved); err == nil {
-				return abs
-			}
-			return resolved
 		}
 	}
 
