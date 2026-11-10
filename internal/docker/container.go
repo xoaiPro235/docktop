@@ -209,3 +209,13 @@ func (c *Client) ExecShellCmd(containerID string) *exec.Cmd {
 	args = append(args, "exec", "-it", containerID, "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh")
 	return exec.Command("docker", args...)
 }
+
+func (c *Client) AttachShellCmd(containerID string) *exec.Cmd {
+	var args []string
+	if c.host != "" {
+		args = append(args, "-H", c.host)
+	}
+	// Use --sig-proxy=false so pressing Ctrl+C detaches instead of killing the container.
+	args = append(args, "attach", "--sig-proxy=false", containerID)
+	return exec.Command("docker", args...)
+}

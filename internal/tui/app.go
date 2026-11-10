@@ -532,6 +532,17 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(cmds...)
 
+	case container.AttachFinishedMsg:
+		if msg.Err != nil {
+			a.errorModal.Show("Container Attach Failed", msg.Err.Error())
+		}
+		var cmd tea.Cmd
+		a.containerModel, cmd = a.containerModel.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return a, tea.Batch(cmds...)
+
 	case spinner.TickMsg:
 		var routed bool
 		if a.containerModel.IsActionRunning() {

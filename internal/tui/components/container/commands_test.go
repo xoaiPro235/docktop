@@ -3,13 +3,71 @@ package container
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	mobyContainer "github.com/moby/moby/api/types/container"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
+
+func TestModel_AttachKeyRunsShellForRunningContainer(t *testing.T) {
+	tests := []struct {
+		name        string
+		state       docker.ContainerState
+		actionRun   bool
+		wantCommand bool
+		wantCall    bool
+	}{
+		{
+			name:        "running container",
+			state:       docker.StateRunning,
+			wantCommand: true,
+			wantCall:    true,
+		},
+		{
+			name:  "stopped container",
+			state: docker.StateExited,
+		},
+		{
+			name:      "container action in progress",
+			state:     docker.StateRunning,
+			actionRun: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCli := &mocks.MockContainerService{
+				AttachShellCmdFunc: func(containerID string) *exec.Cmd {
+					return exec.Command("true")
+				},
+			}
+			m := New(mockCli)
+			m.updateContainers([]docker.ContainerInfo{
+				{ID: "c1", Name: "web", State: tt.state},
+			})
+			if tt.actionRun {
+				m.runningActions["c1"] = RunningAction{Action: modal.ActionStop}
+			}
+
+			_, cmd := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+			if (cmd != nil) != tt.wantCommand {
+				t.Errorf("Attach key returned command = %v, want command %v", cmd != nil, tt.wantCommand)
+			}
+
+			calls := mockCli.AttachShellCmdCalls()
+			if (len(calls) > 0) != tt.wantCall {
+				t.Fatalf("AttachShellCmd called %d times, want called = %v", len(calls), tt.wantCall)
+			}
+			if tt.wantCall && calls[0].ContainerID != "c1" {
+				t.Errorf("AttachShellCmd container ID = %q, want %q", calls[0].ContainerID, "c1")
+			}
+		})
+	}
+}
 
 func TestModel_fetchInspectCmd(t *testing.T) {
 	// Empty container ID returns nil

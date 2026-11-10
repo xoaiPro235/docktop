@@ -27,6 +27,9 @@ var _ docker.Service = &MockService{}
 //
 //		// make and configure a mocked docker.Service
 //		mockedService := &MockService{
+//			AttachShellCmdFunc: func(containerID string) *exec.Cmd {
+//				panic("mock out the AttachShellCmd method")
+//			},
 //			CloseFunc: func() error {
 //				panic("mock out the Close method")
 //			},
@@ -127,6 +130,9 @@ var _ docker.Service = &MockService{}
 //
 //	}
 type MockService struct {
+	// AttachShellCmdFunc mocks the AttachShellCmd method.
+	AttachShellCmdFunc func(containerID string) *exec.Cmd
+
 	// CloseFunc mocks the Close method.
 	CloseFunc func() error
 
@@ -222,6 +228,11 @@ type MockService struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AttachShellCmd holds details about calls to the AttachShellCmd method.
+		AttachShellCmd []struct {
+			// ContainerID is the containerID argument value.
+			ContainerID string
+		}
 		// Close holds details about calls to the Close method.
 		Close []struct {
 		}
@@ -416,6 +427,7 @@ type MockService struct {
 			ContainerID string
 		}
 	}
+	lockAttachShellCmd       sync.RWMutex
 	lockClose                sync.RWMutex
 	lockContainerTop         sync.RWMutex
 	lockExecShellCmd         sync.RWMutex
@@ -447,6 +459,38 @@ type MockService struct {
 	lockStreamContainerStats sync.RWMutex
 	lockStreamEvents         sync.RWMutex
 	lockUnpauseContainer     sync.RWMutex
+}
+
+// AttachShellCmd calls AttachShellCmdFunc.
+func (mock *MockService) AttachShellCmd(containerID string) *exec.Cmd {
+	if mock.AttachShellCmdFunc == nil {
+		panic("MockService.AttachShellCmdFunc: method is nil but Service.AttachShellCmd was just called")
+	}
+	callInfo := struct {
+		ContainerID string
+	}{
+		ContainerID: containerID,
+	}
+	mock.lockAttachShellCmd.Lock()
+	mock.calls.AttachShellCmd = append(mock.calls.AttachShellCmd, callInfo)
+	mock.lockAttachShellCmd.Unlock()
+	return mock.AttachShellCmdFunc(containerID)
+}
+
+// AttachShellCmdCalls gets all the calls that were made to AttachShellCmd.
+// Check the length with:
+//
+//	len(mockedService.AttachShellCmdCalls())
+func (mock *MockService) AttachShellCmdCalls() []struct {
+	ContainerID string
+} {
+	var calls []struct {
+		ContainerID string
+	}
+	mock.lockAttachShellCmd.RLock()
+	calls = mock.calls.AttachShellCmd
+	mock.lockAttachShellCmd.RUnlock()
+	return calls
 }
 
 // Close calls CloseFunc.

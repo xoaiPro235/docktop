@@ -283,6 +283,7 @@ func (m Model) FooterBindings() []key.Binding {
 					keys.ContainerKeys.Remove,
 					keys.ContainerKeys.Prune,
 					keys.ContainerKeys.Exec,
+					keys.ContainerKeys.Attach,
 				)
 			case docker.StatePaused:
 				bindings = append(bindings,

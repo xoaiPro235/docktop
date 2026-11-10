@@ -93,7 +93,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			cmds = append(cmds, m.fetchTopCmd(msg.ContainerID))
 		}
 
-	case ExecFinishedMsg:
+	case ExecFinishedMsg, AttachFinishedMsg:
 		// Interactive terminal shell exited, resume TUI
 		return m, m.syncActivePane()
 
@@ -341,13 +341,22 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.focusZone = FocusLeftTree
 			}
 
-		// Exec shell in running container (like lazydocker)
+		// Exec shell in running container
 		case key.Matches(msg, keys.ContainerKeys.Exec):
 			selected := m.SelectedContainer()
 			if selected != nil && selected.State == docker.StateRunning && !m.isContainerActionRunning(selected.ID) {
 				cmd := m.dockerClient.ExecShellCmd(selected.ID)
 				return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 					return ExecFinishedMsg{Err: err}
+				})
+			}
+		// Attach directly to running container process
+		case key.Matches(msg, keys.ContainerKeys.Attach):
+			selected := m.SelectedContainer()
+			if selected != nil && selected.State == docker.StateRunning && !m.isContainerActionRunning(selected.ID) {
+				cmd := m.dockerClient.AttachShellCmd(selected.ID)
+				return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+					return AttachFinishedMsg{Err: err}
 				})
 			}
 

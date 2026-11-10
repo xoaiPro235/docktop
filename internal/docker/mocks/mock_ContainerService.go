@@ -23,6 +23,9 @@ var _ docker.ContainerService = &MockContainerService{}
 //
 //		// make and configure a mocked docker.ContainerService
 //		mockedContainerService := &MockContainerService{
+//			AttachShellCmdFunc: func(containerID string) *exec.Cmd {
+//				panic("mock out the AttachShellCmd method")
+//			},
 //			ContainerTopFunc: func(ctx context.Context, containerID string) (*container.TopResponse, error) {
 //				panic("mock out the ContainerTop method")
 //			},
@@ -72,6 +75,9 @@ var _ docker.ContainerService = &MockContainerService{}
 //
 //	}
 type MockContainerService struct {
+	// AttachShellCmdFunc mocks the AttachShellCmd method.
+	AttachShellCmdFunc func(containerID string) *exec.Cmd
+
 	// ContainerTopFunc mocks the ContainerTop method.
 	ContainerTopFunc func(ctx context.Context, containerID string) (*container.TopResponse, error)
 
@@ -116,6 +122,11 @@ type MockContainerService struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AttachShellCmd holds details about calls to the AttachShellCmd method.
+		AttachShellCmd []struct {
+			// ContainerID is the containerID argument value.
+			ContainerID string
+		}
 		// ContainerTop holds details about calls to the ContainerTop method.
 		ContainerTop []struct {
 			// Ctx is the ctx argument value.
@@ -213,6 +224,7 @@ type MockContainerService struct {
 			ContainerID string
 		}
 	}
+	lockAttachShellCmd       sync.RWMutex
 	lockContainerTop         sync.RWMutex
 	lockExecShellCmd         sync.RWMutex
 	lockInspectContainer     sync.RWMutex
@@ -227,6 +239,38 @@ type MockContainerService struct {
 	lockStreamContainerLogs  sync.RWMutex
 	lockStreamContainerStats sync.RWMutex
 	lockUnpauseContainer     sync.RWMutex
+}
+
+// AttachShellCmd calls AttachShellCmdFunc.
+func (mock *MockContainerService) AttachShellCmd(containerID string) *exec.Cmd {
+	if mock.AttachShellCmdFunc == nil {
+		panic("MockContainerService.AttachShellCmdFunc: method is nil but ContainerService.AttachShellCmd was just called")
+	}
+	callInfo := struct {
+		ContainerID string
+	}{
+		ContainerID: containerID,
+	}
+	mock.lockAttachShellCmd.Lock()
+	mock.calls.AttachShellCmd = append(mock.calls.AttachShellCmd, callInfo)
+	mock.lockAttachShellCmd.Unlock()
+	return mock.AttachShellCmdFunc(containerID)
+}
+
+// AttachShellCmdCalls gets all the calls that were made to AttachShellCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.AttachShellCmdCalls())
+func (mock *MockContainerService) AttachShellCmdCalls() []struct {
+	ContainerID string
+} {
+	var calls []struct {
+		ContainerID string
+	}
+	mock.lockAttachShellCmd.RLock()
+	calls = mock.calls.AttachShellCmd
+	mock.lockAttachShellCmd.RUnlock()
+	return calls
 }
 
 // ContainerTop calls ContainerTopFunc.

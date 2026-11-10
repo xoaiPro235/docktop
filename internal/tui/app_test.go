@@ -11,6 +11,7 @@ import (
 	"github.com/moby/moby/api/types/events"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
+	"github.com/xoaiPro235/docktop/internal/tui/components/container"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -247,6 +248,37 @@ func TestAppModel_FooterBindingsShowsReconnectWhenDisconnected(t *testing.T) {
 	app.daemonConnected = true
 	if hasReconnect(app.FooterBindings()) {
 		t.Error("FooterBindings should not include Ctrl+R when connected")
+	}
+}
+
+func TestAppModel_Update_AttachFinished(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       error
+		wantModal bool
+	}{
+		{name: "success"},
+		{name: "failure", err: errors.New("attach failed"), wantModal: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := NewApp(helperMockService())
+			model, _ := app.Update(container.AttachFinishedMsg{Err: tt.err})
+			app = model.(AppModel)
+
+			if app.errorModal.Active != tt.wantModal {
+				t.Fatalf("error modal active = %v, want %v", app.errorModal.Active, tt.wantModal)
+			}
+			if tt.wantModal {
+				if app.errorModal.Title != "Container Attach Failed" {
+					t.Errorf("error modal title = %q, want %q", app.errorModal.Title, "Container Attach Failed")
+				}
+				if !strings.Contains(app.errorModal.Message, tt.err.Error()) {
+					t.Errorf("error modal message %q does not contain %q", app.errorModal.Message, tt.err)
+				}
+			}
+		})
 	}
 }
 

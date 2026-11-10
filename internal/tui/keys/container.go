@@ -13,6 +13,7 @@ type ContainerKeyMap struct {
 	Remove        key.Binding
 	Prune         key.Binding
 	Exec          key.Binding
+	Attach        key.Binding
 	NextPane      key.Binding
 	PrevPane      key.Binding
 	ToggleExpand  key.Binding
@@ -64,6 +65,10 @@ var ContainerKeys = ContainerKeyMap{
 	Exec: key.NewBinding(
 		key.WithKeys("e", "E"),
 		key.WithHelp("e", "Exec"),
+	),
+	Attach: key.NewBinding(
+		key.WithKeys("a"),
+		key.WithHelp("a", "Attach"),
 	),
 	NextPane: key.NewBinding(
 		key.WithKeys("]"),

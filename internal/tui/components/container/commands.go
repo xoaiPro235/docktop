@@ -42,6 +42,10 @@ type ExecFinishedMsg struct {
 	Err error
 }
 
+type AttachFinishedMsg struct {
+	Err error
+}
+
 type ContainerActionMsg struct {
 	ContainerID string
 	Action      modal.Action
