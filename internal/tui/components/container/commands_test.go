@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -275,6 +276,75 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			}
 			if (msg.Err != nil) != tt.wantErr {
 				t.Errorf("Err = %v, wantErr = %v", msg.Err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestContainerOpenBrowserCommand(t *testing.T) {
+	tests := []struct {
+		name        string
+		container   docker.ContainerInfo
+		actionRun   bool
+		wantError   bool
+		wantTitle   string
+		wantMessage string
+	}{
+		{
+			name: "running container without published ports",
+			container: docker.ContainerInfo{
+				ID: "ctr-no-ports", Name: "internal-worker", State: docker.StateRunning,
+			},
+			wantError:   true,
+			wantTitle:   "No Public Port",
+			wantMessage: `Container "internal-worker" has no ports mapped to the host.`,
+		},
+		{
+			name: "stopped container with published port",
+			container: docker.ContainerInfo{
+				ID: "ctr-stopped", Name: "stopped-web", State: docker.StateExited,
+				Ports: "0.0.0.0:8080->80/tcp",
+			},
+		},
+		{
+			name: "container action in progress",
+			container: docker.ContainerInfo{
+				ID: "ctr-busy", Name: "busy-web", State: docker.StateRunning,
+				Ports: "0.0.0.0:8080->80/tcp",
+			},
+			actionRun: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New(&mocks.MockContainerService{})
+			m.updateContainers([]docker.ContainerInfo{tt.container})
+			if tt.actionRun {
+				m.runningActions[tt.container.ID] = RunningAction{Action: modal.ActionStop}
+			}
+
+			_, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+			if !tt.wantError {
+				if cmd != nil {
+					t.Fatalf("Open Browser returned unexpected command: %v", cmd)
+				}
+				return
+			}
+
+			if cmd == nil {
+				t.Fatal("expected command reporting that no port is published")
+			}
+			result := cmd()
+			errMsg, ok := result.(modal.ShowErrorMsg)
+			if !ok {
+				t.Fatalf("Open Browser command returned %T, want modal.ShowErrorMsg", result)
+			}
+			if errMsg.Title != tt.wantTitle {
+				t.Errorf("error title = %q, want %q", errMsg.Title, tt.wantTitle)
+			}
+			if !strings.Contains(errMsg.Message, tt.wantMessage) {
+				t.Errorf("error message = %q, want it to contain %q", errMsg.Message, tt.wantMessage)
 			}
 		})
 	}

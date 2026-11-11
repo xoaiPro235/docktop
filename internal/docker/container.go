@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -218,4 +219,55 @@ func (c *Client) AttachShellCmd(containerID string) *exec.Cmd {
 	// Use --sig-proxy=false so pressing Ctrl+C detaches instead of killing the container.
 	args = append(args, "attach", "--sig-proxy=false", containerID)
 	return exec.Command("docker", args...)
+}
+
+func (c ContainerInfo) WebURL() (string, bool) {
+	if c.Ports == "" {
+		return "", false
+	}
+	for item := range strings.SplitSeq(c.Ports, ",") {
+		item := strings.TrimSpace(item)
+		if !strings.Contains(item, "->") {
+			continue
+		}
+
+		parts := strings.SplitN(item, "->", 2)
+		hostPart := strings.TrimSpace(parts[0])
+		if hostPart == "" {
+			return "", false
+		}
+
+		host := "localhost"
+		port := hostPart
+		if before, after, ok := strings.CutLast(hostPart, ":"); ok {
+			host = strings.Trim(before, "[]")
+			port = after
+		}
+
+		if host == "" || host == "0.0.0.0" || host == "::" {
+			host = "localhost"
+		}
+
+		return fmt.Sprintf("http://%s:%s/", host, port), true
+	}
+
+	return "", false
+}
+
+func defaultOpenBrowserCmd(url string) *exec.Cmd {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url)
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default: // linux, bsd
+		return exec.Command("xdg-open", url)
+	}
+}
+
+var openBrowserCmd = defaultOpenBrowserCmd
+
+// OpenBrowser opens the given URL in the user's default web browser.
+func OpenBrowser(url string) error {
+	return openBrowserCmd(url).Start()
 }

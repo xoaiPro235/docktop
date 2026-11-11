@@ -2,6 +2,7 @@ package docker
 
 import (
 	"errors"
+	"os/exec"
 	"reflect"
 	"testing"
 
@@ -101,5 +102,89 @@ func TestClient_ExecShellCmd(t *testing.T) {
 				t.Errorf("ExecShellCmd().Args = %#v, want %#v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWebURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		ports    string
+		expected string
+		ok       bool
+	}{
+		{
+			name:     "standard 0.0.0.0 mapping",
+			ports:    "0.0.0.0:8080->80/tcp",
+			expected: "http://localhost:8080/",
+			ok:       true,
+		},
+		{
+			name:     "custom IP mapping",
+			ports:    "127.0.0.1:3000->3000/tcp",
+			expected: "http://127.0.0.1:3000/",
+			ok:       true,
+		},
+		{
+			name:     "ipv6 mapping",
+			ports:    "[::]:8080->80/tcp",
+			expected: "http://localhost:8080/",
+			ok:       true,
+		},
+		{
+			name:     "short host port format",
+			ports:    "8080->80/tcp",
+			expected: "http://localhost:8080/",
+			ok:       true,
+		},
+		{
+			name:     "internal port only without mapping",
+			ports:    "80/tcp",
+			expected: "",
+			ok:       false,
+		},
+		{
+			name:     "multiple ports picks first mapped",
+			ports:    "80/tcp, 0.0.0.0:8080->80/tcp, 0.0.0.0:9000->9000/tcp",
+			expected: "http://localhost:8080/",
+			ok:       true,
+		},
+		{
+			name:     "empty ports",
+			ports:    "",
+			expected: "",
+			ok:       false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			info := ContainerInfo{Ports: tc.ports}
+			got, ok := info.WebURL()
+			if ok != tc.ok {
+				t.Fatalf("expected ok=%v, got %v", tc.ok, ok)
+			}
+			if got != tc.expected {
+				t.Errorf("expected URL %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestOpenBrowser(t *testing.T) {
+	orig := openBrowserCmd
+	defer func() { openBrowserCmd = orig }()
+
+	var capturedURL string
+	openBrowserCmd = func(url string) *exec.Cmd {
+		capturedURL = url
+		return exec.Command("true")
+	}
+
+	testURL := "http://localhost:8080/"
+	if err := OpenBrowser(testURL); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedURL != testURL {
+		t.Errorf("expected capturedURL %q, got %q", testURL, capturedURL)
 	}
 }

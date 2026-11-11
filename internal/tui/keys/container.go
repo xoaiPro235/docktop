@@ -14,6 +14,7 @@ type ContainerKeyMap struct {
 	Prune         key.Binding
 	Exec          key.Binding
 	Attach        key.Binding
+	OpenBrowser   key.Binding
 	NextPane      key.Binding
 	PrevPane      key.Binding
 	ToggleExpand  key.Binding
@@ -69,6 +70,10 @@ var ContainerKeys = ContainerKeyMap{
 	Attach: key.NewBinding(
 		key.WithKeys("a"),
 		key.WithHelp("a", "Attach"),
+	),
+	OpenBrowser: key.NewBinding(
+		key.WithKeys("o"),
+		key.WithHelp("o", "Open Browser"),
 	),
 	NextPane: key.NewBinding(
 		key.WithKeys("]"),

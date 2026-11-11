@@ -360,6 +360,29 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				})
 			}
 
+		// Open container mapped port in default web browser
+		case key.Matches(msg, keys.ContainerKeys.OpenBrowser):
+			selected := m.SelectedContainer()
+			if selected != nil && selected.State == docker.StateRunning && !m.isContainerActionRunning(selected.ID) {
+				if url, ok := selected.WebURL(); ok {
+					if err := docker.OpenBrowser(url); err != nil {
+						return m, func() tea.Msg {
+							return modal.ShowErrorMsg{
+								Title:   "Failed to Open Browser",
+								Message: fmt.Sprintf("Could not launch default web browser for %s: %v", url, err),
+							}
+						}
+					}
+					return m, nil
+				}
+				return m, func() tea.Msg {
+					return modal.ShowErrorMsg{
+						Title:   "No Public Port",
+						Message: fmt.Sprintf("Container %q has no ports mapped to the host.", selected.Name),
+					}
+				}
+			}
+
 		// Lifecycle: Start / Stop toggle with confirmation modal
 		case key.Matches(msg, keys.ContainerKeys.StartStop):
 			selected := m.SelectedContainer()
