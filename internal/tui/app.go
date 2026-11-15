@@ -34,12 +34,13 @@ type DockerManualReconnectResultMsg struct {
 
 const maxReconnectAttempts = 5
 
-func (a AppModel) attemptReconnectCmd() tea.Cmd {
+func (a AppModel) manualReconnectCmd() tea.Cmd {
 	return func() tea.Msg {
 		err := a.dockerClient.Ping()
 		return DockerManualReconnectResultMsg{Err: err}
 	}
 }
+
 func waitForDockerEvent(eventCh <-chan events.Message, errCh <-chan error) tea.Cmd {
 	return func() tea.Msg {
 		if eventCh == nil && errCh == nil {
@@ -199,8 +200,8 @@ func (a *AppModel) switchTab(tab Tab) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (a AppModel) fetchActiveTabCmd() tea.Cmd {
-	switch a.activeTab {
+func (a AppModel) fetchTabCmd(tab Tab) tea.Cmd {
+	switch tab {
 	case TabContainers:
 		return a.fetchContainersCmd()
 	case TabImages:
@@ -214,7 +215,25 @@ func (a AppModel) fetchActiveTabCmd() tea.Cmd {
 	}
 }
 
-func (a *AppModel) handleDaemonReconnect() []tea.Cmd {
+func (a AppModel) fetchActiveTabCmd() tea.Cmd {
+	return a.fetchTabCmd(a.activeTab)
+}
+
+// handleActionSuccess restores daemon connectivity if needed, and dispatches refreshes for the currently active tab.
+func (a *AppModel) handleActionSuccess(resourceTab Tab) []tea.Cmd {
+	if !a.daemonConnected {
+		return a.handleDaemonReconnected()
+	}
+	// Container changes affect all tabs (mounts, networks, image usage).
+	// Resource-specific changes only affect their own tab.
+	// Inactive tabs are lazily refreshed upon switchTab.
+	if resourceTab == TabContainers || a.activeTab == resourceTab {
+		return []tea.Cmd{a.fetchActiveTabCmd()}
+	}
+	return nil
+}
+
+func (a *AppModel) handleDaemonReconnected() []tea.Cmd {
 	if a.daemonConnected {
 		return nil
 	}
@@ -307,7 +326,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.reconnecting = true
 				a.daemonConnected = false
 				a.reconnectAttempts = 0
-				return a, a.attemptReconnectCmd()
+				return a, a.manualReconnectCmd()
 			}
 
 		case key.Matches(msg, keys.AppKeys.TabContainers):
@@ -352,19 +371,19 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case events.ContainerEventType:
 			if docker.IsContainerLifecycleEvent(msg.Action) {
-				cmds = append(cmds, a.fetchContainersCmd())
+				cmds = append(cmds, a.handleActionSuccess(TabContainers)...)
 			}
 		case events.ImageEventType:
 			if docker.IsImageLifecycleEvent(msg.Action) {
-				cmds = append(cmds, a.fetchImagesCmd())
+				cmds = append(cmds, a.handleActionSuccess(TabImages)...)
 			}
 		case events.VolumeEventType:
 			if docker.IsVolumeLifecycleEvent(msg.Action) {
-				cmds = append(cmds, a.fetchVolumesCmd())
+				cmds = append(cmds, a.handleActionSuccess(TabVolumes)...)
 			}
 		case events.NetworkEventType:
 			if docker.IsNetworkLifecycleEvent(msg.Action) {
-				cmds = append(cmds, a.fetchNetworksCmd())
+				cmds = append(cmds, a.handleActionSuccess(TabNetworks)...)
 			}
 		}
 		cmds = append(cmds, waitForDockerEvent(a.eventChan, a.eventErrChan))
@@ -394,7 +413,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Reconnect successful! Daemon is back online.
-		cmds = append(cmds, a.handleDaemonReconnect()...)
+		cmds = append(cmds, a.handleDaemonReconnected()...)
 		return a, tea.Batch(cmds...)
 
 	case DockerManualReconnectResultMsg:
@@ -411,7 +430,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Manual reconnect successful! Daemon is back online.
-		cmds = append(cmds, a.handleDaemonReconnect()...)
+		cmds = append(cmds, a.handleDaemonReconnected()...)
 		return a, tea.Batch(cmds...)
 
 	case tea.WindowSizeMsg:
@@ -427,7 +446,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ContainerListMsg:
 		if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
+			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
 		if cmd := a.containerModel.SetContainers(msg); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -435,7 +454,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ImageListMsg:
 		if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
+			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
 		if cmd := a.imageModel.SetImages(msg); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -443,7 +462,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case VolumeListMsg:
 		if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
+			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
 		if cmd := a.volumeModel.SetVolumes(msg); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -451,7 +470,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case NetworkListMsg:
 		if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
+			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
 		if cmd := a.networkModel.SetNetworks(msg); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -464,10 +483,21 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case container.ContainerActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Container %s Failed", msg.Action.Title()), msg.Err.Error())
-		} else if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
-			cmds = append(cmds, a.fetchContainersCmd())
+			cmds = append(cmds, a.handleActionSuccess(TabContainers)...)
+		}
+		var cmd tea.Cmd
+		a.containerModel, cmd = a.containerModel.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return a, tea.Batch(cmds...)
+
+	case container.ComposeActionMsg:
+		if msg.Err != nil {
+			a.errorModal.Show(fmt.Sprintf("Compose %s Failed", msg.Action), msg.Err.Error())
+		} else {
+			cmds = append(cmds, a.handleActionSuccess(TabContainers)...)
 		}
 		var cmd tea.Cmd
 		a.containerModel, cmd = a.containerModel.Update(msg)
@@ -479,10 +509,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case image.ImageActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Image %s Failed", msg.Action.Title()), msg.Err.Error())
-		} else if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
-			cmds = append(cmds, a.fetchImagesCmd())
+			cmds = append(cmds, a.handleActionSuccess(TabImages)...)
 		}
 		var cmd tea.Cmd
 		a.imageModel, cmd = a.imageModel.Update(msg)
@@ -494,10 +522,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case volume.VolumeActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Volume %s Failed", msg.Action.Title()), msg.Err.Error())
-		} else if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
-			cmds = append(cmds, a.fetchVolumesCmd())
+			cmds = append(cmds, a.handleActionSuccess(TabVolumes)...)
 		}
 		var cmd tea.Cmd
 		a.volumeModel, cmd = a.volumeModel.Update(msg)
@@ -509,10 +535,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case network.NetworkActionMsg:
 		if msg.Err != nil {
 			a.errorModal.Show(fmt.Sprintf("Network %s Failed", msg.Action.Title()), msg.Err.Error())
-		} else if !a.daemonConnected {
-			cmds = append(cmds, a.handleDaemonReconnect()...)
 		} else {
-			cmds = append(cmds, a.fetchNetworksCmd())
+			cmds = append(cmds, a.handleActionSuccess(TabNetworks)...)
 		}
 		var cmd tea.Cmd
 		a.networkModel, cmd = a.networkModel.Update(msg)

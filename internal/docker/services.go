@@ -26,8 +26,20 @@ type ContainerService interface {
 	ExecShellCmd(containerID string) *exec.Cmd
 	AttachShellCmd(containerID string) *exec.Cmd
 	StreamContainerLogs(ctx context.Context, containerID string, tail string) <-chan string
-	StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-chan string
 	StreamContainerStats(ctx context.Context, id string) <-chan ContainerMetrics
+	ComposeService
+}
+
+// ComposeService defines lifecycle commands for Docker Compose projects and services.
+type ComposeService interface {
+	ComposeUpCmd(ctx context.Context, opts ComposeOpts) (*exec.Cmd, error)
+	ComposeBuildCmd(ctx context.Context, opts ComposeOpts) (*exec.Cmd, error)
+	ComposeDownCmd(ctx context.Context, opts ComposeOpts) (*exec.Cmd, error)
+	ComposeRestartCmd(ctx context.Context, opts ComposeOpts) (*exec.Cmd, error)
+	ComposeStopCmd(ctx context.Context, opts ComposeOpts) (*exec.Cmd, error)
+	ComposeStartCmd(ctx context.Context, opts ComposeOpts) (*exec.Cmd, error)
+	ComposeRmCmd(ctx context.Context, opts ComposeOpts) (*exec.Cmd, error)
+	StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-chan string
 }
 
 // ImageService defines the narrow interface required by Image components.
@@ -76,6 +88,7 @@ type Service interface {
 var (
 	_ Service          = (*Client)(nil)
 	_ ContainerService = (*Client)(nil)
+	_ ComposeService   = (*Client)(nil)
 	_ ImageService     = (*Client)(nil)
 	_ VolumeService    = (*Client)(nil)
 	_ NetworkService   = (*Client)(nil)

@@ -86,16 +86,24 @@ func (m Model) View() string {
 			var styledTitle string
 			switch item.Node.Type {
 			case NodeProject:
-				styledTitle = theme.Current.TreeProject.Render(title)
+				if _, isAction := m.runningActions[item.Node.Key]; isAction {
+					styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
+				} else {
+					styledTitle = theme.Current.TreeProject.Render(title)
+				}
 			case NodeService:
-				styledTitle = theme.Current.TreeService.Render(title)
+				if _, isAction := m.runningActions[item.Node.Key]; isAction {
+					styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
+				} else {
+					styledTitle = theme.Current.TreeService.Render(title)
+				}
 			case NodeContainer:
 				if item.Node.Container != nil {
 					_, isSelfAction := m.runningActions[item.Node.Container.ID]
 					isPruningThis := m.isContainerActionRunning(ActionTargetAll) && item.Node.Container.State != docker.StateRunning
 
 					if isSelfAction || isPruningThis {
-						styledTitle = theme.Current.TreeSelected.Render(m.spinner.View() + " " + title)
+						styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
 					} else if item.Node.Container.State == docker.StateRunning {
 						styledTitle = theme.Current.TreeContainerRunning.Render(title)
 					} else {
@@ -242,6 +250,32 @@ func (m Model) FooterBindings() []key.Binding {
 				keys.CommonHelpKeys.HelpFilter,
 				keys.ContainerKeys.ToggleExpand,
 			)
+
+			if selectedNode.IsCompose() {
+				startOrStop := keys.ComposeKeys.Start
+				if selectedNode.HasRunningContainers() {
+					startOrStop = keys.ComposeKeys.Stop
+				}
+
+				switch selectedNode.Type {
+				case NodeProject:
+					bindings = append(bindings,
+						keys.ComposeKeys.Up,
+						keys.ComposeKeys.Build,
+						keys.ComposeKeys.Restart,
+						startOrStop,
+						keys.ComposeKeys.Down,
+					)
+				case NodeService:
+					bindings = append(bindings,
+						keys.ComposeKeys.Up,
+						keys.ComposeKeys.Build,
+						keys.ComposeKeys.Restart,
+						startOrStop,
+						keys.ComposeKeys.Remove,
+					)
+				}
+			}
 		}
 		if selectedNode.Name != StandaloneProjectName {
 			bindings = append(bindings, keys.CommonHelpKeys.HelpSubpane)

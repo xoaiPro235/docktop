@@ -128,6 +128,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 
+	case ComposeActionMsg:
+		delete(m.runningActions, msg.TargetKey)
+		m.rebuildTree()
+		if msg.Err != nil {
+			return m, func() tea.Msg {
+				return modal.ShowErrorMsg{
+					Title:   fmt.Sprintf("Compose %s Failed", msg.Action),
+					Message: msg.Err.Error(),
+				}
+			}
+		}
+		return m, m.syncActivePane()
+
 	case ContainerActionMsg:
 		targetID := msg.ContainerID
 		if msg.Action == modal.ActionPrune {
@@ -322,117 +335,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
+		// Global keys: Switch focus, toggle display options, cycle subpanes
 		switch {
-		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.SearchBarKeys.Activate):
-			cmd := m.searchBar.Activate()
-			return m, cmd
-
-		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.SearchBarKeys.ClearFilter) && m.searchBar.HasFilter():
-			m.searchBar.Clear()
-			m.rebuildTree()
-			cmds = append(cmds, m.syncActivePane())
-			return m, tea.Batch(cmds...)
-
-		// Switch focus Left / Right
 		case key.Matches(msg, keys.AppKeys.FocusToggle):
 			if m.focusZone == FocusLeftTree {
 				m.focusZone = FocusRightPane
 			} else {
 				m.focusZone = FocusLeftTree
 			}
-
-		// Exec shell in running container
-		case key.Matches(msg, keys.ContainerKeys.Exec):
-			selected := m.SelectedContainer()
-			if selected != nil && selected.State == docker.StateRunning && !m.isContainerActionRunning(selected.ID) {
-				cmd := m.dockerClient.ExecShellCmd(selected.ID)
-				return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-					return ExecFinishedMsg{Err: err}
-				})
-			}
-		// Attach directly to running container process
-		case key.Matches(msg, keys.ContainerKeys.Attach):
-			selected := m.SelectedContainer()
-			if selected != nil && selected.State == docker.StateRunning && !m.isContainerActionRunning(selected.ID) {
-				cmd := m.dockerClient.AttachShellCmd(selected.ID)
-				return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-					return AttachFinishedMsg{Err: err}
-				})
-			}
-
-		// Open container mapped port in default web browser
-		case key.Matches(msg, keys.ContainerKeys.OpenBrowser):
-			selected := m.SelectedContainer()
-			if selected != nil && selected.State == docker.StateRunning && !m.isContainerActionRunning(selected.ID) {
-				if url, ok := selected.WebURL(); ok {
-					if err := docker.OpenBrowser(url); err != nil {
-						return m, func() tea.Msg {
-							return modal.ShowErrorMsg{
-								Title:   "Failed to Open Browser",
-								Message: fmt.Sprintf("Could not launch default web browser for %s: %v", url, err),
-							}
-						}
-					}
-					return m, nil
-				}
-				return m, func() tea.Msg {
-					return modal.ShowErrorMsg{
-						Title:   "No Public Port",
-						Message: fmt.Sprintf("Container %q has no ports mapped to the host.", selected.Name),
-					}
-				}
-			}
-
-		// Lifecycle: Start / Stop toggle with confirmation modal
-		case key.Matches(msg, keys.ContainerKeys.StartStop):
-			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-				if selected.State == docker.StateRunning || selected.State == docker.StatePaused {
-					m.confirmModal.ShowContainerAction(modal.ActionStop, selected.ID, selected.Name)
-				} else {
-					m.confirmModal.ShowContainerAction(modal.ActionStart, selected.ID, selected.Name)
-				}
-				return m, nil
-			}
-
-		// Lifecycle: Pause / Unpause toggle with confirmation modal
-		case key.Matches(msg, keys.ContainerKeys.Pause):
-			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-				if selected.State == docker.StatePaused {
-					m.confirmModal.ShowContainerAction(modal.ActionUnpause, selected.ID, selected.Name)
-				} else {
-					m.confirmModal.ShowContainerAction(modal.ActionPause, selected.ID, selected.Name)
-				}
-				return m, nil
-			}
-
-		// Lifecycle: Restart with confirmation modal
-		case key.Matches(msg, keys.ContainerKeys.Restart):
-			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-				m.confirmModal.ShowContainerAction(modal.ActionRestart, selected.ID, selected.Name)
-				return m, nil
-			}
-
-		// Lifecycle: Remove container
-		case key.Matches(msg, keys.ContainerKeys.Remove):
-			selected := m.SelectedContainer()
-			if selected != nil && !m.isContainerActionRunning(selected.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-				if selected.State == docker.StateRunning || selected.State == docker.StatePaused {
-					m.confirmModal.ShowContainerAction(modal.ActionRemoveForce, selected.ID, selected.Name)
-				} else {
-					m.confirmModal.ShowContainerAction(modal.ActionRemove, selected.ID, selected.Name)
-				}
-				return m, nil
-			}
-
-		// Lifecycle: Prune stopped containers
-		case key.Matches(msg, keys.ContainerKeys.Prune):
-			if !m.IsActionRunning() {
-				m.confirmModal.ShowContainerPrune()
-				return m, nil
-			}
+			return m, nil
 
 		// Inspect pane: Toggle Raw / Formatted JSON
 		case key.Matches(msg, keys.ContainerKeys.ToggleRaw):
@@ -442,7 +353,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 
 		// Stats pane: Cycle Braille graph layout modes (Mirrored, Both Up, Both Down, Inverted)
-		case key.Matches(msg, keys.ContainerKeys.ToggleBraille):
+		// Only active when not on a Compose node, so 'b' correctly triggers Compose Build on Project & Service nodes.
+		case !m.SelectedNode().IsCompose() && key.Matches(msg, keys.ContainerKeys.ToggleBraille):
 			if m.activePane == SubPaneStats {
 				m.statsPane.CycleGraphMode()
 				return m, nil
@@ -462,25 +374,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			switch m.activePane {
 			case SubPaneLogs:
 				m.logsPane.ToggleWrap()
-				return m, nil
 			case SubPaneInspect:
 				m.inspectPane.ToggleWrap()
-				return m, nil
 			case SubPaneTop:
 				m.topPane.ToggleWrap()
-				return m, nil
 			}
+			return m, nil
 
 		// Cycle subpanes: '[' and ']'
 		case key.Matches(msg, keys.ContainerKeys.NextPane):
 			selectedNode := m.SelectedNode()
 			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != StandaloneProjectName {
 				m.composeActivePane = (m.composeActivePane + 1) % 2
-				cmds = append(cmds, m.syncActivePane())
 			} else {
 				m.activePane = (m.activePane + 1) % 4
-				cmds = append(cmds, m.syncActivePane())
 			}
+			return m, m.syncActivePane()
+
 		case key.Matches(msg, keys.ContainerKeys.PrevPane):
 			selectedNode := m.SelectedNode()
 			if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) && selectedNode.Name != StandaloneProjectName {
@@ -489,79 +399,222 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				} else {
 					m.composeActivePane--
 				}
-				cmds = append(cmds, m.syncActivePane())
 			} else {
 				if m.activePane == 0 {
 					m.activePane = SubPaneInspect
 				} else {
 					m.activePane--
 				}
-				cmds = append(cmds, m.syncActivePane())
 			}
-
-		// Navigate tree (when left tree is focused)
-		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Up):
-			if m.cursorIndex >= len(m.flatItems) {
-				m.cursorIndex = max(0, len(m.flatItems)-1)
-				m.syncScroll()
-				cmds = append(cmds, m.syncActivePane())
-			} else if m.cursorIndex > 0 {
-				m.cursorIndex--
-				m.syncScroll()
-				cmds = append(cmds, m.syncActivePane())
-			}
-		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Down):
-			if m.cursorIndex >= len(m.flatItems) {
-				m.cursorIndex = max(0, len(m.flatItems)-1)
-				m.syncScroll()
-				cmds = append(cmds, m.syncActivePane())
-			} else if m.cursorIndex < len(m.flatItems)-1 {
-				m.cursorIndex++
-				m.syncScroll()
-				cmds = append(cmds, m.syncActivePane())
-			}
-
-		// Space / Enter: Toggle expand/collapse
-		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.ToggleExpand):
-			selected := m.SelectedNode()
-			if selected != nil && len(selected.Children) > 0 {
-				selected.Expanded = !selected.Expanded
-				m.expandedState[selected.Key] = selected.Expanded
-				m.flatItems = Flatten(m.treeRoots, "")
-				if m.cursorIndex >= len(m.flatItems) {
-					m.cursorIndex = max(0, len(m.flatItems)-1)
-				}
-				cmds = append(cmds, m.syncActivePane())
-			}
-
-		// Left / h: Collapse open node
-		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Collapse):
-			selected := m.SelectedNode()
-			if selected != nil && len(selected.Children) > 0 && selected.Expanded {
-				selected.Expanded = false
-				m.expandedState[selected.Key] = false
-				m.flatItems = Flatten(m.treeRoots, "")
-				if m.cursorIndex >= len(m.flatItems) {
-					m.cursorIndex = max(0, len(m.flatItems)-1)
-				}
-				cmds = append(cmds, m.syncActivePane())
-			}
-
-		// Right / l: Expand closed node
-		case m.focusZone == FocusLeftTree && key.Matches(msg, keys.ContainerKeys.Expand):
-			selected := m.SelectedNode()
-			if selected != nil && len(selected.Children) > 0 && !selected.Expanded {
-				selected.Expanded = true
-				m.expandedState[selected.Key] = true
-				m.flatItems = Flatten(m.treeRoots, "")
-				if m.cursorIndex >= len(m.flatItems) {
-					m.cursorIndex = max(0, len(m.flatItems)-1)
-				}
-				cmds = append(cmds, m.syncActivePane())
-			}
+			return m, m.syncActivePane()
 		}
 
-		// Forward key events to right pane when focused
+		// -------------------------------------------------------------
+		// 1. LEFT TREE FOCUSED: Navigation, Search, Compose & Container actions
+		// -------------------------------------------------------------
+		if m.focusZone == FocusLeftTree {
+			selectedNode := m.SelectedNode()
+			selectedContainer := m.SelectedContainer()
+
+			switch {
+			case key.Matches(msg, keys.SearchBarKeys.Activate):
+				cmd := m.searchBar.Activate()
+				return m, cmd
+
+			case key.Matches(msg, keys.SearchBarKeys.ClearFilter) && m.searchBar.HasFilter():
+				m.searchBar.Clear()
+				m.rebuildTree()
+				return m, m.syncActivePane()
+
+			// --- Docker Compose lifecycle commands ---
+			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Up):
+				opts := selectedNode.ComposeOpts()
+				m.confirmModal.ShowComposeAction(modal.ActionComposeUp, selectedNode.Key, opts.ProjectName, opts.Service)
+				return m, nil
+
+			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Build):
+				opts := selectedNode.ComposeOpts()
+				m.confirmModal.ShowComposeAction(modal.ActionComposeBuild, selectedNode.Key, opts.ProjectName, opts.Service)
+				return m, nil
+
+			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Restart):
+				opts := selectedNode.ComposeOpts()
+				m.confirmModal.ShowComposeAction(modal.ActionComposeRestart, selectedNode.Key, opts.ProjectName, opts.Service)
+				return m, nil
+
+			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Start):
+				opts := selectedNode.ComposeOpts()
+				if selectedNode.HasRunningContainers() {
+					m.confirmModal.ShowComposeAction(modal.ActionComposeStop, selectedNode.Key, opts.ProjectName, opts.Service)
+				} else {
+					m.confirmModal.ShowComposeAction(modal.ActionComposeStart, selectedNode.Key, opts.ProjectName, opts.Service)
+				}
+				return m, nil
+
+			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Down):
+				opts := selectedNode.ComposeOpts()
+				switch selectedNode.Type {
+				case NodeProject:
+					m.confirmModal.ShowComposeAction(modal.ActionComposeDown, selectedNode.Key, opts.ProjectName, "")
+				case NodeService:
+					m.confirmModal.ShowComposeAction(modal.ActionComposeRm, selectedNode.Key, opts.ProjectName, opts.Service)
+				}
+				return m, nil
+
+			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Remove):
+				opts := selectedNode.ComposeOpts()
+				switch selectedNode.Type {
+				case NodeService:
+					m.confirmModal.ShowComposeAction(modal.ActionComposeRm, selectedNode.Key, opts.ProjectName, opts.Service)
+					return m, nil
+				case NodeProject:
+					m.confirmModal.ShowComposeAction(modal.ActionComposeDown, selectedNode.Key, opts.ProjectName, "")
+					return m, nil
+				}
+
+			// --- Container lifecycle commands ---
+			case key.Matches(msg, keys.ContainerKeys.Exec):
+				if selectedContainer != nil && selectedContainer.State == docker.StateRunning && !m.isContainerActionRunning(selectedContainer.ID) {
+					cmd := m.dockerClient.ExecShellCmd(selectedContainer.ID)
+					return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+						return ExecFinishedMsg{Err: err}
+					})
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Attach):
+				if selectedContainer != nil && selectedContainer.State == docker.StateRunning && !m.isContainerActionRunning(selectedContainer.ID) {
+					cmd := m.dockerClient.AttachShellCmd(selectedContainer.ID)
+					return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+						return AttachFinishedMsg{Err: err}
+					})
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.OpenBrowser):
+				if selectedContainer != nil && selectedContainer.State == docker.StateRunning && !m.isContainerActionRunning(selectedContainer.ID) {
+					if url, ok := selectedContainer.WebURL(); ok {
+						if err := docker.OpenBrowser(url); err != nil {
+							return m, func() tea.Msg {
+								return modal.ShowErrorMsg{
+									Title:   "Failed to Open Browser",
+									Message: fmt.Sprintf("Could not launch default web browser for %s: %v", url, err),
+								}
+							}
+						}
+						return m, nil
+					}
+					return m, func() tea.Msg {
+						return modal.ShowErrorMsg{
+							Title:   "No Public Port",
+							Message: fmt.Sprintf("Container %q has no ports mapped to the host.", selectedContainer.Name),
+						}
+					}
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Start):
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
+					if selectedContainer.State == docker.StateRunning || selectedContainer.State == docker.StatePaused {
+						m.confirmModal.ShowContainerAction(modal.ActionStop, selectedContainer.ID, selectedContainer.Name)
+					} else {
+						m.confirmModal.ShowContainerAction(modal.ActionStart, selectedContainer.ID, selectedContainer.Name)
+					}
+					return m, nil
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Pause):
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
+					if selectedContainer.State == docker.StatePaused {
+						m.confirmModal.ShowContainerAction(modal.ActionUnpause, selectedContainer.ID, selectedContainer.Name)
+					} else {
+						m.confirmModal.ShowContainerAction(modal.ActionPause, selectedContainer.ID, selectedContainer.Name)
+					}
+					return m, nil
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Restart):
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
+					m.confirmModal.ShowContainerAction(modal.ActionRestart, selectedContainer.ID, selectedContainer.Name)
+					return m, nil
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Remove):
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
+					if selectedContainer.State == docker.StateRunning || selectedContainer.State == docker.StatePaused {
+						m.confirmModal.ShowContainerAction(modal.ActionRemoveForce, selectedContainer.ID, selectedContainer.Name)
+					} else {
+						m.confirmModal.ShowContainerAction(modal.ActionRemove, selectedContainer.ID, selectedContainer.Name)
+					}
+					return m, nil
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Prune):
+				if !m.IsActionRunning() {
+					m.confirmModal.ShowContainerPrune()
+					return m, nil
+				}
+
+			// --- Tree navigation ---
+			case key.Matches(msg, keys.ContainerKeys.Up):
+				if m.cursorIndex >= len(m.flatItems) {
+					m.cursorIndex = max(0, len(m.flatItems)-1)
+					m.syncScroll()
+					cmds = append(cmds, m.syncActivePane())
+				} else if m.cursorIndex > 0 {
+					m.cursorIndex--
+					m.syncScroll()
+					cmds = append(cmds, m.syncActivePane())
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Down):
+				if m.cursorIndex >= len(m.flatItems) {
+					m.cursorIndex = max(0, len(m.flatItems)-1)
+					m.syncScroll()
+					cmds = append(cmds, m.syncActivePane())
+				} else if m.cursorIndex < len(m.flatItems)-1 {
+					m.cursorIndex++
+					m.syncScroll()
+					cmds = append(cmds, m.syncActivePane())
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.ToggleExpand):
+				if selectedNode != nil && len(selectedNode.Children) > 0 {
+					selectedNode.Expanded = !selectedNode.Expanded
+					m.expandedState[selectedNode.Key] = selectedNode.Expanded
+					m.flatItems = Flatten(m.treeRoots, "")
+					if m.cursorIndex >= len(m.flatItems) {
+						m.cursorIndex = max(0, len(m.flatItems)-1)
+					}
+					cmds = append(cmds, m.syncActivePane())
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Collapse):
+				if selectedNode != nil && len(selectedNode.Children) > 0 && selectedNode.Expanded {
+					selectedNode.Expanded = false
+					m.expandedState[selectedNode.Key] = false
+					m.flatItems = Flatten(m.treeRoots, "")
+					if m.cursorIndex >= len(m.flatItems) {
+						m.cursorIndex = max(0, len(m.flatItems)-1)
+					}
+					cmds = append(cmds, m.syncActivePane())
+				}
+
+			case key.Matches(msg, keys.ContainerKeys.Expand):
+				if selectedNode != nil && len(selectedNode.Children) > 0 && !selectedNode.Expanded {
+					selectedNode.Expanded = true
+					m.expandedState[selectedNode.Key] = true
+					m.flatItems = Flatten(m.treeRoots, "")
+					if m.cursorIndex >= len(m.flatItems) {
+						m.cursorIndex = max(0, len(m.flatItems)-1)
+					}
+					cmds = append(cmds, m.syncActivePane())
+				}
+			}
+
+			return m, tea.Batch(cmds...)
+		}
+
+		// -------------------------------------------------------------
+		// 2. RIGHT PANE FOCUSED: Forward keys to active viewport
+		// -------------------------------------------------------------
 		if m.focusZone == FocusRightPane {
 			var cmd tea.Cmd
 			selectedNode := m.SelectedNode()
@@ -592,6 +645,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m Model) resolveComposeOpts(targetKey string) docker.ComposeOpts {
+	var targetNode *TreeNode
+	for _, item := range m.flatItems {
+		if item.Node != nil && item.Node.Key == targetKey {
+			targetNode = item.Node
+			break
+		}
+	}
+	if targetNode == nil {
+		targetNode = m.SelectedNode()
+	}
+	if targetNode == nil {
+		return docker.ComposeOpts{}
+	}
+	return targetNode.ComposeOpts()
+}
+
 func (m Model) executeAction(action modal.Action, targetID, targetName string) (string, tea.Cmd) {
 	switch action {
 	case modal.ActionStart:
@@ -610,6 +680,30 @@ func (m Model) executeAction(action modal.Action, targetID, targetName string) (
 		return fmt.Sprintf("Force removing %s...", targetName), m.removeContainerCmd(targetID, true)
 	case modal.ActionPrune:
 		return "Pruning stopped containers...", m.pruneContainersCmd()
+
+	// Compose Actions
+	case modal.ActionComposeUp:
+		opts := m.resolveComposeOpts(targetID)
+		return fmt.Sprintf("Starting %s...", targetName), m.composeUpCmd(targetID, targetName, opts)
+	case modal.ActionComposeBuild:
+		opts := m.resolveComposeOpts(targetID)
+		return fmt.Sprintf("Building and starting %s...", targetName), m.composeBuildCmd(targetID, targetName, opts)
+	case modal.ActionComposeRestart:
+		opts := m.resolveComposeOpts(targetID)
+		return fmt.Sprintf("Restarting %s...", targetName), m.composeRestartCmd(targetID, targetName, opts)
+	case modal.ActionComposeStop:
+		opts := m.resolveComposeOpts(targetID)
+		return fmt.Sprintf("Stopping %s...", targetName), m.composeStopCmd(targetID, targetName, opts)
+	case modal.ActionComposeStart:
+		opts := m.resolveComposeOpts(targetID)
+		return fmt.Sprintf("Starting %s...", targetName), m.composeStartCmd(targetID, targetName, opts)
+	case modal.ActionComposeDown:
+		opts := m.resolveComposeOpts(targetID)
+		return fmt.Sprintf("Stopping and removing %s...", targetName), m.composeDownCmd(targetID, targetName, opts)
+	case modal.ActionComposeRm:
+		opts := m.resolveComposeOpts(targetID)
+		return fmt.Sprintf("Removing %s...", targetName), m.composeRmCmd(targetID, targetName, opts)
+
 	default:
 		return "", nil
 	}

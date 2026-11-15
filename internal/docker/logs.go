@@ -5,7 +5,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -65,37 +64,24 @@ func (c *Client) StreamComposeLogs(ctx context.Context, opts ComposeLogOpts) <-c
 	go func() {
 		defer close(outCh)
 
-		tail := opts.Tail
-		if tail == "" {
-			tail = "50"
+		composeOpts := ComposeOpts{
+			ProjectName: opts.ProjectName,
+			Service:     opts.Service,
+			WorkingDir:  opts.WorkingDir,
+			ConfigFile:  opts.ConfigFile,
 		}
 
-		var args []string
-		if c.host != "" {
-			args = append(args, "-H", c.host)
-		}
-		args = append(args, "compose", "--ansi", "always")
-		if opts.ProjectName != "" {
-			args = append(args, "-p", opts.ProjectName)
-		}
-		if opts.ConfigFile != "" {
-			args = append(args, "-f", opts.ConfigFile)
-		}
-		if opts.WorkingDir != "" {
-			args = append(args, "--project-directory", opts.WorkingDir)
-		}
-		args = append(args, "logs", "-f", "--tail", tail)
-		if opts.Service != "" {
-			args = append(args, opts.Service)
+		cmd, err := c.ComposeLogsCmd(ctx, composeOpts, opts.Tail)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			case outCh <- "Compose error: " + err.Error():
+			}
+			return
 		}
 
-		cmd := exec.CommandContext(ctx, "docker", args...)
-		if opts.WorkingDir != "" {
-			cmd.Dir = opts.WorkingDir
-		}
 		setProcessGroup(cmd)
-
-		cmd.WaitDelay = 200 * time.Millisecond
+		cmd.WaitDelay = 500 * time.Millisecond
 
 		pr, pw, err := os.Pipe()
 		if err != nil {

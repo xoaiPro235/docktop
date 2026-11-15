@@ -26,6 +26,13 @@ const (
 	ActionRemoveForce
 	ActionPrune
 	ActionDelete
+	ActionComposeDown
+	ActionComposeUp
+	ActionComposeBuild
+	ActionComposeRestart
+	ActionComposeStop
+	ActionComposeStart
+	ActionComposeRm
 )
 
 // TargetAll represents the special target identifier when pruning all unused/stopped resources.
@@ -44,11 +51,11 @@ const (
 // Style returns the default visual Style associated with this Action.
 func (a Action) Style() Style {
 	switch a {
-	case ActionStop, ActionRemove, ActionRemoveForce, ActionDelete:
+	case ActionStop, ActionRemove, ActionRemoveForce, ActionDelete, ActionComposeDown, ActionComposeStop, ActionComposeRm:
 		return StyleDanger
-	case ActionRestart, ActionPause, ActionPrune:
+	case ActionRestart, ActionPause, ActionPrune, ActionComposeRestart, ActionComposeBuild:
 		return StyleWarning
-	case ActionStart, ActionUnpause:
+	case ActionStart, ActionUnpause, ActionComposeUp, ActionComposeStart:
 		return StyleSuccess
 	default:
 		return StyleDefault
@@ -76,6 +83,20 @@ func (a Action) String() string {
 		return "prune"
 	case ActionDelete:
 		return "delete"
+	case ActionComposeDown:
+		return "compose_down"
+	case ActionComposeUp:
+		return "compose_up"
+	case ActionComposeBuild:
+		return "compose_build"
+	case ActionComposeRestart:
+		return "compose_restart"
+	case ActionComposeStop:
+		return "compose_stop"
+	case ActionComposeStart:
+		return "compose_start"
+	case ActionComposeRm:
+		return "compose_rm"
 	default:
 		return ""
 	}
@@ -102,6 +123,20 @@ func (a Action) Title() string {
 		return "Prune"
 	case ActionDelete:
 		return "Delete"
+	case ActionComposeDown:
+		return "Compose Down"
+	case ActionComposeUp:
+		return "Compose Up"
+	case ActionComposeBuild:
+		return "Compose Build"
+	case ActionComposeRestart:
+		return "Compose Restart"
+	case ActionComposeStop:
+		return "Compose Stop"
+	case ActionComposeStart:
+		return "Compose Start"
+	case ActionComposeRm:
+		return "Compose Remove"
 	default:
 		return ""
 	}
@@ -218,6 +253,69 @@ func (m *ConfirmModal) ShowContainerPrune() {
 		TargetAll,
 		"all stopped containers",
 	)
+}
+
+// ShowComposeAction formats and shows a Docker Compose lifecycle confirmation dialog.
+func (m *ConfirmModal) ShowComposeAction(action Action, targetKey, projectName, serviceName string) {
+	var question, command string
+	displayName := projectName
+	if serviceName != "" {
+		displayName = fmt.Sprintf("%s/%s", projectName, serviceName)
+	}
+	if targetKey == "" {
+		targetKey = displayName
+	}
+
+	switch action {
+	case ActionComposeUp:
+		if serviceName != "" {
+			question = fmt.Sprintf("Are you sure you want to start service %q (%s)?", serviceName, projectName)
+			command = fmt.Sprintf("docker compose -p %s up -d %s", projectName, serviceName)
+		} else {
+			question = fmt.Sprintf("Are you sure you want to start compose project %q?", projectName)
+			command = fmt.Sprintf("docker compose -p %s up -d", projectName)
+		}
+	case ActionComposeBuild:
+		if serviceName != "" {
+			question = fmt.Sprintf("Are you sure you want to build and start service %q (%s)?", serviceName, projectName)
+			command = fmt.Sprintf("docker compose -p %s up -d --build %s", projectName, serviceName)
+		} else {
+			question = fmt.Sprintf("Are you sure you want to build and start compose project %q?", projectName)
+			command = fmt.Sprintf("docker compose -p %s up -d --build", projectName)
+		}
+	case ActionComposeRestart:
+		if serviceName != "" {
+			question = fmt.Sprintf("Are you sure you want to restart service %q (%s)?", serviceName, projectName)
+			command = fmt.Sprintf("docker compose -p %s restart %s", projectName, serviceName)
+		} else {
+			question = fmt.Sprintf("Are you sure you want to restart compose project %q?", projectName)
+			command = fmt.Sprintf("docker compose -p %s restart", projectName)
+		}
+	case ActionComposeStop:
+		if serviceName != "" {
+			question = fmt.Sprintf("Are you sure you want to stop service %q (%s)?", serviceName, projectName)
+			command = fmt.Sprintf("docker compose -p %s stop %s", projectName, serviceName)
+		} else {
+			question = fmt.Sprintf("Are you sure you want to stop compose project %q?", projectName)
+			command = fmt.Sprintf("docker compose -p %s stop", projectName)
+		}
+	case ActionComposeStart:
+		if serviceName != "" {
+			question = fmt.Sprintf("Are you sure you want to start service %q (%s)?", serviceName, projectName)
+			command = fmt.Sprintf("docker compose -p %s start %s", projectName, serviceName)
+		} else {
+			question = fmt.Sprintf("Are you sure you want to start compose project %q?", projectName)
+			command = fmt.Sprintf("docker compose -p %s start", projectName)
+		}
+	case ActionComposeDown:
+		question = fmt.Sprintf("Are you sure you want to run compose down for project %q?", projectName)
+		command = fmt.Sprintf("docker compose -p %s down", projectName)
+	case ActionComposeRm:
+		question = fmt.Sprintf("Are you sure you want to remove service container %q (%s)?", serviceName, projectName)
+		command = fmt.Sprintf("docker compose -p %s rm -f -s %s", projectName, serviceName)
+	}
+
+	m.Show(question, command, action.Style(), action, targetKey, displayName)
 }
 
 // ShowImageAction formats and shows an image confirmation dialog.

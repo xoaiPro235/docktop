@@ -228,6 +228,76 @@ func TestAppModel_AutomaticReconnectAfterEventStreamCloses(t *testing.T) {
 	}
 }
 
+func TestAppModel_HandleActionSuccessRefreshesActiveTabOnly(t *testing.T) {
+	tests := []struct {
+		name        string
+		resourceTab Tab
+		wantRefresh bool
+	}{
+		{
+			name:        "refreshes when changed resource is active",
+			resourceTab: TabImages,
+			wantRefresh: true,
+		},
+		{
+			name:        "defers inactive resource refresh",
+			resourceTab: TabVolumes,
+		},
+		{
+			name:        "container changes refresh active tab",
+			resourceTab: TabContainers,
+			wantRefresh: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSvc := helperMockService()
+			app := NewApp(mockSvc)
+			app.activeTab = TabImages
+
+			cmds := app.handleActionSuccess(tt.resourceTab)
+			if got := len(cmds) > 0; got != tt.wantRefresh {
+				t.Fatalf("handleActionSuccess() returned refresh command = %v, want %v", got, tt.wantRefresh)
+			}
+			if !tt.wantRefresh {
+				return
+			}
+
+			msg := cmds[0]()
+			if _, ok := msg.(ImageListMsg); !ok {
+				t.Fatalf("refresh command returned %T, want ImageListMsg for active images tab", msg)
+			}
+			if got := len(mockSvc.ListImagesCalls()); got != 1 {
+				t.Errorf("ListImages called %d times, want 1", got)
+			}
+		})
+	}
+}
+
+func TestAppModel_HandleActionSuccessRestoresDisconnectedDaemon(t *testing.T) {
+	mockSvc := helperMockService()
+	app := NewApp(mockSvc)
+	app.daemonConnected = false
+	app.reconnecting = true
+	app.reconnectAttempts = 2
+
+	cmds := app.handleActionSuccess(TabVolumes)
+	if app.daemonConnected != true || app.reconnecting {
+		t.Errorf("after action success: daemonConnected=%v, reconnecting=%v; want true, false",
+			app.daemonConnected, app.reconnecting)
+	}
+	if app.reconnectAttempts != 0 {
+		t.Errorf("reconnectAttempts = %d, want 0", app.reconnectAttempts)
+	}
+	if got := len(cmds); got != 5 {
+		t.Errorf("handleActionSuccess() returned %d commands, want event listener and four resource refreshes", got)
+	}
+	if got := len(mockSvc.StreamEventsCalls()); got != 2 {
+		t.Errorf("StreamEvents called %d times, want 2 after reconnect", got)
+	}
+}
+
 func TestAppModel_FooterBindingsShowsReconnectWhenDisconnected(t *testing.T) {
 	app := NewApp(helperMockService())
 	app.daemonConnected = false

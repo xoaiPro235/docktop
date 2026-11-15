@@ -214,31 +214,61 @@ func TestBuildTreeAndFlatten(t *testing.T) {
 	}
 }
 
-func Test_resolveComposeProject(t *testing.T) {
+func TestTreeNode_ComposeOpts(t *testing.T) {
 	tempDir := t.TempDir()
 	composePath := filepath.Join(tempDir, "docker-compose.yml")
 	if err := os.WriteFile(composePath, []byte("services: {}"), 0o644); err != nil {
 		t.Fatalf("Failed to write compose file: %v", err)
 	}
 
-	node := &TreeNode{
-		Type:        NodeContainer,
-		Name:        "web-1",
-		ProjectName: "myproject",
-		ConfigFiles: composePath,
-		WorkingDir:  tempDir,
+	tests := []struct {
+		name        string
+		node        *TreeNode
+		wantProject string
+		wantService string
+	}{
+		{
+			name: "project",
+			node: &TreeNode{
+				Type:        NodeProject,
+				Name:        "myproject",
+				ConfigFiles: composePath,
+				WorkingDir:  tempDir,
+			},
+			wantProject: "myproject",
+		},
+		{
+			name: "service",
+			node: &TreeNode{
+				Type:        NodeService,
+				Name:        "web",
+				ProjectName: "myproject",
+				ConfigFiles: composePath,
+				WorkingDir:  tempDir,
+			},
+			wantProject: "myproject",
+			wantService: "web",
+		},
 	}
-	proj, svc, dir, file := resolveComposeProject(node)
-	if proj != "myproject" {
-		t.Errorf("got proj = %q, want myproject", proj)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := tt.node.ComposeOpts()
+			if opts.ProjectName != tt.wantProject {
+				t.Errorf("ProjectName = %q, want %q", opts.ProjectName, tt.wantProject)
+			}
+			if opts.Service != tt.wantService {
+				t.Errorf("Service = %q, want %q", opts.Service, tt.wantService)
+			}
+			if opts.WorkingDir != tempDir || opts.ConfigFile != composePath {
+				t.Errorf("ComposeOpts() = {WorkingDir: %q, ConfigFile: %q}, want {WorkingDir: %q, ConfigFile: %q}",
+					opts.WorkingDir, opts.ConfigFile, tempDir, composePath)
+			}
+		})
 	}
-	if dir != tempDir || file != composePath {
-		t.Errorf("got dir=%q, file=%q, want dir=%q, file=%q", dir, file, tempDir, composePath)
-	}
-	_ = svc
 }
 
-func TestFindComposeFile(t *testing.T) {
+func TestTreeNode_ComposeOptsFindsComposeFile(t *testing.T) {
 	rootDir := t.TempDir()
 	rootFile := filepath.Join(rootDir, "compose.yaml")
 	if err := os.WriteFile(rootFile, []byte("services: {}"), 0o644); err != nil {
@@ -251,46 +281,34 @@ func TestFindComposeFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	childDir := t.TempDir()
-	childFile := filepath.Join(childDir, "compose.yml")
-	if err := os.WriteFile(childFile, []byte("services: {}"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
 	tests := []struct {
-		name string
-		node *TreeNode
-		want string
+		name        string
+		node        *TreeNode
+		wantFile    string
+		wantWorkDir string
 	}{
 		{
-			name: "uses first existing path in config file labels",
+			name: "uses first existing config file from labels",
 			node: &TreeNode{
 				ConfigFiles: filepath.Join(rootDir, "missing.yaml") + ", " + rootFile,
 			},
-			want: rootFile,
+			wantFile:    rootFile,
+			wantWorkDir: rootDir,
 		},
 		{
-			name: "falls back to compose file in root working directory",
-			node: &TreeNode{WorkingDir: workingDir},
-			want: workingFile,
-		},
-		{
-			name: "finds compose file in nested container working directory",
-			node: &TreeNode{
-				Children: []*TreeNode{{
-					Children: []*TreeNode{{
-						Container: &docker.ContainerInfo{WorkingDir: childDir},
-					}},
-				}},
-			},
-			want: childFile,
+			name:        "finds a compose file in the working directory",
+			node:        &TreeNode{WorkingDir: workingDir},
+			wantFile:    workingFile,
+			wantWorkDir: workingDir,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := findComposeFile(tt.node); got != tt.want {
-				t.Errorf("findComposeFile() = %q, want %q", got, tt.want)
+			opts := tt.node.ComposeOpts()
+			if opts.ConfigFile != tt.wantFile || opts.WorkingDir != tt.wantWorkDir {
+				t.Errorf("ComposeOpts() = {ConfigFile: %q, WorkingDir: %q}, want {ConfigFile: %q, WorkingDir: %q}",
+					opts.ConfigFile, opts.WorkingDir, tt.wantFile, tt.wantWorkDir)
 			}
 		})
 	}

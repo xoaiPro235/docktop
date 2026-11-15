@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/xoaiPro235/docktop/internal/docker"
 )
@@ -46,6 +47,22 @@ func (n *TreeNode) CountContainers() int {
 	return count
 }
 
+// HasRunningContainers returns true if at least one container within this node is currently running.
+func (n *TreeNode) HasRunningContainers() bool {
+	if n == nil {
+		return false
+	}
+	if n.Type == NodeContainer {
+		return n.Container != nil && n.Container.State == docker.StateRunning
+	}
+	for _, child := range n.Children {
+		if child.HasRunningContainers() {
+			return true
+		}
+	}
+	return false
+}
+
 func (n *TreeNode) DisplayTitle() string {
 	if n == nil {
 		return ""
@@ -76,6 +93,41 @@ func (n *TreeNode) DisplayTitle() string {
 	default:
 		return n.Name
 	}
+}
+
+// ComposeOpts extracts Docker Compose parameters directly from a TreeNode.
+func (n *TreeNode) ComposeOpts() docker.ComposeOpts {
+	if n == nil {
+		return docker.ComposeOpts{}
+	}
+	var proj, svc string
+	if n.Type == NodeProject && n.Name != StandaloneProjectName {
+		proj = n.Name
+		if n.ProjectName != "" {
+			proj = n.ProjectName
+		}
+	} else if n.Type == NodeService {
+		proj = n.ProjectName
+		svc = n.Name
+	}
+
+	configFile := docker.FindComposeFile(n.ConfigFiles, n.WorkingDir)
+	workDir := n.WorkingDir
+	if configFile != "" {
+		workDir = filepath.Dir(configFile)
+	}
+
+	return docker.ComposeOpts{
+		ProjectName: proj,
+		Service:     svc,
+		WorkingDir:  workDir,
+		ConfigFile:  configFile,
+	}
+}
+
+// IsCompose returns true if this node represents a Docker Compose project or service.
+func (n *TreeNode) IsCompose() bool {
+	return n != nil && n.Name != StandaloneProjectName && (n.Type == NodeProject || n.Type == NodeService)
 }
 
 type FlatItem struct {
@@ -155,6 +207,8 @@ func findOrCreateChild(parent *TreeNode, name string, nodeType NodeType, stateMa
 	return newNode
 }
 
+var detectLocalComposeFunc = docker.DetectLocalCompose
+
 func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*TreeNode {
 	var roots []*TreeNode
 	var standaloneNode *TreeNode
@@ -163,6 +217,14 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 		c := &containers[i]
 
 		if c.IsCompose && c.ProjectName != "" {
+			cleanFile := docker.FindComposeFile(c.ConfigFiles, c.WorkingDir)
+			workDir := c.WorkingDir
+			if cleanFile != "" {
+				workDir = filepath.Dir(cleanFile)
+			} else {
+				cleanFile = c.ConfigFiles
+			}
+
 			var projNode *TreeNode
 			for _, r := range roots {
 				if r.Name == c.ProjectName {
@@ -177,15 +239,15 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 					Name:        c.ProjectName,
 					ProjectName: c.ProjectName,
 					Key:         key,
-					ConfigFiles: c.ConfigFiles,
-					WorkingDir:  c.WorkingDir,
+					ConfigFiles: cleanFile,
+					WorkingDir:  workDir,
 					Expanded:    isNodeExpanded(key, stateMap),
 				}
 				roots = append(roots, projNode)
 			} else {
-				if projNode.ConfigFiles == "" && c.ConfigFiles != "" {
-					projNode.ConfigFiles = c.ConfigFiles
-					projNode.WorkingDir = c.WorkingDir
+				if projNode.ConfigFiles == "" && cleanFile != "" {
+					projNode.ConfigFiles = cleanFile
+					projNode.WorkingDir = workDir
 				}
 			}
 
@@ -197,16 +259,20 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 			if svcNode.ProjectName == "" {
 				svcNode.ProjectName = c.ProjectName
 			}
-			if svcNode.ConfigFiles == "" && c.ConfigFiles != "" {
-				svcNode.ConfigFiles = c.ConfigFiles
-				svcNode.WorkingDir = c.WorkingDir
+			if svcNode.ConfigFiles == "" && cleanFile != "" {
+				svcNode.ConfigFiles = cleanFile
+				svcNode.WorkingDir = workDir
 			}
 
+			ctrKey := c.ID
+			if ctrKey == "" {
+				ctrKey = c.Name
+			}
 			svcNode.Children = append(svcNode.Children, &TreeNode{
 				Type:        NodeContainer,
 				Name:        c.Name,
 				ProjectName: c.ProjectName,
-				Key:         "ctr:" + c.ID,
+				Key:         "ctr:" + ctrKey,
 				Container:   c,
 			})
 		} else {
@@ -219,24 +285,72 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 					Expanded: isNodeExpanded(key, stateMap),
 				}
 			}
+			ctrKey := c.ID
+			if ctrKey == "" {
+				ctrKey = c.Name
+			}
 			standaloneNode.Children = append(standaloneNode.Children, &TreeNode{
 				Type:      NodeContainer,
 				Name:      c.Name,
-				Key:       "ctr:" + c.ID,
+				Key:       "ctr:" + ctrKey,
 				Container: c,
 			})
 		}
 	}
 
+	// Detect local compose project in current working directory (if any)
+	if detectLocalComposeFunc != nil {
+		if localProj, _ := detectLocalComposeFunc(""); localProj != nil && localProj.ProjectName != "" {
+			var existingProj *TreeNode
+			for _, r := range roots {
+				if strings.EqualFold(r.Name, localProj.ProjectName) ||
+					(r.WorkingDir != "" && localProj.WorkingDir != "" && filepath.Clean(r.WorkingDir) == filepath.Clean(localProj.WorkingDir)) ||
+					(r.ConfigFiles != "" && localProj.ConfigFile != "" && filepath.Clean(r.ConfigFiles) == filepath.Clean(localProj.ConfigFile)) {
+					existingProj = r
+					break
+				}
+			}
+
+			if existingProj == nil {
+				key := "proj:" + localProj.ProjectName
+				existingProj = &TreeNode{
+					Type:        NodeProject,
+					Name:        localProj.ProjectName,
+					ProjectName: localProj.ProjectName,
+					Key:         key,
+					ConfigFiles: localProj.ConfigFile,
+					WorkingDir:  localProj.WorkingDir,
+					Expanded:    isNodeExpanded(key, stateMap),
+				}
+				roots = append(roots, existingProj)
+			} else {
+				if existingProj.ConfigFiles == "" {
+					existingProj.ConfigFiles = localProj.ConfigFile
+					existingProj.WorkingDir = localProj.WorkingDir
+				}
+			}
+
+			for _, svcName := range localProj.Services {
+				svcNode := findOrCreateChild(existingProj, svcName, NodeService, stateMap)
+				if svcNode.ProjectName == "" {
+					svcNode.ProjectName = existingProj.Name
+				}
+				if svcNode.ConfigFiles == "" {
+					svcNode.ConfigFiles = localProj.ConfigFile
+					svcNode.WorkingDir = localProj.WorkingDir
+				}
+			}
+		}
+	}
+
+	// Sort entire tree: projects A-Z, services A-Z, containers by running state
 	slices.SortFunc(roots, func(a, b *TreeNode) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
-
 	for _, proj := range roots {
 		slices.SortFunc(proj.Children, func(a, b *TreeNode) int {
 			return cmp.Compare(a.Name, b.Name)
 		})
-
 		for _, svc := range proj.Children {
 			slices.SortStableFunc(svc.Children, compareContainerNodes)
 		}
@@ -293,26 +407,4 @@ func Flatten(nodes []*TreeNode, parentPrefix string) []FlatItem {
 		}
 	}
 	return list
-}
-
-// resolveComposeProject extracts ProjectName, ServiceName, WorkingDir, and ConfigFile for a TreeNode.
-func resolveComposeProject(node *TreeNode) (projectName string, serviceName string, workDir string, configFile string) {
-	if node == nil {
-		return "", "", "", ""
-	}
-	projectName = node.ProjectName
-	if projectName == "" && node.Type == NodeProject && node.Name != StandaloneProjectName {
-		projectName = node.Name
-	}
-	if node.Type == NodeService {
-		serviceName = node.Name
-	}
-	configFile = findComposeFile(node)
-	if configFile != "" {
-		workDir = filepath.Dir(configFile)
-	}
-	if workDir == "" {
-		workDir = node.WorkingDir
-	}
-	return projectName, serviceName, workDir, configFile
 }

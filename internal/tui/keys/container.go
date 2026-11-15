@@ -4,7 +4,6 @@ import "charm.land/bubbles/v2/key"
 
 // ContainerKeyMap holds key bindings for the Container view component.
 type ContainerKeyMap struct {
-	StartStop     key.Binding
 	Start         key.Binding
 	Stop          key.Binding
 	Pause         key.Binding
@@ -31,10 +30,6 @@ type ContainerKeyMap struct {
 
 // ContainerKeys is the default instance of ContainerKeyMap.
 var ContainerKeys = ContainerKeyMap{
-	StartStop: key.NewBinding(
-		key.WithKeys("s", "S"),
-		key.WithHelp("s", "Start/Stop"),
-	),
 	Start: key.NewBinding(
 		key.WithKeys("s", "S"),
 		key.WithHelp("s", "Start"),

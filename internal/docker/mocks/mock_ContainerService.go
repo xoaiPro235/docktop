@@ -26,6 +26,27 @@ var _ docker.ContainerService = &MockContainerService{}
 //			AttachShellCmdFunc: func(containerID string) *exec.Cmd {
 //				panic("mock out the AttachShellCmd method")
 //			},
+//			ComposeBuildCmdFunc: func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+//				panic("mock out the ComposeBuildCmd method")
+//			},
+//			ComposeDownCmdFunc: func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+//				panic("mock out the ComposeDownCmd method")
+//			},
+//			ComposeRestartCmdFunc: func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+//				panic("mock out the ComposeRestartCmd method")
+//			},
+//			ComposeRmCmdFunc: func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+//				panic("mock out the ComposeRmCmd method")
+//			},
+//			ComposeStartCmdFunc: func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+//				panic("mock out the ComposeStartCmd method")
+//			},
+//			ComposeStopCmdFunc: func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+//				panic("mock out the ComposeStopCmd method")
+//			},
+//			ComposeUpCmdFunc: func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+//				panic("mock out the ComposeUpCmd method")
+//			},
 //			ContainerTopFunc: func(ctx context.Context, containerID string) (*container.TopResponse, error) {
 //				panic("mock out the ContainerTop method")
 //			},
@@ -78,6 +99,27 @@ type MockContainerService struct {
 	// AttachShellCmdFunc mocks the AttachShellCmd method.
 	AttachShellCmdFunc func(containerID string) *exec.Cmd
 
+	// ComposeBuildCmdFunc mocks the ComposeBuildCmd method.
+	ComposeBuildCmdFunc func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error)
+
+	// ComposeDownCmdFunc mocks the ComposeDownCmd method.
+	ComposeDownCmdFunc func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error)
+
+	// ComposeRestartCmdFunc mocks the ComposeRestartCmd method.
+	ComposeRestartCmdFunc func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error)
+
+	// ComposeRmCmdFunc mocks the ComposeRmCmd method.
+	ComposeRmCmdFunc func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error)
+
+	// ComposeStartCmdFunc mocks the ComposeStartCmd method.
+	ComposeStartCmdFunc func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error)
+
+	// ComposeStopCmdFunc mocks the ComposeStopCmd method.
+	ComposeStopCmdFunc func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error)
+
+	// ComposeUpCmdFunc mocks the ComposeUpCmd method.
+	ComposeUpCmdFunc func(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error)
+
 	// ContainerTopFunc mocks the ContainerTop method.
 	ContainerTopFunc func(ctx context.Context, containerID string) (*container.TopResponse, error)
 
@@ -126,6 +168,55 @@ type MockContainerService struct {
 		AttachShellCmd []struct {
 			// ContainerID is the containerID argument value.
 			ContainerID string
+		}
+		// ComposeBuildCmd holds details about calls to the ComposeBuildCmd method.
+		ComposeBuildCmd []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Opts is the opts argument value.
+			Opts docker.ComposeOpts
+		}
+		// ComposeDownCmd holds details about calls to the ComposeDownCmd method.
+		ComposeDownCmd []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Opts is the opts argument value.
+			Opts docker.ComposeOpts
+		}
+		// ComposeRestartCmd holds details about calls to the ComposeRestartCmd method.
+		ComposeRestartCmd []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Opts is the opts argument value.
+			Opts docker.ComposeOpts
+		}
+		// ComposeRmCmd holds details about calls to the ComposeRmCmd method.
+		ComposeRmCmd []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Opts is the opts argument value.
+			Opts docker.ComposeOpts
+		}
+		// ComposeStartCmd holds details about calls to the ComposeStartCmd method.
+		ComposeStartCmd []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Opts is the opts argument value.
+			Opts docker.ComposeOpts
+		}
+		// ComposeStopCmd holds details about calls to the ComposeStopCmd method.
+		ComposeStopCmd []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Opts is the opts argument value.
+			Opts docker.ComposeOpts
+		}
+		// ComposeUpCmd holds details about calls to the ComposeUpCmd method.
+		ComposeUpCmd []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Opts is the opts argument value.
+			Opts docker.ComposeOpts
 		}
 		// ContainerTop holds details about calls to the ContainerTop method.
 		ContainerTop []struct {
@@ -225,6 +316,13 @@ type MockContainerService struct {
 		}
 	}
 	lockAttachShellCmd       sync.RWMutex
+	lockComposeBuildCmd      sync.RWMutex
+	lockComposeDownCmd       sync.RWMutex
+	lockComposeRestartCmd    sync.RWMutex
+	lockComposeRmCmd         sync.RWMutex
+	lockComposeStartCmd      sync.RWMutex
+	lockComposeStopCmd       sync.RWMutex
+	lockComposeUpCmd         sync.RWMutex
 	lockContainerTop         sync.RWMutex
 	lockExecShellCmd         sync.RWMutex
 	lockInspectContainer     sync.RWMutex
@@ -270,6 +368,258 @@ func (mock *MockContainerService) AttachShellCmdCalls() []struct {
 	mock.lockAttachShellCmd.RLock()
 	calls = mock.calls.AttachShellCmd
 	mock.lockAttachShellCmd.RUnlock()
+	return calls
+}
+
+// ComposeBuildCmd calls ComposeBuildCmdFunc.
+func (mock *MockContainerService) ComposeBuildCmd(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+	if mock.ComposeBuildCmdFunc == nil {
+		panic("MockContainerService.ComposeBuildCmdFunc: method is nil but ContainerService.ComposeBuildCmd was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}{
+		Ctx:  ctx,
+		Opts: opts,
+	}
+	mock.lockComposeBuildCmd.Lock()
+	mock.calls.ComposeBuildCmd = append(mock.calls.ComposeBuildCmd, callInfo)
+	mock.lockComposeBuildCmd.Unlock()
+	return mock.ComposeBuildCmdFunc(ctx, opts)
+}
+
+// ComposeBuildCmdCalls gets all the calls that were made to ComposeBuildCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.ComposeBuildCmdCalls())
+func (mock *MockContainerService) ComposeBuildCmdCalls() []struct {
+	Ctx  context.Context
+	Opts docker.ComposeOpts
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}
+	mock.lockComposeBuildCmd.RLock()
+	calls = mock.calls.ComposeBuildCmd
+	mock.lockComposeBuildCmd.RUnlock()
+	return calls
+}
+
+// ComposeDownCmd calls ComposeDownCmdFunc.
+func (mock *MockContainerService) ComposeDownCmd(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+	if mock.ComposeDownCmdFunc == nil {
+		panic("MockContainerService.ComposeDownCmdFunc: method is nil but ContainerService.ComposeDownCmd was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}{
+		Ctx:  ctx,
+		Opts: opts,
+	}
+	mock.lockComposeDownCmd.Lock()
+	mock.calls.ComposeDownCmd = append(mock.calls.ComposeDownCmd, callInfo)
+	mock.lockComposeDownCmd.Unlock()
+	return mock.ComposeDownCmdFunc(ctx, opts)
+}
+
+// ComposeDownCmdCalls gets all the calls that were made to ComposeDownCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.ComposeDownCmdCalls())
+func (mock *MockContainerService) ComposeDownCmdCalls() []struct {
+	Ctx  context.Context
+	Opts docker.ComposeOpts
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}
+	mock.lockComposeDownCmd.RLock()
+	calls = mock.calls.ComposeDownCmd
+	mock.lockComposeDownCmd.RUnlock()
+	return calls
+}
+
+// ComposeRestartCmd calls ComposeRestartCmdFunc.
+func (mock *MockContainerService) ComposeRestartCmd(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+	if mock.ComposeRestartCmdFunc == nil {
+		panic("MockContainerService.ComposeRestartCmdFunc: method is nil but ContainerService.ComposeRestartCmd was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}{
+		Ctx:  ctx,
+		Opts: opts,
+	}
+	mock.lockComposeRestartCmd.Lock()
+	mock.calls.ComposeRestartCmd = append(mock.calls.ComposeRestartCmd, callInfo)
+	mock.lockComposeRestartCmd.Unlock()
+	return mock.ComposeRestartCmdFunc(ctx, opts)
+}
+
+// ComposeRestartCmdCalls gets all the calls that were made to ComposeRestartCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.ComposeRestartCmdCalls())
+func (mock *MockContainerService) ComposeRestartCmdCalls() []struct {
+	Ctx  context.Context
+	Opts docker.ComposeOpts
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}
+	mock.lockComposeRestartCmd.RLock()
+	calls = mock.calls.ComposeRestartCmd
+	mock.lockComposeRestartCmd.RUnlock()
+	return calls
+}
+
+// ComposeRmCmd calls ComposeRmCmdFunc.
+func (mock *MockContainerService) ComposeRmCmd(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+	if mock.ComposeRmCmdFunc == nil {
+		panic("MockContainerService.ComposeRmCmdFunc: method is nil but ContainerService.ComposeRmCmd was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}{
+		Ctx:  ctx,
+		Opts: opts,
+	}
+	mock.lockComposeRmCmd.Lock()
+	mock.calls.ComposeRmCmd = append(mock.calls.ComposeRmCmd, callInfo)
+	mock.lockComposeRmCmd.Unlock()
+	return mock.ComposeRmCmdFunc(ctx, opts)
+}
+
+// ComposeRmCmdCalls gets all the calls that were made to ComposeRmCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.ComposeRmCmdCalls())
+func (mock *MockContainerService) ComposeRmCmdCalls() []struct {
+	Ctx  context.Context
+	Opts docker.ComposeOpts
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}
+	mock.lockComposeRmCmd.RLock()
+	calls = mock.calls.ComposeRmCmd
+	mock.lockComposeRmCmd.RUnlock()
+	return calls
+}
+
+// ComposeStartCmd calls ComposeStartCmdFunc.
+func (mock *MockContainerService) ComposeStartCmd(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+	if mock.ComposeStartCmdFunc == nil {
+		panic("MockContainerService.ComposeStartCmdFunc: method is nil but ContainerService.ComposeStartCmd was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}{
+		Ctx:  ctx,
+		Opts: opts,
+	}
+	mock.lockComposeStartCmd.Lock()
+	mock.calls.ComposeStartCmd = append(mock.calls.ComposeStartCmd, callInfo)
+	mock.lockComposeStartCmd.Unlock()
+	return mock.ComposeStartCmdFunc(ctx, opts)
+}
+
+// ComposeStartCmdCalls gets all the calls that were made to ComposeStartCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.ComposeStartCmdCalls())
+func (mock *MockContainerService) ComposeStartCmdCalls() []struct {
+	Ctx  context.Context
+	Opts docker.ComposeOpts
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}
+	mock.lockComposeStartCmd.RLock()
+	calls = mock.calls.ComposeStartCmd
+	mock.lockComposeStartCmd.RUnlock()
+	return calls
+}
+
+// ComposeStopCmd calls ComposeStopCmdFunc.
+func (mock *MockContainerService) ComposeStopCmd(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+	if mock.ComposeStopCmdFunc == nil {
+		panic("MockContainerService.ComposeStopCmdFunc: method is nil but ContainerService.ComposeStopCmd was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}{
+		Ctx:  ctx,
+		Opts: opts,
+	}
+	mock.lockComposeStopCmd.Lock()
+	mock.calls.ComposeStopCmd = append(mock.calls.ComposeStopCmd, callInfo)
+	mock.lockComposeStopCmd.Unlock()
+	return mock.ComposeStopCmdFunc(ctx, opts)
+}
+
+// ComposeStopCmdCalls gets all the calls that were made to ComposeStopCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.ComposeStopCmdCalls())
+func (mock *MockContainerService) ComposeStopCmdCalls() []struct {
+	Ctx  context.Context
+	Opts docker.ComposeOpts
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}
+	mock.lockComposeStopCmd.RLock()
+	calls = mock.calls.ComposeStopCmd
+	mock.lockComposeStopCmd.RUnlock()
+	return calls
+}
+
+// ComposeUpCmd calls ComposeUpCmdFunc.
+func (mock *MockContainerService) ComposeUpCmd(ctx context.Context, opts docker.ComposeOpts) (*exec.Cmd, error) {
+	if mock.ComposeUpCmdFunc == nil {
+		panic("MockContainerService.ComposeUpCmdFunc: method is nil but ContainerService.ComposeUpCmd was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}{
+		Ctx:  ctx,
+		Opts: opts,
+	}
+	mock.lockComposeUpCmd.Lock()
+	mock.calls.ComposeUpCmd = append(mock.calls.ComposeUpCmd, callInfo)
+	mock.lockComposeUpCmd.Unlock()
+	return mock.ComposeUpCmdFunc(ctx, opts)
+}
+
+// ComposeUpCmdCalls gets all the calls that were made to ComposeUpCmd.
+// Check the length with:
+//
+//	len(mockedContainerService.ComposeUpCmdCalls())
+func (mock *MockContainerService) ComposeUpCmdCalls() []struct {
+	Ctx  context.Context
+	Opts docker.ComposeOpts
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Opts docker.ComposeOpts
+	}
+	mock.lockComposeUpCmd.RLock()
+	calls = mock.calls.ComposeUpCmd
+	mock.lockComposeUpCmd.RUnlock()
 	return calls
 }
 
