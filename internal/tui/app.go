@@ -93,6 +93,7 @@ type AppModel struct {
 	imageModel        image.Model
 	volumeModel       volume.Model
 	networkModel      network.Model
+	confirmModal      modal.ConfirmModal
 	errorModal        modal.ErrorModal
 	activeTab         Tab
 	eventCancel       context.CancelFunc
@@ -116,6 +117,7 @@ func NewApp(cli docker.Service) AppModel {
 		imageModel:        image.New(cli),
 		volumeModel:       volume.New(cli),
 		networkModel:      network.New(cli),
+		confirmModal:      modal.NewConfirmModal(),
 		errorModal:        modal.NewErrorModal(),
 		activeTab:         TabContainers,
 		eventCancel:       cancel,
@@ -274,11 +276,7 @@ func (a AppModel) Init() tea.Cmd {
 }
 
 func (a AppModel) isAnyModalActive() bool {
-	return a.errorModal.Active ||
-		a.containerModel.IsModalActive() ||
-		a.imageModel.IsModalActive() ||
-		a.volumeModel.IsModalActive() ||
-		a.networkModel.IsModalActive()
+	return a.errorModal.Active || a.confirmModal.Active
 }
 
 func (a AppModel) isAnySearching() bool {
@@ -289,6 +287,17 @@ func (a AppModel) isAnySearching() bool {
 }
 
 func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if a.confirmModal.Active {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			var cmd tea.Cmd
+			a.confirmModal, cmd = a.confirmModal.Update(msg)
+			return a, cmd
+		case tea.MouseClickMsg:
+			return a, nil
+		}
+	}
+
 	if a.errorModal.Active {
 		switch msg := msg.(type) {
 		case tea.KeyPressMsg, tea.MouseClickMsg:
@@ -476,13 +485,49 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+	case modal.ShowConfirmMsg:
+		a.confirmModal.Show(msg.Question, msg.Command, msg.Style, msg.OnConfirm)
+		return a, nil
+
 	case modal.ShowErrorMsg:
 		a.errorModal.Show(msg.Title, msg.Message)
 		return a, nil
 
+	case container.RunCmdMsg:
+		var cmd tea.Cmd
+		a.containerModel, cmd = a.containerModel.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return a, tea.Batch(cmds...)
+
+	case image.RunCmdMsg:
+		var cmd tea.Cmd
+		a.imageModel, cmd = a.imageModel.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return a, tea.Batch(cmds...)
+
+	case volume.RunCmdMsg:
+		var cmd tea.Cmd
+		a.volumeModel, cmd = a.volumeModel.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return a, tea.Batch(cmds...)
+
+	case network.RunCmdMsg:
+		var cmd tea.Cmd
+		a.networkModel, cmd = a.networkModel.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return a, tea.Batch(cmds...)
+
 	case container.ContainerActionMsg:
 		if msg.Err != nil {
-			a.errorModal.Show(fmt.Sprintf("Container %s Failed", msg.Action.Title()), msg.Err.Error())
+			a.errorModal.Show("Container Action Failed", msg.Err.Error())
 		} else {
 			cmds = append(cmds, a.handleActionSuccess(TabContainers)...)
 		}
@@ -495,7 +540,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case container.ComposeActionMsg:
 		if msg.Err != nil {
-			a.errorModal.Show(fmt.Sprintf("Compose %s Failed", msg.Action), msg.Err.Error())
+			a.errorModal.Show("Compose Action Failed", msg.Err.Error())
 		} else {
 			cmds = append(cmds, a.handleActionSuccess(TabContainers)...)
 		}
@@ -506,9 +551,9 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(cmds...)
 
-	case image.ImageActionMsg:
+	case image.ImageResultMsg:
 		if msg.Err != nil {
-			a.errorModal.Show(fmt.Sprintf("Image %s Failed", msg.Action.Title()), msg.Err.Error())
+			a.errorModal.Show("Image Error", msg.Err.Error())
 		} else {
 			cmds = append(cmds, a.handleActionSuccess(TabImages)...)
 		}
@@ -519,9 +564,9 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(cmds...)
 
-	case volume.VolumeActionMsg:
+	case volume.VolumeResultMsg:
 		if msg.Err != nil {
-			a.errorModal.Show(fmt.Sprintf("Volume %s Failed", msg.Action.Title()), msg.Err.Error())
+			a.errorModal.Show("Volume Error", msg.Err.Error())
 		} else {
 			cmds = append(cmds, a.handleActionSuccess(TabVolumes)...)
 		}
@@ -532,9 +577,9 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(cmds...)
 
-	case network.NetworkActionMsg:
+	case network.NetworkResultMsg:
 		if msg.Err != nil {
-			a.errorModal.Show(fmt.Sprintf("Network %s Failed", msg.Action.Title()), msg.Err.Error())
+			a.errorModal.Show("Network Error", msg.Err.Error())
 		} else {
 			cmds = append(cmds, a.handleActionSuccess(TabNetworks)...)
 		}
@@ -577,7 +622,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			routed = true
 		}
-		if a.imageModel.IsActionRunning() {
+		if a.imageModel.IsLoading() {
 			var cmd tea.Cmd
 			a.imageModel, cmd = a.imageModel.Update(msg)
 			if cmd != nil {
@@ -585,7 +630,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			routed = true
 		}
-		if a.volumeModel.IsActionRunning() {
+		if a.volumeModel.IsLoading() {
 			var cmd tea.Cmd
 			a.volumeModel, cmd = a.volumeModel.Update(msg)
 			if cmd != nil {
@@ -593,7 +638,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			routed = true
 		}
-		if a.networkModel.IsActionRunning() {
+		if a.networkModel.IsLoading() {
 			var cmd tea.Cmd
 			a.networkModel, cmd = a.networkModel.Update(msg)
 			if cmd != nil {
@@ -664,6 +709,9 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a AppModel) FooterBindings() []key.Binding {
+	if a.confirmModal.Active {
+		return a.confirmModal.FooterBindings()
+	}
 	if a.errorModal.Active {
 		return a.errorModal.FooterBindings()
 	}
@@ -719,10 +767,33 @@ func (a AppModel) View() tea.View {
 		statusBadge = theme.Current.StatusStopped.Render("○ DISCONNECTED")
 	}
 
+	var pruningStatus string
+	switch a.activeTab {
+	case TabContainers:
+		if a.containerModel.IsPruning() {
+			pruningStatus = theme.Current.ActionLoading.Render(a.containerModel.SpinnerView() + " Pruning containers...")
+		}
+	case TabImages:
+		if a.imageModel.IsPruning() {
+			pruningStatus = theme.Current.ActionLoading.Render(a.imageModel.SpinnerView() + " Pruning images...")
+		}
+	case TabVolumes:
+		if a.volumeModel.IsPruning() {
+			pruningStatus = theme.Current.ActionLoading.Render(a.volumeModel.SpinnerView() + " Pruning volumes...")
+		}
+	case TabNetworks:
+		if a.networkModel.IsPruning() {
+			pruningStatus = theme.Current.ActionLoading.Render(a.networkModel.SpinnerView() + " Pruning networks...")
+		}
+	}
+
 	rawHost := a.dockerClient.Host()
 	hostLabel := theme.Current.Key.Render("Host: ")
 	hostValue := theme.Current.Value.Render(rawHost)
 	fullRight := hostLabel + hostValue + "  " + statusBadge
+	if pruningStatus != "" {
+		fullRight = pruningStatus + "  " + fullRight
+	}
 
 	leftWidth := ansi.StringWidth(headerTabs)
 	rightWidth := a.width - leftWidth
@@ -732,6 +803,8 @@ func (a AppModel) View() tea.View {
 		var rightContent string
 		if rightWidth >= ansi.StringWidth(fullRight)+2 {
 			rightContent = fullRight
+		} else if pruningStatus != "" && rightWidth >= ansi.StringWidth(pruningStatus+"  "+statusBadge)+2 {
+			rightContent = pruningStatus + "  " + statusBadge
 		} else if rightWidth >= ansi.StringWidth(statusBadge)+2 {
 			rightContent = statusBadge
 		}
@@ -762,7 +835,9 @@ func (a AppModel) View() tea.View {
 	footer := theme.Current.Footer.Width(a.width).Render(footerHelp)
 
 	out := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
-	if a.errorModal.Active {
+	if a.confirmModal.Active {
+		out = a.confirmModal.Overlay(out, a.width, a.height)
+	} else if a.errorModal.Active {
 		out = a.errorModal.Overlay(out, a.width, a.height)
 	}
 

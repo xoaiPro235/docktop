@@ -97,8 +97,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Interactive terminal shell exited, resume TUI
 		return m, m.syncActivePane()
 
+	case RunCmdMsg:
+		if m.runningIDs == nil {
+			m.runningIDs = make(map[string]bool)
+		}
+		wasEmpty := len(m.runningIDs) == 0
+		m.runningIDs[msg.TargetID] = true
+		if wasEmpty {
+			cmds = append(cmds, m.spinner.Tick)
+		}
+		cmds = append(cmds, msg.Cmd)
+		return m, tea.Batch(cmds...)
+
 	case spinner.TickMsg:
-		if len(m.runningActions) > 0 {
+		if len(m.runningIDs) > 0 {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			if cmd != nil {
@@ -106,35 +118,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		}
 
-	case ExecuteActionMsg:
-		if m.runningActions == nil {
-			m.runningActions = make(map[string]RunningAction)
-		}
-		wasEmpty := len(m.runningActions) == 0
-
-		desc, cmd := m.executeAction(msg.Action, msg.TargetID, msg.TargetName)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
-		m.runningActions[msg.TargetID] = RunningAction{
-			Action:      msg.Action,
-			TargetName:  msg.TargetName,
-			Description: desc,
-		}
-
-		if wasEmpty {
-			cmds = append(cmds, m.spinner.Tick)
-		}
-		return m, tea.Batch(cmds...)
-
 	case ComposeActionMsg:
-		delete(m.runningActions, msg.TargetKey)
+		delete(m.runningIDs, msg.TargetKey)
 		m.rebuildTree()
 		if msg.Err != nil {
 			return m, func() tea.Msg {
 				return modal.ShowErrorMsg{
-					Title:   fmt.Sprintf("Compose %s Failed", msg.Action),
+					Title:   "Compose Action Failed",
 					Message: msg.Err.Error(),
 				}
 			}
@@ -142,55 +132,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, m.syncActivePane()
 
 	case ContainerActionMsg:
-		targetID := msg.ContainerID
-		if msg.Action == modal.ActionPrune {
-			targetID = ActionTargetAll
-		}
-		delete(m.runningActions, targetID)
-
-		if msg.Err == nil {
-			switch msg.Action {
-			case modal.ActionRemove, modal.ActionRemoveForce:
-				var remaining []docker.ContainerInfo
-				for _, c := range m.containers {
-					if c.ID != msg.ContainerID {
-						remaining = append(remaining, c)
-					}
-				}
-				m.containers = remaining
-			case modal.ActionPrune:
-				var remaining []docker.ContainerInfo
-				for _, c := range m.containers {
-					if c.State == docker.StateRunning {
-						remaining = append(remaining, c)
-					}
-				}
-				m.containers = remaining
-			default:
-				for i := range m.containers {
-					if m.containers[i].ID == msg.ContainerID {
-						switch msg.Action {
-						case modal.ActionPause:
-							m.containers[i].State = docker.StatePaused
-						case modal.ActionUnpause:
-							m.containers[i].State = docker.StateRunning
-						case modal.ActionStop:
-							m.containers[i].State = docker.StateExited
-						case modal.ActionStart, modal.ActionRestart:
-							m.containers[i].State = docker.StateRunning
-						}
-						break
-					}
-				}
-			}
-			m.updateContainers(m.containers)
-		}
+		delete(m.runningIDs, msg.ContainerID)
 		return m, m.syncActivePane()
 
 	case tea.MouseClickMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
 		leftWidth := max(m.width*35/100, 25)
 
 		if msg.X <= leftWidth {
@@ -270,9 +215,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseWheelMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
 		leftWidth := max(m.width*35/100, 25)
 
 		if msg.X <= leftWidth {
@@ -311,18 +253,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.KeyPressMsg:
-		if m.confirmModal.Active {
-			m.confirmModal, _ = m.confirmModal.Update(msg)
-			if m.confirmModal.Confirmed {
-				return m.Update(ExecuteActionMsg{
-					Action:     m.confirmModal.Action,
-					TargetID:   m.confirmModal.TargetID,
-					TargetName: m.confirmModal.TargetName,
-				})
-			}
-			return m, nil
-		}
-
 		if m.searchBar.IsActive() {
 			var cmd tea.Cmd
 			var evt searchbar.Event
@@ -429,47 +359,173 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			// --- Docker Compose lifecycle commands ---
 			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Up):
 				opts := selectedNode.ComposeOpts()
-				m.confirmModal.ShowComposeAction(modal.ActionComposeUp, selectedNode.Key, opts.ProjectName, opts.Service)
-				return m, nil
+				q := fmt.Sprintf("Are you sure you want to start compose project %q?", opts.ProjectName)
+				cmdStr := fmt.Sprintf("docker compose -p %s up -d", opts.ProjectName)
+				if opts.Service != "" {
+					q = fmt.Sprintf("Are you sure you want to start service %q (%s)?", opts.Service, opts.ProjectName)
+					cmdStr = fmt.Sprintf("docker compose -p %s up -d %s", opts.ProjectName, opts.Service)
+				}
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: q,
+						Command:  cmdStr,
+						Style:    modal.StyleSuccess,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: selectedNode.Key,
+								Cmd:      m.composeUpCmd(selectedNode.Key, opts),
+							}
+						},
+					}
+				}
 
 			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Build):
 				opts := selectedNode.ComposeOpts()
-				m.confirmModal.ShowComposeAction(modal.ActionComposeBuild, selectedNode.Key, opts.ProjectName, opts.Service)
-				return m, nil
+				q := fmt.Sprintf("Are you sure you want to build and start compose project %q?", opts.ProjectName)
+				cmdStr := fmt.Sprintf("docker compose -p %s up -d --build", opts.ProjectName)
+				if opts.Service != "" {
+					q = fmt.Sprintf("Are you sure you want to build and start service %q (%s)?", opts.Service, opts.ProjectName)
+					cmdStr = fmt.Sprintf("docker compose -p %s up -d --build %s", opts.ProjectName, opts.Service)
+				}
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: q,
+						Command:  cmdStr,
+						Style:    modal.StyleWarning,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: selectedNode.Key,
+								Cmd:      m.composeBuildCmd(selectedNode.Key, opts),
+							}
+						},
+					}
+				}
 
 			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Restart):
 				opts := selectedNode.ComposeOpts()
-				m.confirmModal.ShowComposeAction(modal.ActionComposeRestart, selectedNode.Key, opts.ProjectName, opts.Service)
-				return m, nil
+				q := fmt.Sprintf("Are you sure you want to restart compose project %q?", opts.ProjectName)
+				cmdStr := fmt.Sprintf("docker compose -p %s restart", opts.ProjectName)
+				if opts.Service != "" {
+					q = fmt.Sprintf("Are you sure you want to restart service %q (%s)?", opts.Service, opts.ProjectName)
+					cmdStr = fmt.Sprintf("docker compose -p %s restart %s", opts.ProjectName, opts.Service)
+				}
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: q,
+						Command:  cmdStr,
+						Style:    modal.StyleWarning,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: selectedNode.Key,
+								Cmd:      m.composeRestartCmd(selectedNode.Key, opts),
+							}
+						},
+					}
+				}
 
 			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Start):
 				opts := selectedNode.ComposeOpts()
 				if selectedNode.HasRunningContainers() {
-					m.confirmModal.ShowComposeAction(modal.ActionComposeStop, selectedNode.Key, opts.ProjectName, opts.Service)
-				} else {
-					m.confirmModal.ShowComposeAction(modal.ActionComposeStart, selectedNode.Key, opts.ProjectName, opts.Service)
+					q := fmt.Sprintf("Are you sure you want to stop compose project %q?", opts.ProjectName)
+					cmdStr := fmt.Sprintf("docker compose -p %s stop", opts.ProjectName)
+					if opts.Service != "" {
+						q = fmt.Sprintf("Are you sure you want to stop service %q (%s)?", opts.Service, opts.ProjectName)
+						cmdStr = fmt.Sprintf("docker compose -p %s stop %s", opts.ProjectName, opts.Service)
+					}
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: q,
+							Command:  cmdStr,
+							Style:    modal.StyleDanger,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: selectedNode.Key,
+									Cmd:      m.composeStopCmd(selectedNode.Key, opts),
+								}
+							},
+						}
+					}
 				}
-				return m, nil
+				q := fmt.Sprintf("Are you sure you want to start compose project %q?", opts.ProjectName)
+				cmdStr := fmt.Sprintf("docker compose -p %s start", opts.ProjectName)
+				if opts.Service != "" {
+					q = fmt.Sprintf("Are you sure you want to start service %q (%s)?", opts.Service, opts.ProjectName)
+					cmdStr = fmt.Sprintf("docker compose -p %s start %s", opts.ProjectName, opts.Service)
+				}
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: q,
+						Command:  cmdStr,
+						Style:    modal.StyleSuccess,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: selectedNode.Key,
+								Cmd:      m.composeStartCmd(selectedNode.Key, opts),
+							}
+						},
+					}
+				}
 
 			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Down):
 				opts := selectedNode.ComposeOpts()
-				switch selectedNode.Type {
-				case NodeProject:
-					m.confirmModal.ShowComposeAction(modal.ActionComposeDown, selectedNode.Key, opts.ProjectName, "")
-				case NodeService:
-					m.confirmModal.ShowComposeAction(modal.ActionComposeRm, selectedNode.Key, opts.ProjectName, opts.Service)
+				if selectedNode.Type == NodeProject {
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: fmt.Sprintf("Are you sure you want to run compose down for project %q?", opts.ProjectName),
+							Command:  fmt.Sprintf("docker compose -p %s down", opts.ProjectName),
+							Style:    modal.StyleDanger,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: selectedNode.Key,
+									Cmd:      m.composeDownCmd(selectedNode.Key, opts),
+								}
+							},
+						}
+					}
 				}
-				return m, nil
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: fmt.Sprintf("Are you sure you want to remove service container %q (%s)?", opts.Service, opts.ProjectName),
+						Command:  fmt.Sprintf("docker compose -p %s rm -f -s %s", opts.ProjectName, opts.Service),
+						Style:    modal.StyleDanger,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: selectedNode.Key,
+								Cmd:      m.composeRmCmd(selectedNode.Key, opts),
+							}
+						},
+					}
+				}
 
 			case selectedNode.IsCompose() && key.Matches(msg, keys.ComposeKeys.Remove):
 				opts := selectedNode.ComposeOpts()
-				switch selectedNode.Type {
-				case NodeService:
-					m.confirmModal.ShowComposeAction(modal.ActionComposeRm, selectedNode.Key, opts.ProjectName, opts.Service)
-					return m, nil
-				case NodeProject:
-					m.confirmModal.ShowComposeAction(modal.ActionComposeDown, selectedNode.Key, opts.ProjectName, "")
-					return m, nil
+				if selectedNode.Type == NodeService {
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: fmt.Sprintf("Are you sure you want to remove service container %q (%s)?", opts.Service, opts.ProjectName),
+							Command:  fmt.Sprintf("docker compose -p %s rm -f -s %s", opts.ProjectName, opts.Service),
+							Style:    modal.StyleDanger,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: selectedNode.Key,
+									Cmd:      m.composeRmCmd(selectedNode.Key, opts),
+								}
+							},
+						}
+					}
+				}
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: fmt.Sprintf("Are you sure you want to run compose down for project %q?", opts.ProjectName),
+						Command:  fmt.Sprintf("docker compose -p %s down", opts.ProjectName),
+						Style:    modal.StyleDanger,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: selectedNode.Key,
+								Cmd:      m.composeDownCmd(selectedNode.Key, opts),
+							}
+						},
+					}
 				}
 
 			// --- Container lifecycle commands ---
@@ -511,45 +567,127 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Start):
-				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-					if selectedContainer.State == docker.StateRunning || selectedContainer.State == docker.StatePaused {
-						m.confirmModal.ShowContainerAction(modal.ActionStop, selectedContainer.ID, selectedContainer.Name)
-					} else {
-						m.confirmModal.ShowContainerAction(modal.ActionStart, selectedContainer.ID, selectedContainer.Name)
+				if selectedContainer != nil {
+					c := selectedContainer
+					if c.State == docker.StateRunning || c.State == docker.StatePaused {
+						return m, func() tea.Msg {
+							return modal.ShowConfirmMsg{
+								Question: fmt.Sprintf("Are you sure you want to stop %q?", c.Name),
+								Command:  fmt.Sprintf("docker stop %s", c.Name),
+								Style:    modal.StyleDanger,
+								OnConfirm: func() tea.Msg {
+									return RunCmdMsg{
+										TargetID: c.ID,
+										Cmd:      m.stopContainerCmd(c.ID),
+									}
+								},
+							}
+						}
 					}
-					return m, nil
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: fmt.Sprintf("Are you sure you want to start %q?", c.Name),
+							Command:  fmt.Sprintf("docker start %s", c.Name),
+							Style:    modal.StyleSuccess,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: c.ID,
+									Cmd:      m.startContainerCmd(c.ID),
+								}
+							},
+						}
+					}
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Pause):
-				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-					if selectedContainer.State == docker.StatePaused {
-						m.confirmModal.ShowContainerAction(modal.ActionUnpause, selectedContainer.ID, selectedContainer.Name)
-					} else {
-						m.confirmModal.ShowContainerAction(modal.ActionPause, selectedContainer.ID, selectedContainer.Name)
+				if selectedContainer != nil {
+					c := selectedContainer
+					if c.State == docker.StatePaused {
+						return m, func() tea.Msg {
+							return modal.ShowConfirmMsg{
+								Question: fmt.Sprintf("Are you sure you want to unpause %q?", c.Name),
+								Command:  fmt.Sprintf("docker unpause %s", c.Name),
+								Style:    modal.StyleSuccess,
+								OnConfirm: func() tea.Msg {
+									return RunCmdMsg{
+										TargetID: c.ID,
+										Cmd:      m.unpauseContainerCmd(c.ID),
+									}
+								},
+							}
+						}
 					}
-					return m, nil
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: fmt.Sprintf("Are you sure you want to pause %q?", c.Name),
+							Command:  fmt.Sprintf("docker pause %s", c.Name),
+							Style:    modal.StyleWarning,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: c.ID,
+									Cmd:      m.pauseContainerCmd(c.ID),
+								}
+							},
+						}
+					}
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Restart):
-				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-					m.confirmModal.ShowContainerAction(modal.ActionRestart, selectedContainer.ID, selectedContainer.Name)
-					return m, nil
+				if selectedContainer != nil {
+					c := selectedContainer
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: fmt.Sprintf("Are you sure you want to restart %q?", c.Name),
+							Command:  fmt.Sprintf("docker restart %s", c.Name),
+							Style:    modal.StyleWarning,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: c.ID,
+									Cmd:      m.restartContainerCmd(c.ID),
+								}
+							},
+						}
+					}
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Remove):
-				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) && !m.isContainerActionRunning(ActionTargetAll) {
-					if selectedContainer.State == docker.StateRunning || selectedContainer.State == docker.StatePaused {
-						m.confirmModal.ShowContainerAction(modal.ActionRemoveForce, selectedContainer.ID, selectedContainer.Name)
-					} else {
-						m.confirmModal.ShowContainerAction(modal.ActionRemove, selectedContainer.ID, selectedContainer.Name)
+				if selectedContainer != nil {
+					c := selectedContainer
+					force := c.State == docker.StateRunning || c.State == docker.StatePaused
+					q := fmt.Sprintf("Are you sure you want to remove %q?", c.Name)
+					cmdStr := fmt.Sprintf("docker rm %s", c.Name)
+					if force {
+						q = fmt.Sprintf("Are you sure you want to force remove %q?", c.Name)
+						cmdStr = fmt.Sprintf("docker rm -f %s", c.Name)
 					}
-					return m, nil
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: q,
+							Command:  cmdStr,
+							Style:    modal.StyleDanger,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: c.ID,
+									Cmd:      m.removeContainerCmd(c.ID, force),
+								}
+							},
+						}
+					}
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Prune):
-				if !m.IsActionRunning() {
-					m.confirmModal.ShowContainerPrune()
-					return m, nil
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: "Are you sure you want to remove all stopped containers?",
+						Command:  "docker container prune -f",
+						Style:    modal.StyleWarning,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: ActionTargetAll,
+								Cmd:      m.pruneContainersCmd(),
+							}
+						},
+					}
 				}
 
 			// --- Tree navigation ---
@@ -643,68 +781,4 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
-}
-
-func (m Model) resolveComposeOpts(targetKey string) docker.ComposeOpts {
-	var targetNode *TreeNode
-	for _, item := range m.flatItems {
-		if item.Node != nil && item.Node.Key == targetKey {
-			targetNode = item.Node
-			break
-		}
-	}
-	if targetNode == nil {
-		targetNode = m.SelectedNode()
-	}
-	if targetNode == nil {
-		return docker.ComposeOpts{}
-	}
-	return targetNode.ComposeOpts()
-}
-
-func (m Model) executeAction(action modal.Action, targetID, targetName string) (string, tea.Cmd) {
-	switch action {
-	case modal.ActionStart:
-		return fmt.Sprintf("Starting %s...", targetName), m.startContainerCmd(targetID)
-	case modal.ActionStop:
-		return fmt.Sprintf("Stopping %s...", targetName), m.stopContainerCmd(targetID)
-	case modal.ActionRestart:
-		return fmt.Sprintf("Restarting %s...", targetName), m.restartContainerCmd(targetID)
-	case modal.ActionPause:
-		return fmt.Sprintf("Pausing %s...", targetName), m.pauseContainerCmd(targetID)
-	case modal.ActionUnpause:
-		return fmt.Sprintf("Unpausing %s...", targetName), m.unpauseContainerCmd(targetID)
-	case modal.ActionRemove:
-		return fmt.Sprintf("Removing %s...", targetName), m.removeContainerCmd(targetID, false)
-	case modal.ActionRemoveForce:
-		return fmt.Sprintf("Force removing %s...", targetName), m.removeContainerCmd(targetID, true)
-	case modal.ActionPrune:
-		return "Pruning stopped containers...", m.pruneContainersCmd()
-
-	// Compose Actions
-	case modal.ActionComposeUp:
-		opts := m.resolveComposeOpts(targetID)
-		return fmt.Sprintf("Starting %s...", targetName), m.composeUpCmd(targetID, targetName, opts)
-	case modal.ActionComposeBuild:
-		opts := m.resolveComposeOpts(targetID)
-		return fmt.Sprintf("Building and starting %s...", targetName), m.composeBuildCmd(targetID, targetName, opts)
-	case modal.ActionComposeRestart:
-		opts := m.resolveComposeOpts(targetID)
-		return fmt.Sprintf("Restarting %s...", targetName), m.composeRestartCmd(targetID, targetName, opts)
-	case modal.ActionComposeStop:
-		opts := m.resolveComposeOpts(targetID)
-		return fmt.Sprintf("Stopping %s...", targetName), m.composeStopCmd(targetID, targetName, opts)
-	case modal.ActionComposeStart:
-		opts := m.resolveComposeOpts(targetID)
-		return fmt.Sprintf("Starting %s...", targetName), m.composeStartCmd(targetID, targetName, opts)
-	case modal.ActionComposeDown:
-		opts := m.resolveComposeOpts(targetID)
-		return fmt.Sprintf("Stopping and removing %s...", targetName), m.composeDownCmd(targetID, targetName, opts)
-	case modal.ActionComposeRm:
-		opts := m.resolveComposeOpts(targetID)
-		return fmt.Sprintf("Removing %s...", targetName), m.composeRmCmd(targetID, targetName, opts)
-
-	default:
-		return "", nil
-	}
 }

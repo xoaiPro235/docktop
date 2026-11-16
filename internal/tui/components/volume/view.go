@@ -130,8 +130,8 @@ func (m Model) View() string {
 			rowContent := fmt.Sprintf("%s  %s  %s  %s", nameDisplay, driverDisplay, statusDisplay, refDisplay)
 
 			var line string
-			if m.action.IsRunning() && vol.Name == m.action.TargetName {
-				line = m.spinner.View() + " " + theme.Current.TreeSelected.Render(rowContent)
+			if m.runningIDs[vol.Name] {
+				line = theme.Current.ActionLoading.Render(m.spinner.View() + " " + rowContent)
 			} else if i == m.cursorIndex && m.focusZone == FocusVolumesList {
 				line = theme.Current.TreeSelected.Render(cursorMark + rowContent)
 			} else if i == m.cursorIndex {
@@ -161,18 +161,10 @@ func (m Model) View() string {
 		rightStyle.Render(rightContent),
 	)
 
-	if m.confirmModal.Active {
-		return m.confirmModal.Overlay(baseView, m.width, m.height)
-	}
-
 	return baseView
 }
 
 func (m Model) FooterBindings() []key.Binding {
-	if m.confirmModal.Active {
-		return m.confirmModal.FooterBindings()
-	}
-
 	if m.searchBar.IsActive() {
 		return []key.Binding{
 			keys.CommonHelpKeys.HelpFilterActive,

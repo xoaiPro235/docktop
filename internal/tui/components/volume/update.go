@@ -16,38 +16,32 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case VolumeActionMsg:
-		m.action.Finish()
+	case RunCmdMsg:
+		if m.runningIDs == nil {
+			m.runningIDs = make(map[string]bool)
+		}
+		wasEmpty := len(m.runningIDs) == 0
+		m.runningIDs[msg.TargetID] = true
+		if wasEmpty {
+			cmds = append(cmds, m.spinner.Tick)
+		}
+		cmds = append(cmds, msg.Cmd)
+		return m, tea.Batch(cmds...)
+
+	case VolumeResultMsg:
+		delete(m.runningIDs, msg.TargetID)
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.action.IsRunning() {
+		if len(m.runningIDs) > 0 {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
-			cmds = append(cmds, cmd)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 
 	case tea.KeyPressMsg:
-		if m.confirmModal.Active {
-			m.confirmModal, _ = m.confirmModal.Update(msg)
-			if m.confirmModal.Confirmed {
-				action := m.confirmModal.Action
-				volName := m.confirmModal.TargetName
-				switch action {
-				case modal.ActionRemove:
-					m.action.Start(action, volName, volName, fmt.Sprintf("Removing volume %s...", volName))
-					return m, tea.Batch(m.removeVolumeCmd(volName, false), m.spinner.Tick)
-				case modal.ActionRemoveForce:
-					m.action.Start(action, volName, volName, fmt.Sprintf("Force removing volume %s...", volName))
-					return m, tea.Batch(m.removeVolumeCmd(volName, true), m.spinner.Tick)
-				case modal.ActionPrune:
-					m.action.StartPrune("Pruning unused volumes...")
-					return m, tea.Batch(m.pruneVolumesCmd(), m.spinner.Tick)
-				}
-			}
-			return m, nil
-		}
-
 		if m.searchBar.IsActive() {
 			var cmd tea.Cmd
 			var evt searchbar.Event
@@ -60,7 +54,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 		switch {
-		case m.focusZone == FocusVolumesList && !m.action.IsRunning() && key.Matches(msg, keys.SearchBarKeys.Activate):
+		case m.focusZone == FocusVolumesList && !m.IsLoading() && key.Matches(msg, keys.SearchBarKeys.Activate):
 			cmd := m.searchBar.Activate()
 			return m, cmd
 
@@ -120,27 +114,47 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.VolumeKeys.Remove):
 			selected := m.SelectedVolume()
-			if selected != nil && !m.action.IsRunning() {
+			if selected != nil && !m.isVolumeActionRunning(selected.Name) {
 				volName := selected.Name
-				if selected.InUse {
-					m.confirmModal.Show(
-						fmt.Sprintf("Volume is mounted by %d container(s)! Force remove \"%s\"?", len(selected.Containers), volName),
-						fmt.Sprintf("docker volume rm -f %s", volName),
-						modal.StyleDanger,
-						modal.ActionRemoveForce,
-						volName,
-						volName,
-					)
+				force := selected.InUse
+				var question, cmdStr string
+				if force {
+					question = fmt.Sprintf("Volume is mounted by %d container(s)! Force remove %q?", len(selected.Containers), volName)
+					cmdStr = fmt.Sprintf("docker volume rm -f %s", volName)
 				} else {
-					m.confirmModal.ShowVolumeAction(modal.ActionRemove, volName)
+					question = fmt.Sprintf("Are you sure you want to remove volume %q?", volName)
+					cmdStr = fmt.Sprintf("docker volume rm %s", volName)
 				}
-				return m, nil
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: question,
+						Command:  cmdStr,
+						Style:    modal.StyleDanger,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: volName,
+								Cmd:      m.removeVolumeCmd(volName, force),
+							}
+						},
+					}
+				}
 			}
 
 		case key.Matches(msg, keys.VolumeKeys.Prune):
-			if !m.action.IsRunning() {
-				m.confirmModal.ShowVolumePrune()
-				return m, nil
+			if !m.isVolumeActionRunning(ActionTargetAll) {
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: "Are you sure you want to remove all unused volumes?",
+						Command:  "docker volume prune -f",
+						Style:    modal.StyleWarning,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: ActionTargetAll,
+								Cmd:      m.pruneVolumesCmd(),
+							}
+						},
+					}
+				}
 			}
 
 		default:
@@ -152,10 +166,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseClickMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
-
 		leftWidth := (m.width * 52) / 100
 		if msg.X < leftWidth {
 			m.focusZone = FocusVolumesList
@@ -176,9 +186,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseWheelMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
 		if m.focusZone == FocusVolumesList {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
 				m.cursorIndex--

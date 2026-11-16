@@ -51,7 +51,7 @@ func TestModel_AttachKeyRunsShellForRunningContainer(t *testing.T) {
 				{ID: "c1", Name: "web", State: tt.state},
 			})
 			if tt.actionRun {
-				m.runningActions["c1"] = RunningAction{Action: modal.ActionStop}
+				m.runningIDs["c1"] = true
 			}
 
 			_, cmd := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
@@ -124,16 +124,14 @@ func TestModel_fetchTopCmd(t *testing.T) {
 
 func TestModel_LifecycleCmds(t *testing.T) {
 	tests := []struct {
-		name       string
-		action     modal.Action
-		setupMock  func(*mocks.MockContainerService, *bool)
-		runCmd     func(Model) ContainerActionMsg
-		wantAction modal.Action
-		wantErr    bool
+		name         string
+		setupMock    func(*mocks.MockContainerService, *bool)
+		runCmd       func(Model) ContainerActionMsg
+		wantTargetID string
+		wantErr      bool
 	}{
 		{
-			name:   "StartContainer",
-			action: modal.ActionStart,
+			name: "StartContainer",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.StartContainerFunc = func(ctx context.Context, id string) error {
 					*called = true
@@ -143,12 +141,11 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.startContainerCmd("c1")().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionStart,
-			wantErr:    false,
+			wantTargetID: "c1",
+			wantErr:      false,
 		},
 		{
-			name:   "StopContainer",
-			action: modal.ActionStop,
+			name: "StopContainer",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.StopContainerFunc = func(ctx context.Context, id string) error {
 					*called = true
@@ -158,12 +155,11 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.stopContainerCmd("c1")().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionStop,
-			wantErr:    false,
+			wantTargetID: "c1",
+			wantErr:      false,
 		},
 		{
-			name:   "RestartContainer",
-			action: modal.ActionRestart,
+			name: "RestartContainer",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.RestartContainerFunc = func(ctx context.Context, id string) error {
 					*called = true
@@ -173,12 +169,11 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.restartContainerCmd("c1")().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionRestart,
-			wantErr:    false,
+			wantTargetID: "c1",
+			wantErr:      false,
 		},
 		{
-			name:   "PauseContainer",
-			action: modal.ActionPause,
+			name: "PauseContainer",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.PauseContainerFunc = func(ctx context.Context, id string) error {
 					*called = true
@@ -188,12 +183,11 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.pauseContainerCmd("c1")().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionPause,
-			wantErr:    false,
+			wantTargetID: "c1",
+			wantErr:      false,
 		},
 		{
-			name:   "UnpauseContainer",
-			action: modal.ActionUnpause,
+			name: "UnpauseContainer",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.UnpauseContainerFunc = func(ctx context.Context, id string) error {
 					*called = true
@@ -203,12 +197,11 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.unpauseContainerCmd("c1")().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionUnpause,
-			wantErr:    false,
+			wantTargetID: "c1",
+			wantErr:      false,
 		},
 		{
-			name:   "RemoveContainer Normal",
-			action: modal.ActionRemove,
+			name: "RemoveContainer Normal",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.RemoveContainerFunc = func(ctx context.Context, id string, opts docker.RemoveContainerOpts) error {
 					*called = true
@@ -221,12 +214,11 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.removeContainerCmd("c1", false)().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionRemove,
-			wantErr:    false,
+			wantTargetID: "c1",
+			wantErr:      false,
 		},
 		{
-			name:   "RemoveContainer Force",
-			action: modal.ActionRemoveForce,
+			name: "RemoveContainer Force",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.RemoveContainerFunc = func(ctx context.Context, id string, opts docker.RemoveContainerOpts) error {
 					*called = true
@@ -239,12 +231,11 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.removeContainerCmd("c1", true)().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionRemoveForce,
-			wantErr:    false,
+			wantTargetID: "c1",
+			wantErr:      false,
 		},
 		{
-			name:   "PruneContainers",
-			action: modal.ActionPrune,
+			name: "PruneContainers",
 			setupMock: func(m *mocks.MockContainerService, called *bool) {
 				m.PruneContainersFunc = func(ctx context.Context) (mobyContainer.PruneReport, error) {
 					*called = true
@@ -254,8 +245,8 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			runCmd: func(m Model) ContainerActionMsg {
 				return m.pruneContainersCmd()().(ContainerActionMsg)
 			},
-			wantAction: modal.ActionPrune,
-			wantErr:    false,
+			wantTargetID: ActionTargetAll,
+			wantErr:      false,
 		},
 	}
 
@@ -271,8 +262,8 @@ func TestModel_LifecycleCmds(t *testing.T) {
 			if !called {
 				t.Errorf("%s was not called on mock", tt.name)
 			}
-			if msg.Action != tt.wantAction {
-				t.Errorf("Action = %v, want %v", msg.Action, tt.wantAction)
+			if msg.ContainerID != tt.wantTargetID {
+				t.Errorf("ContainerID = %v, want %v", msg.ContainerID, tt.wantTargetID)
 			}
 			if (msg.Err != nil) != tt.wantErr {
 				t.Errorf("Err = %v, wantErr = %v", msg.Err, tt.wantErr)
@@ -321,7 +312,7 @@ func TestContainerOpenBrowserCommand(t *testing.T) {
 			m := New(&mocks.MockContainerService{})
 			m.updateContainers([]docker.ContainerInfo{tt.container})
 			if tt.actionRun {
-				m.runningActions[tt.container.ID] = RunningAction{Action: modal.ActionStop}
+				m.runningIDs[tt.container.ID] = true
 			}
 
 			_, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})

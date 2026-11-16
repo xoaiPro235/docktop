@@ -8,7 +8,6 @@ import (
 	mobyimage "github.com/moby/moby/api/types/image"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
 func TestModel_fetchImageDetailsCmd(t *testing.T) {
@@ -71,25 +70,22 @@ func TestModel_fetchImageDetailsCmd(t *testing.T) {
 
 func TestModel_removeImageCmd(t *testing.T) {
 	tests := []struct {
-		name       string
-		targetID   string
-		mockErr    error
-		wantAction modal.Action
-		wantErr    bool
+		name     string
+		targetID string
+		mockErr  error
+		wantErr  bool
 	}{
 		{
-			name:       "successful removal",
-			targetID:   "img-1",
-			mockErr:    nil,
-			wantAction: modal.ActionRemove,
-			wantErr:    false,
+			name:     "successful removal",
+			targetID: "img-1",
+			mockErr:  nil,
+			wantErr:  false,
 		},
 		{
-			name:       "removal conflict error",
-			targetID:   "img-in-use",
-			mockErr:    errors.New("image is being used by running container"),
-			wantAction: modal.ActionRemove,
-			wantErr:    true,
+			name:     "removal conflict error",
+			targetID: "img-in-use",
+			mockErr:  errors.New("image is being used by running container"),
+			wantErr:  true,
 		},
 	}
 
@@ -113,18 +109,18 @@ func TestModel_removeImageCmd(t *testing.T) {
 			}
 
 			msg := cmd()
-			actionMsg, ok := msg.(ImageActionMsg)
+			resultMsg, ok := msg.(ImageResultMsg)
 			if !ok {
-				t.Fatalf("Expected ImageActionMsg, got %T", msg)
+				t.Fatalf("Expected ImageResultMsg, got %T", msg)
 			}
 			if !called {
 				t.Error("Mock ImageService.RemoveImage was not called")
 			}
-			if actionMsg.Action != tt.wantAction {
-				t.Errorf("Action = %v, want %v", actionMsg.Action, tt.wantAction)
+			if resultMsg.TargetID != tt.targetID {
+				t.Errorf("TargetID = %v, want %v", resultMsg.TargetID, tt.targetID)
 			}
-			if (actionMsg.Err != nil) != tt.wantErr {
-				t.Errorf("Err = %v, wantErr = %v", actionMsg.Err, tt.wantErr)
+			if (resultMsg.Err != nil) != tt.wantErr {
+				t.Errorf("Err = %v, wantErr = %v", resultMsg.Err, tt.wantErr)
 			}
 		})
 	}
@@ -132,27 +128,24 @@ func TestModel_removeImageCmd(t *testing.T) {
 
 func TestModel_pruneImagesCmd(t *testing.T) {
 	tests := []struct {
-		name       string
-		report     mobyimage.PruneReport
-		mockErr    error
-		wantAction modal.Action
-		wantErr    bool
+		name    string
+		report  mobyimage.PruneReport
+		mockErr error
+		wantErr bool
 	}{
 		{
 			name: "successful prune",
 			report: mobyimage.PruneReport{
 				ImagesDeleted: []mobyimage.DeleteResponse{{Untagged: "dangling"}},
 			},
-			mockErr:    nil,
-			wantAction: modal.ActionPrune,
-			wantErr:    false,
+			mockErr: nil,
+			wantErr: false,
 		},
 		{
-			name:       "prune error",
-			report:     mobyimage.PruneReport{},
-			mockErr:    errors.New("daemon connection lost"),
-			wantAction: modal.ActionPrune,
-			wantErr:    true,
+			name:    "prune error",
+			report:  mobyimage.PruneReport{},
+			mockErr: errors.New("daemon connection lost"),
+			wantErr: true,
 		},
 	}
 
@@ -173,18 +166,18 @@ func TestModel_pruneImagesCmd(t *testing.T) {
 			}
 
 			msg := cmd()
-			actionMsg, ok := msg.(ImageActionMsg)
+			resultMsg, ok := msg.(ImageResultMsg)
 			if !ok {
-				t.Fatalf("Expected ImageActionMsg, got %T", msg)
+				t.Fatalf("Expected ImageResultMsg, got %T", msg)
 			}
 			if !called {
 				t.Error("Mock ImageService.PruneImages was not called")
 			}
-			if actionMsg.Action != tt.wantAction {
-				t.Errorf("Action = %v, want %v", actionMsg.Action, tt.wantAction)
+			if resultMsg.TargetID != ActionTargetAll {
+				t.Errorf("TargetID = %v, want %v", resultMsg.TargetID, ActionTargetAll)
 			}
-			if (actionMsg.Err != nil) != tt.wantErr {
-				t.Errorf("Err = %v, wantErr = %v", actionMsg.Err, tt.wantErr)
+			if (resultMsg.Err != nil) != tt.wantErr {
+				t.Errorf("Err = %v, wantErr = %v", resultMsg.Err, tt.wantErr)
 			}
 		})
 	}

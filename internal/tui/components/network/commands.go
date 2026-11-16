@@ -6,14 +6,18 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
 type NetworkListMsg []docker.NetworkInfo
 
-type NetworkActionMsg struct {
-	Action modal.Action
-	Err    error
+type NetworkResultMsg struct {
+	TargetID string
+	Err      error
+}
+
+type RunCmdMsg struct {
+	TargetID string
+	Cmd      tea.Cmd
 }
 
 func (m Model) removeNetworkCmd(id string) tea.Cmd {
@@ -22,7 +26,7 @@ func (m Model) removeNetworkCmd(id string) tea.Cmd {
 		defer cancel()
 
 		err := m.dockerClient.RemoveNetwork(ctx, id)
-		return NetworkActionMsg{Action: modal.ActionDelete, Err: err}
+		return NetworkResultMsg{TargetID: id, Err: err}
 	}
 }
 
@@ -32,6 +36,6 @@ func (m Model) pruneNetworksCmd() tea.Cmd {
 		defer cancel()
 
 		_, err := m.dockerClient.PruneNetworks(ctx)
-		return NetworkActionMsg{Action: modal.ActionPrune, Err: err}
+		return NetworkResultMsg{TargetID: ActionTargetAll, Err: err}
 	}
 }

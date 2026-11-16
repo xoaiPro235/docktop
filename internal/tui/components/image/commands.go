@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	mobyimage "github.com/moby/moby/api/types/image"
 	"github.com/xoaiPro235/docktop/internal/docker"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
 type ImageListMsg []docker.ImageInfo
@@ -19,9 +18,14 @@ type ImageDetailsMsg struct {
 	Err     error
 }
 
-type ImageActionMsg struct {
-	Action modal.Action
-	Err    error
+type ImageResultMsg struct {
+	TargetID string
+	Err      error
+}
+
+type RunCmdMsg struct {
+	TargetID string
+	Cmd      tea.Cmd
 }
 
 func (m Model) fetchImageDetailsCmd(imageID string) tea.Cmd {
@@ -46,7 +50,7 @@ func (m Model) removeImageCmd(targetID string) tea.Cmd {
 		defer cancel()
 
 		err := m.dockerClient.RemoveImage(ctx, targetID, false)
-		return ImageActionMsg{Action: modal.ActionRemove, Err: err}
+		return ImageResultMsg{TargetID: targetID, Err: err}
 	}
 }
 
@@ -56,6 +60,6 @@ func (m Model) pruneImagesCmd() tea.Cmd {
 		defer cancel()
 
 		_, err := m.dockerClient.PruneImages(ctx)
-		return ImageActionMsg{Action: modal.ActionPrune, Err: err}
+		return ImageResultMsg{TargetID: ActionTargetAll, Err: err}
 	}
 }

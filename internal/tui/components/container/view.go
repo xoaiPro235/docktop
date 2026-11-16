@@ -86,23 +86,20 @@ func (m Model) View() string {
 			var styledTitle string
 			switch item.Node.Type {
 			case NodeProject:
-				if _, isAction := m.runningActions[item.Node.Key]; isAction {
+				if m.runningIDs[item.Node.Key] {
 					styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
 				} else {
 					styledTitle = theme.Current.TreeProject.Render(title)
 				}
 			case NodeService:
-				if _, isAction := m.runningActions[item.Node.Key]; isAction {
+				if m.runningIDs[item.Node.Key] {
 					styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
 				} else {
 					styledTitle = theme.Current.TreeService.Render(title)
 				}
 			case NodeContainer:
 				if item.Node.Container != nil {
-					_, isSelfAction := m.runningActions[item.Node.Container.ID]
-					isPruningThis := m.isContainerActionRunning(ActionTargetAll) && item.Node.Container.State != docker.StateRunning
-
-					if isSelfAction || isPruningThis {
+					if m.runningIDs[item.Node.Container.ID] {
 						styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
 					} else if item.Node.Container.State == docker.StateRunning {
 						styledTitle = theme.Current.TreeContainerRunning.Render(title)
@@ -178,18 +175,8 @@ func (m Model) View() string {
 		var rightBody string
 		switch m.activePane {
 		case SubPaneStats:
-			var actionLoading string
-			var actionType string
-			if pruneAct, ok := m.runningActions[ActionTargetAll]; ok {
-				actionLoading = m.spinner.View() + " " + theme.Current.ActionLoading.Render(pruneAct.Description)
-				actionType = pruneAct.Action.String()
-			} else if selectedContainer != nil {
-				if act, ok := m.runningActions[selectedContainer.ID]; ok {
-					actionLoading = m.spinner.View() + " " + theme.Current.ActionLoading.Render(act.Description)
-					actionType = act.Action.String()
-				}
-			}
-			rightBody = m.statsPane.Render(selectedContainer, rightWidth-2, m.height-4, actionLoading, actionType, m.spinner.View())
+			isRunning := selectedContainer != nil && m.runningIDs[selectedContainer.ID]
+			rightBody = m.statsPane.Render(selectedContainer, rightWidth-2, m.height-4, isRunning, m.spinner.View())
 		case SubPaneLogs:
 			rightBody = m.logsPane.Render()
 		case SubPaneTop:
@@ -217,19 +204,11 @@ func (m Model) View() string {
 		rightStyle.Render(rightContent),
 	)
 
-	if m.confirmModal.Active {
-		return m.confirmModal.Overlay(baseView, m.width, m.height)
-	}
-
 	return baseView
 }
 
 // FooterBindings returns the active keybindings relevant to the current container view state.
 func (m Model) FooterBindings() []key.Binding {
-	if m.confirmModal.Active {
-		return m.confirmModal.FooterBindings()
-	}
-
 	if m.searchBar.IsActive() {
 		return []key.Binding{
 			keys.CommonHelpKeys.HelpFilterActive,

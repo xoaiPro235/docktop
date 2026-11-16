@@ -6,14 +6,18 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
 type VolumeListMsg []docker.VolumeInfo
 
-type VolumeActionMsg struct {
-	Action modal.Action
-	Err    error
+type VolumeResultMsg struct {
+	TargetID string
+	Err      error
+}
+
+type RunCmdMsg struct {
+	TargetID string
+	Cmd      tea.Cmd
 }
 
 func (m Model) removeVolumeCmd(name string, force bool) tea.Cmd {
@@ -22,7 +26,7 @@ func (m Model) removeVolumeCmd(name string, force bool) tea.Cmd {
 		defer cancel()
 
 		err := m.dockerClient.RemoveVolume(ctx, name, force)
-		return VolumeActionMsg{Action: modal.ActionRemove, Err: err}
+		return VolumeResultMsg{TargetID: name, Err: err}
 	}
 }
 
@@ -32,6 +36,6 @@ func (m Model) pruneVolumesCmd() tea.Cmd {
 		defer cancel()
 
 		_, err := m.dockerClient.PruneVolumes(ctx)
-		return VolumeActionMsg{Action: modal.ActionPrune, Err: err}
+		return VolumeResultMsg{TargetID: ActionTargetAll, Err: err}
 	}
 }

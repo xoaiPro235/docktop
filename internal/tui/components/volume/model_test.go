@@ -7,7 +7,6 @@ import (
 	"github.com/moby/moby/api/types/volume"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -25,11 +24,8 @@ func TestNew(t *testing.T) {
 	if m.focusZone != FocusVolumesList {
 		t.Errorf("focusZone = %v, want FocusVolumesList", m.focusZone)
 	}
-	if m.IsModalActive() {
-		t.Error("New model should have inactive modal")
-	}
-	if m.IsActionRunning() {
-		t.Error("New model should not have active action")
+	if m.IsLoading() {
+		t.Error("New model should not be loading")
 	}
 }
 
@@ -117,29 +113,16 @@ func TestModel_FilterVolumes(t *testing.T) {
 	}
 }
 
-func TestModel_IsModalActive(t *testing.T) {
+func TestModel_IsLoading(t *testing.T) {
 	mockCli := &mocks.MockVolumeService{}
 	m := New(mockCli)
-	if m.IsModalActive() {
-		t.Error("IsModalActive() should be false initially")
+	if m.IsLoading() {
+		t.Error("IsLoading() should be false initially")
 	}
 
-	m.confirmModal.ShowVolumeAction(modal.ActionRemove, "vol-1")
-	if !m.IsModalActive() {
-		t.Error("IsModalActive() should be true when modal is shown")
-	}
-}
-
-func TestModel_IsActionRunning(t *testing.T) {
-	mockCli := &mocks.MockVolumeService{}
-	m := New(mockCli)
-	if m.IsActionRunning() {
-		t.Error("IsActionRunning() should be false initially")
-	}
-
-	m.action.Start(modal.ActionRemove, "vol-1", "vol-1", "Removing volume")
-	if !m.IsActionRunning() {
-		t.Error("IsActionRunning() should be true after action.Start")
+	m.runningIDs["vol-1"] = true
+	if !m.IsLoading() {
+		t.Error("IsLoading() should be true when runningIDs is set")
 	}
 }
 

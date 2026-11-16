@@ -2,7 +2,6 @@ package docker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -12,8 +11,6 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
-
-var ErrMustStopContainer = errors.New("container must be stopped before removal")
 
 type ContainerState = container.ContainerState
 
@@ -50,24 +47,6 @@ type ContainerInfo struct {
 type RemoveContainerOpts struct {
 	RemoveVolumes bool
 	Force         bool
-}
-
-type statusCoder interface {
-	StatusCode() int
-}
-
-func isConflictError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	var sc statusCoder
-	if errors.As(err, &sc) && sc.StatusCode() == 409 {
-		return true
-	}
-
-	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "container is running") || strings.Contains(errMsg, "conflict")
 }
 
 func ShortID(id string) string {
@@ -185,13 +164,7 @@ func (c *Client) RemoveContainer(ctx context.Context, id string, opts RemoveCont
 		Force:         opts.Force,
 		RemoveVolumes: opts.RemoveVolumes,
 	})
-	if err != nil {
-		if isConflictError(err) {
-			return ErrMustStopContainer
-		}
-		return err
-	}
-	return nil
+	return err
 }
 
 func (c *Client) PruneContainers(ctx context.Context) (container.PruneReport, error) {

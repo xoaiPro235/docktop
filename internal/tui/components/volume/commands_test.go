@@ -3,12 +3,10 @@ package volume
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/moby/moby/api/types/volume"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
 func TestModel_removeVolumeCmd(t *testing.T) {
@@ -17,7 +15,6 @@ func TestModel_removeVolumeCmd(t *testing.T) {
 		volumeName string
 		force      bool
 		mockErr    error
-		wantAction modal.Action
 		wantErr    bool
 	}{
 		{
@@ -25,7 +22,6 @@ func TestModel_removeVolumeCmd(t *testing.T) {
 			volumeName: "vol-1",
 			force:      false,
 			mockErr:    nil,
-			wantAction: modal.ActionRemove,
 			wantErr:    false,
 		},
 		{
@@ -33,7 +29,6 @@ func TestModel_removeVolumeCmd(t *testing.T) {
 			volumeName: "vol-in-use",
 			force:      true,
 			mockErr:    errors.New("volume is in use"),
-			wantAction: modal.ActionRemove,
 			wantErr:    true,
 		},
 	}
@@ -61,18 +56,18 @@ func TestModel_removeVolumeCmd(t *testing.T) {
 			}
 
 			msg := cmd()
-			actionMsg, ok := msg.(VolumeActionMsg)
+			resultMsg, ok := msg.(VolumeResultMsg)
 			if !ok {
-				t.Fatalf("Expected VolumeActionMsg, got %T", msg)
+				t.Fatalf("Expected VolumeResultMsg, got %T", msg)
 			}
 			if !called {
 				t.Error("Mock VolumeService.RemoveVolume was not called")
 			}
-			if actionMsg.Action != tt.wantAction {
-				t.Errorf("Action = %v, want %v", actionMsg.Action, tt.wantAction)
+			if resultMsg.TargetID != tt.volumeName {
+				t.Errorf("TargetID = %v, want %v", resultMsg.TargetID, tt.volumeName)
 			}
-			if (actionMsg.Err != nil) != tt.wantErr {
-				t.Errorf("Err = %v, wantErr = %v", actionMsg.Err, tt.wantErr)
+			if (resultMsg.Err != nil) != tt.wantErr {
+				t.Errorf("Err = %v, wantErr = %v", resultMsg.Err, tt.wantErr)
 			}
 		})
 	}
@@ -80,11 +75,10 @@ func TestModel_removeVolumeCmd(t *testing.T) {
 
 func TestModel_pruneVolumesCmd(t *testing.T) {
 	tests := []struct {
-		name       string
-		report     volume.PruneReport
-		mockErr    error
-		wantAction modal.Action
-		wantErr    bool
+		name    string
+		report  volume.PruneReport
+		mockErr error
+		wantErr bool
 	}{
 		{
 			name: "successful prune",
@@ -92,16 +86,14 @@ func TestModel_pruneVolumesCmd(t *testing.T) {
 				VolumesDeleted: []string{"v1", "v2"},
 				SpaceReclaimed: 1024,
 			},
-			mockErr:    nil,
-			wantAction: modal.ActionPrune,
-			wantErr:    false,
+			mockErr: nil,
+			wantErr: false,
 		},
 		{
-			name:       "prune error",
-			report:     volume.PruneReport{},
-			mockErr:    errors.New("daemon failure"),
-			wantAction: modal.ActionPrune,
-			wantErr:    true,
+			name:    "prune error",
+			report:  volume.PruneReport{},
+			mockErr: errors.New("daemon failure"),
+			wantErr: true,
 		},
 	}
 
@@ -122,18 +114,18 @@ func TestModel_pruneVolumesCmd(t *testing.T) {
 			}
 
 			msg := cmd()
-			actionMsg, ok := msg.(VolumeActionMsg)
+			resultMsg, ok := msg.(VolumeResultMsg)
 			if !ok {
-				t.Fatalf("Expected VolumeActionMsg, got %T", msg)
+				t.Fatalf("Expected VolumeResultMsg, got %T", msg)
 			}
 			if !called {
 				t.Error("Mock VolumeService.PruneVolumes was not called")
 			}
-			if !reflect.DeepEqual(actionMsg.Action, tt.wantAction) {
-				t.Errorf("Action = %v, want %v", actionMsg.Action, tt.wantAction)
+			if resultMsg.TargetID != ActionTargetAll {
+				t.Errorf("TargetID = %v, want %v", resultMsg.TargetID, ActionTargetAll)
 			}
-			if (actionMsg.Err != nil) != tt.wantErr {
-				t.Errorf("Err = %v, wantErr = %v", actionMsg.Err, tt.wantErr)
+			if (resultMsg.Err != nil) != tt.wantErr {
+				t.Errorf("Err = %v, wantErr = %v", resultMsg.Err, tt.wantErr)
 			}
 		})
 	}

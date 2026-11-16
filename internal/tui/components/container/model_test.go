@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -27,9 +26,6 @@ func TestNew(t *testing.T) {
 	}
 	if m.activePane != SubPaneStats {
 		t.Errorf("activePane = %v, want SubPaneStats", m.activePane)
-	}
-	if m.IsModalActive() {
-		t.Error("New model should have inactive modal")
 	}
 }
 
@@ -148,19 +144,6 @@ func TestModel_PauseAndResume(t *testing.T) {
 	m.Resume()
 }
 
-func TestModel_IsModalActive(t *testing.T) {
-	mockCli := &mocks.MockContainerService{}
-	m := New(mockCli)
-	if m.IsModalActive() {
-		t.Error("IsModalActive() should be false initially")
-	}
-
-	m.confirmModal.ShowContainerAction(modal.ActionRestart, "c1", "web")
-	if !m.IsModalActive() {
-		t.Error("IsModalActive() should be true when modal is shown")
-	}
-}
-
 func TestModel_ActionsRunning(t *testing.T) {
 	mockCli := &mocks.MockContainerService{}
 	m := New(mockCli)
@@ -172,9 +155,9 @@ func TestModel_ActionsRunning(t *testing.T) {
 		t.Error("isContainerActionRunning(c1) should be false initially")
 	}
 
-	m.runningActions["c1"] = RunningAction{Action: modal.ActionStop, TargetName: "web"}
+	m.runningIDs["c1"] = true
 	if !m.IsActionRunning() {
-		t.Error("IsActionRunning() should be true when runningActions has items")
+		t.Error("IsActionRunning() should be true when runningIDs has items")
 	}
 	if !m.isContainerActionRunning("c1") {
 		t.Error("isContainerActionRunning(c1) should be true")

@@ -12,253 +12,6 @@ func init() {
 	theme.SetThemeByName("tokyo-night")
 }
 
-func TestAction_Style(t *testing.T) {
-	tests := []struct {
-		name string
-		a    Action
-		want Style
-	}{
-		{"Stop", ActionStop, StyleDanger},
-		{"Remove", ActionRemove, StyleDanger},
-		{"RemoveForce", ActionRemoveForce, StyleDanger},
-		{"Delete", ActionDelete, StyleDanger},
-		{"Restart", ActionRestart, StyleWarning},
-		{"Pause", ActionPause, StyleWarning},
-		{"Prune", ActionPrune, StyleWarning},
-		{"Start", ActionStart, StyleSuccess},
-		{"Unpause", ActionUnpause, StyleSuccess},
-		{"None", ActionNone, StyleDefault},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.a.Style(); got != tt.want {
-				t.Errorf("Action.Style() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestAction_String(t *testing.T) {
-	tests := []struct {
-		a    Action
-		want string
-	}{
-		{ActionStart, "start"},
-		{ActionStop, "stop"},
-		{ActionRestart, "restart"},
-		{ActionPause, "pause"},
-		{ActionUnpause, "unpause"},
-		{ActionRemove, "remove"},
-		{ActionRemoveForce, "remove_force"},
-		{ActionPrune, "prune"},
-		{ActionDelete, "delete"},
-		{ActionNone, ""},
-	}
-	for _, tt := range tests {
-		if got := tt.a.String(); got != tt.want {
-			t.Errorf("Action.String() for %v = %v, want %v", tt.a, got, tt.want)
-		}
-	}
-}
-
-func TestAction_Title(t *testing.T) {
-	tests := []struct {
-		a    Action
-		want string
-	}{
-		{ActionStart, "Start"},
-		{ActionStop, "Stop"},
-		{ActionRestart, "Restart"},
-		{ActionPause, "Pause"},
-		{ActionUnpause, "Unpause"},
-		{ActionRemove, "Remove"},
-		{ActionRemoveForce, "Force Remove"},
-		{ActionPrune, "Prune"},
-		{ActionDelete, "Delete"},
-		{ActionNone, ""},
-	}
-	for _, tt := range tests {
-		if got := tt.a.Title(); got != tt.want {
-			t.Errorf("Action.Title() for %v = %v, want %v", tt.a, got, tt.want)
-		}
-	}
-}
-
-func TestActionState_Lifecycle(t *testing.T) {
-	state := ActionState{}
-	if state.IsRunning() {
-		t.Error("Initial ActionState should not be running")
-	}
-
-	state.Start(ActionRestart, "cid123", "my-web", "Restarting container")
-	if !state.IsRunning() {
-		t.Error("ActionState should be running after Start")
-	}
-	if state.Action != ActionRestart || state.TargetID != "cid123" || state.TargetName != "my-web" {
-		t.Errorf("Unexpected ActionState after Start: %+v", state)
-	}
-
-	state.Finish()
-	if state.IsRunning() {
-		t.Error("ActionState should not be running after Finish")
-	}
-	if state.Action != ActionNone || state.TargetID != "" || state.TargetName != "" || state.Desc != "" {
-		t.Errorf("ActionState after Finish = %+v, want cleared state", state)
-	}
-}
-
-func TestActionState_StartPrune(t *testing.T) {
-	state := ActionState{}
-	state.StartPrune("Pruning resources...")
-
-	if !state.IsRunning() {
-		t.Fatal("ActionState should be running after StartPrune")
-	}
-	if state.Action != ActionPrune || state.TargetID != TargetAll || state.TargetName != TargetAll {
-		t.Errorf("StartPrune() state = %+v, want prune action targeting all resources", state)
-	}
-	if state.Desc != "Pruning resources..." {
-		t.Errorf("Desc = %q, want %q", state.Desc, "Pruning resources...")
-	}
-}
-
-func TestNewConfirmModal(t *testing.T) {
-	m := NewConfirmModal()
-	if m.Active {
-		t.Error("New modal should be inactive")
-	}
-	if !m.SelectedYes {
-		t.Error("New modal should have SelectedYes default to true")
-	}
-}
-
-func TestConfirmModal_ShowAndHide(t *testing.T) {
-	m := NewConfirmModal()
-	m.Show("Are you sure?", "docker rm test", StyleDanger, ActionRemove, "id1", "test")
-
-	if !m.Active {
-		t.Error("Modal should be active after Show")
-	}
-	if m.Question != "Are you sure?" || m.Command != "docker rm test" {
-		t.Errorf("Unexpected question or command: %q, %q", m.Question, m.Command)
-	}
-
-	m.Hide()
-	if m.Active {
-		t.Error("Modal should be inactive after Hide")
-	}
-	if m.Confirmed {
-		t.Error("Modal Confirmed should be false after Hide")
-	}
-}
-
-func TestConfirmModal_ShowActions(t *testing.T) {
-	m := NewConfirmModal()
-
-	// Container actions
-	containerActions := []Action{
-		ActionStart, ActionStop, ActionPause, ActionUnpause,
-		ActionRestart, ActionRemove, ActionRemoveForce, ActionPrune,
-	}
-	for _, act := range containerActions {
-		m.ShowContainerAction(act, "cid1", "cname1")
-		if !m.Active || m.Action != act {
-			t.Errorf("ShowContainerAction failed for action %v", act)
-		}
-	}
-
-	// Image actions
-	m.ShowImageAction(ActionRemove, "img1", "alpine:latest")
-	if !m.Active || m.Action != ActionRemove {
-		t.Errorf("ShowImageAction Remove failed")
-	}
-	m.ShowImageAction(ActionPrune, "img1", "alpine:latest")
-	if !m.Active || m.Action != ActionPrune {
-		t.Errorf("ShowImageAction Prune failed")
-	}
-
-	// Volume actions
-	m.ShowVolumeAction(ActionRemove, "my-vol")
-	if !m.Active || m.Action != ActionRemove {
-		t.Errorf("ShowVolumeAction Remove failed")
-	}
-	m.ShowVolumeAction(ActionPrune, "my-vol")
-	if !m.Active || m.Action != ActionPrune {
-		t.Errorf("ShowVolumeAction Prune failed")
-	}
-
-	// Network actions
-	m.ShowNetworkAction(ActionDelete, "net1", "bridge")
-	if !m.Active || m.Action != ActionDelete {
-		t.Errorf("ShowNetworkAction Delete failed")
-	}
-	m.ShowNetworkAction(ActionPrune, "net1", "bridge")
-	if !m.Active || m.Action != ActionPrune {
-		t.Errorf("ShowNetworkAction Prune failed")
-	}
-}
-
-func TestConfirmModal_ShowPruneActions(t *testing.T) {
-	tests := []struct {
-		name       string
-		show       func(*ConfirmModal)
-		question   string
-		command    string
-		targetName string
-	}{
-		{
-			name:       "containers",
-			show:       (*ConfirmModal).ShowContainerPrune,
-			question:   "Are you sure you want to remove all stopped containers?",
-			command:    "docker container prune -f",
-			targetName: "all stopped containers",
-		},
-		{
-			name:       "images",
-			show:       (*ConfirmModal).ShowImagePrune,
-			question:   "Are you sure you want to remove all dangling images?",
-			command:    "docker image prune -f",
-			targetName: "all dangling images",
-		},
-		{
-			name:       "volumes",
-			show:       (*ConfirmModal).ShowVolumePrune,
-			question:   "Are you sure you want to remove all unused volumes?",
-			command:    "docker volume prune -f",
-			targetName: "all unused volumes",
-		},
-		{
-			name:       "networks",
-			show:       (*ConfirmModal).ShowNetworkPrune,
-			question:   "Are you sure you want to remove all unused networks?",
-			command:    "docker network prune -f",
-			targetName: "all unused networks",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := NewConfirmModal()
-			tt.show(&m)
-
-			if !m.Active || m.Action != ActionPrune {
-				t.Fatalf("prune modal state = %+v, want active prune modal", m)
-			}
-			if m.Style != StyleWarning {
-				t.Errorf("Style = %v, want StyleWarning", m.Style)
-			}
-			if m.Question != tt.question || m.Command != tt.command {
-				t.Errorf("Question/Command = (%q, %q), want (%q, %q)",
-					m.Question, m.Command, tt.question, tt.command)
-			}
-			if m.TargetID != TargetAll || m.TargetName != tt.targetName {
-				t.Errorf("Target = (%q, %q), want (%q, %q)",
-					m.TargetID, m.TargetName, TargetAll, tt.targetName)
-			}
-		})
-	}
-}
-
 func TestConfirmModal_Init(t *testing.T) {
 	m := NewConfirmModal()
 	if cmd := m.Init(); cmd != nil {
@@ -266,43 +19,47 @@ func TestConfirmModal_Init(t *testing.T) {
 	}
 }
 
+type testConfirmMsg struct{}
+
 func TestConfirmModal_Update(t *testing.T) {
 	// 1. Inactive modal ignores keys
 	m := NewConfirmModal()
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'y'})
-	if m.Active || m.Confirmed {
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'y'})
+	if m.Active || cmd != nil {
 		t.Error("Inactive modal responded to keypress")
 	}
 
+	testCmd := func() tea.Msg { return testConfirmMsg{} }
+
 	// 2. Press Yes ('y')
-	m.Show("Confirm?", "cmd", StyleDanger, ActionRemove, "1", "name")
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'y'})
+	m.Show("Confirm?", "cmd", StyleDanger, testCmd)
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'y'})
 	if m.Active {
 		t.Error("Modal should become inactive after pressing Yes")
 	}
-	if !m.Confirmed {
-		t.Error("Modal should be Confirmed after pressing Yes")
+	if cmd == nil || cmd() != (testConfirmMsg{}) {
+		t.Error("Modal should return OnConfirm cmd after pressing Yes")
 	}
 
 	// 3. Press No ('n')
-	m.Show("Confirm?", "cmd", StyleDanger, ActionRemove, "1", "name")
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'n'})
+	m.Show("Confirm?", "cmd", StyleDanger, testCmd)
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'n'})
 	if m.Active {
 		t.Error("Modal should become inactive after pressing No")
 	}
-	if m.Confirmed {
-		t.Error("Modal should NOT be Confirmed after pressing No")
+	if cmd != nil {
+		t.Error("Modal should NOT return cmd after pressing No")
 	}
 
 	// 4. Press Escape
-	m.Show("Confirm?", "cmd", StyleDanger, ActionRemove, "1", "name")
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
-	if m.Active || m.Confirmed {
-		t.Error("Modal should be dismissed without confirm on Esc")
+	m.Show("Confirm?", "cmd", StyleDanger, testCmd)
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if m.Active || cmd != nil {
+		t.Error("Modal should be dismissed without cmd on Esc")
 	}
 
 	// 5. Toggle switch (Tab)
-	m.Show("Confirm?", "cmd", StyleDanger, ActionRemove, "1", "name")
+	m.Show("Confirm?", "cmd", StyleDanger, testCmd)
 	if !m.SelectedYes {
 		t.Error("SelectedYes should be true initially")
 	}
@@ -310,19 +67,29 @@ func TestConfirmModal_Update(t *testing.T) {
 	if m.SelectedYes {
 		t.Error("SelectedYes should toggle to false after Tab")
 	}
-	// Press Enter when No is selected -> Confirmed should be false
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	// Press Enter when No is selected -> cmd should be nil
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.Active {
 		t.Error("Modal should be inactive after Enter")
 	}
-	if m.Confirmed {
-		t.Error("Modal should not be confirmed when Enter pressed with SelectedYes=false")
+	if cmd != nil {
+		t.Error("Modal should not execute cmd when Enter pressed with SelectedYes=false")
+	}
+
+	// 6. Press Enter with Yes selected -> cmd should execute
+	m.Show("Confirm?", "cmd", StyleDanger, testCmd)
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.Active {
+		t.Error("Modal should be inactive after Enter")
+	}
+	if cmd == nil || cmd() != (testConfirmMsg{}) {
+		t.Error("Modal should execute cmd when Enter pressed with SelectedYes=true")
 	}
 }
 
 func TestConfirmModal_ViewAndOverlay(t *testing.T) {
 	m := NewConfirmModal()
-	m.Show("Are you sure you want to delete this?", "docker rm test", StyleDanger, ActionRemove, "1", "test")
+	m.Show("Are you sure you want to delete this?", "docker rm test", StyleDanger, nil)
 
 	view := m.View()
 	if !strings.Contains(view, "docker rm test") {

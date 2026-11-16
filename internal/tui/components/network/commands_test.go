@@ -3,35 +3,30 @@ package network
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 
 	mobyNetwork "github.com/moby/moby/api/types/network"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
 func TestModel_removeNetworkCmd(t *testing.T) {
 	tests := []struct {
-		name       string
-		networkID  string
-		mockErr    error
-		wantAction modal.Action
-		wantErr    bool
+		name      string
+		networkID string
+		mockErr   error
+		wantErr   bool
 	}{
 		{
-			name:       "successful network removal",
-			networkID:  "net-custom",
-			mockErr:    nil,
-			wantAction: modal.ActionDelete,
-			wantErr:    false,
+			name:      "successful network removal",
+			networkID: "net-custom",
+			mockErr:   nil,
+			wantErr:   false,
 		},
 		{
-			name:       "network in use error",
-			networkID:  "net-busy",
-			mockErr:    errors.New("network has active endpoints"),
-			wantAction: modal.ActionDelete,
-			wantErr:    true,
+			name:      "network in use error",
+			networkID: "net-busy",
+			mockErr:   errors.New("network has active endpoints"),
+			wantErr:   true,
 		},
 	}
 
@@ -55,18 +50,18 @@ func TestModel_removeNetworkCmd(t *testing.T) {
 			}
 
 			msg := cmd()
-			actionMsg, ok := msg.(NetworkActionMsg)
+			resultMsg, ok := msg.(NetworkResultMsg)
 			if !ok {
-				t.Fatalf("Expected NetworkActionMsg, got %T", msg)
+				t.Fatalf("Expected NetworkResultMsg, got %T", msg)
 			}
 			if !called {
 				t.Error("Mock NetworkService.RemoveNetwork was not called")
 			}
-			if actionMsg.Action != tt.wantAction {
-				t.Errorf("Action = %v, want %v", actionMsg.Action, tt.wantAction)
+			if resultMsg.TargetID != tt.networkID {
+				t.Errorf("TargetID = %v, want %v", resultMsg.TargetID, tt.networkID)
 			}
-			if (actionMsg.Err != nil) != tt.wantErr {
-				t.Errorf("Err = %v, wantErr = %v", actionMsg.Err, tt.wantErr)
+			if (resultMsg.Err != nil) != tt.wantErr {
+				t.Errorf("Err = %v, wantErr = %v", resultMsg.Err, tt.wantErr)
 			}
 		})
 	}
@@ -74,27 +69,24 @@ func TestModel_removeNetworkCmd(t *testing.T) {
 
 func TestModel_pruneNetworksCmd(t *testing.T) {
 	tests := []struct {
-		name       string
-		report     mobyNetwork.PruneReport
-		mockErr    error
-		wantAction modal.Action
-		wantErr    bool
+		name    string
+		report  mobyNetwork.PruneReport
+		mockErr error
+		wantErr bool
 	}{
 		{
 			name: "successful network prune",
 			report: mobyNetwork.PruneReport{
 				NetworksDeleted: []string{"net1", "net2"},
 			},
-			mockErr:    nil,
-			wantAction: modal.ActionPrune,
-			wantErr:    false,
+			mockErr: nil,
+			wantErr: false,
 		},
 		{
-			name:       "error on prune",
-			report:     mobyNetwork.PruneReport{},
-			mockErr:    errors.New("daemon error"),
-			wantAction: modal.ActionPrune,
-			wantErr:    true,
+			name:    "error on prune",
+			report:  mobyNetwork.PruneReport{},
+			mockErr: errors.New("daemon error"),
+			wantErr: true,
 		},
 	}
 
@@ -115,18 +107,18 @@ func TestModel_pruneNetworksCmd(t *testing.T) {
 			}
 
 			msg := cmd()
-			actionMsg, ok := msg.(NetworkActionMsg)
+			resultMsg, ok := msg.(NetworkResultMsg)
 			if !ok {
-				t.Fatalf("Expected NetworkActionMsg, got %T", msg)
+				t.Fatalf("Expected NetworkResultMsg, got %T", msg)
 			}
 			if !called {
 				t.Error("Mock NetworkService.PruneNetworks was not called")
 			}
-			if !reflect.DeepEqual(actionMsg.Action, tt.wantAction) {
-				t.Errorf("Action = %v, want %v", actionMsg.Action, tt.wantAction)
+			if resultMsg.TargetID != ActionTargetAll {
+				t.Errorf("TargetID = %v, want %v", resultMsg.TargetID, ActionTargetAll)
 			}
-			if (actionMsg.Err != nil) != tt.wantErr {
-				t.Errorf("Err = %v, wantErr = %v", actionMsg.Err, tt.wantErr)
+			if (resultMsg.Err != nil) != tt.wantErr {
+				t.Errorf("Err = %v, wantErr = %v", resultMsg.Err, tt.wantErr)
 			}
 		})
 	}

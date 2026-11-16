@@ -1,7 +1,6 @@
 package modal
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -11,32 +10,6 @@ import (
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
-
-// Action represents the numerical action type for confirmation dialogs.
-type Action int
-
-const (
-	ActionNone Action = iota
-	ActionStart
-	ActionStop
-	ActionRestart
-	ActionPause
-	ActionUnpause
-	ActionRemove
-	ActionRemoveForce
-	ActionPrune
-	ActionDelete
-	ActionComposeDown
-	ActionComposeUp
-	ActionComposeBuild
-	ActionComposeRestart
-	ActionComposeStop
-	ActionComposeStart
-	ActionComposeRm
-)
-
-// TargetAll represents the special target identifier when pruning all unused/stopped resources.
-const TargetAll = "all"
 
 // Style represents the visual style/severity of the confirmation dialog.
 type Style int
@@ -48,148 +21,22 @@ const (
 	StyleSuccess
 )
 
-// Style returns the default visual Style associated with this Action.
-func (a Action) Style() Style {
-	switch a {
-	case ActionStop, ActionRemove, ActionRemoveForce, ActionDelete, ActionComposeDown, ActionComposeStop, ActionComposeRm:
-		return StyleDanger
-	case ActionRestart, ActionPause, ActionPrune, ActionComposeRestart, ActionComposeBuild:
-		return StyleWarning
-	case ActionStart, ActionUnpause, ActionComposeUp, ActionComposeStart:
-		return StyleSuccess
-	default:
-		return StyleDefault
-	}
-}
-
-// String returns the canonical action name string.
-func (a Action) String() string {
-	switch a {
-	case ActionStart:
-		return "start"
-	case ActionStop:
-		return "stop"
-	case ActionRestart:
-		return "restart"
-	case ActionPause:
-		return "pause"
-	case ActionUnpause:
-		return "unpause"
-	case ActionRemove:
-		return "remove"
-	case ActionRemoveForce:
-		return "remove_force"
-	case ActionPrune:
-		return "prune"
-	case ActionDelete:
-		return "delete"
-	case ActionComposeDown:
-		return "compose_down"
-	case ActionComposeUp:
-		return "compose_up"
-	case ActionComposeBuild:
-		return "compose_build"
-	case ActionComposeRestart:
-		return "compose_restart"
-	case ActionComposeStop:
-		return "compose_stop"
-	case ActionComposeStart:
-		return "compose_start"
-	case ActionComposeRm:
-		return "compose_rm"
-	default:
-		return ""
-	}
-}
-
-// Title returns a capitalized, human-readable title for the action.
-func (a Action) Title() string {
-	switch a {
-	case ActionStart:
-		return "Start"
-	case ActionStop:
-		return "Stop"
-	case ActionRestart:
-		return "Restart"
-	case ActionPause:
-		return "Pause"
-	case ActionUnpause:
-		return "Unpause"
-	case ActionRemove:
-		return "Remove"
-	case ActionRemoveForce:
-		return "Force Remove"
-	case ActionPrune:
-		return "Prune"
-	case ActionDelete:
-		return "Delete"
-	case ActionComposeDown:
-		return "Compose Down"
-	case ActionComposeUp:
-		return "Compose Up"
-	case ActionComposeBuild:
-		return "Compose Build"
-	case ActionComposeRestart:
-		return "Compose Restart"
-	case ActionComposeStop:
-		return "Compose Stop"
-	case ActionComposeStart:
-		return "Compose Start"
-	case ActionComposeRm:
-		return "Compose Remove"
-	default:
-		return ""
-	}
-}
-
-// ActionState encapsulates the runtime execution state of an asynchronous action.
-type ActionState struct {
-	Running    bool
-	Action     Action
-	TargetID   string
-	TargetName string
-	Desc       string
-}
-
-// Start marks the action as running with the given parameters.
-func (s *ActionState) Start(action Action, targetID, targetName, desc string) {
-	s.Running = true
-	s.Action = action
-	s.TargetID = targetID
-	s.TargetName = targetName
-	s.Desc = desc
-}
-
-// StartPrune marks a prune action as running across all resources of this type.
-func (s *ActionState) StartPrune(desc string) {
-	s.Start(ActionPrune, TargetAll, TargetAll, desc)
-}
-
-// Finish marks the action as finished.
-func (s *ActionState) Finish() {
-	s.Running = false
-	s.Action = ActionNone
-	s.TargetID = ""
-	s.TargetName = ""
-	s.Desc = ""
-}
-
-// IsRunning returns whether an action is currently active.
-func (s ActionState) IsRunning() bool {
-	return s.Running
+// ShowConfirmMsg is sent to AppModel to display a confirmation dialog.
+type ShowConfirmMsg struct {
+	Question  string
+	Command   string
+	Style     Style
+	OnConfirm tea.Cmd
 }
 
 // ConfirmModal manages a floating confirmation dialog with command preview.
 type ConfirmModal struct {
 	Active      bool
-	Confirmed   bool // true if confirmed during the last Update
 	Question    string
 	Command     string
 	Style       Style
-	Action      Action
-	TargetID    string
-	TargetName  string
 	SelectedYes bool
+	OnConfirm   tea.Cmd
 }
 
 func NewConfirmModal() ConfirmModal {
@@ -198,211 +45,23 @@ func NewConfirmModal() ConfirmModal {
 	}
 }
 
-// Show activates the confirmation dialog with full parameters.
-func (m *ConfirmModal) Show(question, command string, style Style, action Action, targetID, targetName string) {
+// Show activates the confirmation dialog.
+func (m *ConfirmModal) Show(question, command string, style Style, onConfirm tea.Cmd) {
 	m.Active = true
-	m.Confirmed = false
 	m.Question = question
 	m.Command = command
 	m.Style = style
-	m.Action = action
-	m.TargetID = targetID
-	m.TargetName = targetName
 	m.SelectedYes = true
-}
-
-// ShowContainerAction formats and shows a container lifecycle confirmation dialog.
-func (m *ConfirmModal) ShowContainerAction(action Action, id, name string) {
-	var question, command string
-	switch action {
-	case ActionStart:
-		question = fmt.Sprintf("Are you sure you want to start \"%s\"?", name)
-		command = fmt.Sprintf("docker start %s", name)
-	case ActionStop:
-		question = fmt.Sprintf("Are you sure you want to stop \"%s\"?", name)
-		command = fmt.Sprintf("docker stop %s", name)
-	case ActionPause:
-		question = fmt.Sprintf("Are you sure you want to pause \"%s\"?", name)
-		command = fmt.Sprintf("docker pause %s", name)
-	case ActionUnpause:
-		question = fmt.Sprintf("Are you sure you want to unpause \"%s\"?", name)
-		command = fmt.Sprintf("docker unpause %s", name)
-	case ActionRestart:
-		question = fmt.Sprintf("Are you sure you want to restart \"%s\"?", name)
-		command = fmt.Sprintf("docker restart %s", name)
-	case ActionRemove:
-		question = fmt.Sprintf("Are you sure you want to remove container \"%s\"?", name)
-		command = fmt.Sprintf("docker rm %s", name)
-	case ActionRemoveForce:
-		question = fmt.Sprintf("Container is running! Force remove \"%s\"?", name)
-		command = fmt.Sprintf("docker rm -f %s", name)
-	case ActionPrune:
-		m.ShowContainerPrune()
-		return
-	}
-	m.Show(question, command, action.Style(), action, id, name)
-}
-
-// ShowContainerPrune displays the confirmation dialog for pruning stopped containers.
-func (m *ConfirmModal) ShowContainerPrune() {
-	m.Show(
-		"Are you sure you want to remove all stopped containers?",
-		"docker container prune -f",
-		StyleWarning,
-		ActionPrune,
-		TargetAll,
-		"all stopped containers",
-	)
-}
-
-// ShowComposeAction formats and shows a Docker Compose lifecycle confirmation dialog.
-func (m *ConfirmModal) ShowComposeAction(action Action, targetKey, projectName, serviceName string) {
-	var question, command string
-	displayName := projectName
-	if serviceName != "" {
-		displayName = fmt.Sprintf("%s/%s", projectName, serviceName)
-	}
-	if targetKey == "" {
-		targetKey = displayName
-	}
-
-	switch action {
-	case ActionComposeUp:
-		if serviceName != "" {
-			question = fmt.Sprintf("Are you sure you want to start service %q (%s)?", serviceName, projectName)
-			command = fmt.Sprintf("docker compose -p %s up -d %s", projectName, serviceName)
-		} else {
-			question = fmt.Sprintf("Are you sure you want to start compose project %q?", projectName)
-			command = fmt.Sprintf("docker compose -p %s up -d", projectName)
-		}
-	case ActionComposeBuild:
-		if serviceName != "" {
-			question = fmt.Sprintf("Are you sure you want to build and start service %q (%s)?", serviceName, projectName)
-			command = fmt.Sprintf("docker compose -p %s up -d --build %s", projectName, serviceName)
-		} else {
-			question = fmt.Sprintf("Are you sure you want to build and start compose project %q?", projectName)
-			command = fmt.Sprintf("docker compose -p %s up -d --build", projectName)
-		}
-	case ActionComposeRestart:
-		if serviceName != "" {
-			question = fmt.Sprintf("Are you sure you want to restart service %q (%s)?", serviceName, projectName)
-			command = fmt.Sprintf("docker compose -p %s restart %s", projectName, serviceName)
-		} else {
-			question = fmt.Sprintf("Are you sure you want to restart compose project %q?", projectName)
-			command = fmt.Sprintf("docker compose -p %s restart", projectName)
-		}
-	case ActionComposeStop:
-		if serviceName != "" {
-			question = fmt.Sprintf("Are you sure you want to stop service %q (%s)?", serviceName, projectName)
-			command = fmt.Sprintf("docker compose -p %s stop %s", projectName, serviceName)
-		} else {
-			question = fmt.Sprintf("Are you sure you want to stop compose project %q?", projectName)
-			command = fmt.Sprintf("docker compose -p %s stop", projectName)
-		}
-	case ActionComposeStart:
-		if serviceName != "" {
-			question = fmt.Sprintf("Are you sure you want to start service %q (%s)?", serviceName, projectName)
-			command = fmt.Sprintf("docker compose -p %s start %s", projectName, serviceName)
-		} else {
-			question = fmt.Sprintf("Are you sure you want to start compose project %q?", projectName)
-			command = fmt.Sprintf("docker compose -p %s start", projectName)
-		}
-	case ActionComposeDown:
-		question = fmt.Sprintf("Are you sure you want to run compose down for project %q?", projectName)
-		command = fmt.Sprintf("docker compose -p %s down", projectName)
-	case ActionComposeRm:
-		question = fmt.Sprintf("Are you sure you want to remove service container %q (%s)?", serviceName, projectName)
-		command = fmt.Sprintf("docker compose -p %s rm -f -s %s", projectName, serviceName)
-	}
-
-	m.Show(question, command, action.Style(), action, targetKey, displayName)
-}
-
-// ShowImageAction formats and shows an image confirmation dialog.
-func (m *ConfirmModal) ShowImageAction(action Action, id, ref string) {
-	var question, command string
-	switch action {
-	case ActionRemove:
-		question = fmt.Sprintf("Are you sure you want to remove image \"%s\"?", ref)
-		command = fmt.Sprintf("docker rmi %s", id)
-	case ActionPrune:
-		m.ShowImagePrune()
-		return
-	}
-	m.Show(question, command, action.Style(), action, id, ref)
-}
-
-// ShowImagePrune displays the confirmation dialog for pruning dangling images.
-func (m *ConfirmModal) ShowImagePrune() {
-	m.Show(
-		"Are you sure you want to remove all dangling images?",
-		"docker image prune -f",
-		StyleWarning,
-		ActionPrune,
-		TargetAll,
-		"all dangling images",
-	)
-}
-
-// ShowVolumeAction formats and shows a volume confirmation dialog.
-func (m *ConfirmModal) ShowVolumeAction(action Action, name string) {
-	var question, command string
-	switch action {
-	case ActionRemove:
-		question = fmt.Sprintf("Are you sure you want to remove volume \"%s\"?", name)
-		command = fmt.Sprintf("docker volume rm %s", name)
-	case ActionPrune:
-		m.ShowVolumePrune()
-		return
-	}
-	m.Show(question, command, action.Style(), action, name, name)
-}
-
-// ShowVolumePrune displays the confirmation dialog for pruning unused volumes.
-func (m *ConfirmModal) ShowVolumePrune() {
-	m.Show(
-		"Are you sure you want to remove all unused volumes?",
-		"docker volume prune -f",
-		StyleWarning,
-		ActionPrune,
-		TargetAll,
-		"all unused volumes",
-	)
-}
-
-// ShowNetworkAction formats and shows a network confirmation dialog.
-func (m *ConfirmModal) ShowNetworkAction(action Action, id, name string) {
-	var question, command string
-	switch action {
-	case ActionDelete, ActionRemove:
-		question = fmt.Sprintf("Are you sure you want to remove network \"%s\"?", name)
-		command = fmt.Sprintf("docker network rm %s", id)
-	case ActionPrune:
-		m.ShowNetworkPrune()
-		return
-	}
-	m.Show(question, command, action.Style(), action, id, name)
-}
-
-// ShowNetworkPrune displays the confirmation dialog for pruning unused networks.
-func (m *ConfirmModal) ShowNetworkPrune() {
-	m.Show(
-		"Are you sure you want to remove all unused networks?",
-		"docker network prune -f",
-		StyleWarning,
-		ActionPrune,
-		TargetAll,
-		"all unused networks",
-	)
+	m.OnConfirm = onConfirm
 }
 
 // Hide closes the modal.
 func (m *ConfirmModal) Hide() {
 	m.Active = false
-	m.Confirmed = false
+	m.OnConfirm = nil
 }
 
-// Init returns initial command for the modal (standard Charm Bubble Tea interface).
+// Init returns initial command for the modal.
 func (m ConfirmModal) Init() tea.Cmd {
 	return nil
 }
@@ -413,20 +72,18 @@ func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, tea.Cmd) {
 		return m, nil
 	}
 
-	m.Confirmed = false
 	km := keys.ConfirmModalKeys
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, km.Yes):
-			m.Active = false
-			m.Confirmed = true
-			return m, nil
+			cmd := m.OnConfirm
+			m.Hide()
+			return m, cmd
 
 		case key.Matches(msg, km.No):
-			m.Active = false
-			m.Confirmed = false
+			m.Hide()
 			return m, nil
 
 		case key.Matches(msg, km.Switch):
@@ -434,8 +91,12 @@ func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, km.Enter):
-			m.Active = false
-			m.Confirmed = m.SelectedYes
+			if m.SelectedYes {
+				cmd := m.OnConfirm
+				m.Hide()
+				return m, cmd
+			}
+			m.Hide()
 			return m, nil
 		}
 	}
@@ -443,7 +104,7 @@ func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, tea.Cmd) {
 	return m, nil
 }
 
-// View builds the clean, minimalist styled modal dialog string (standard Charm Bubble Tea interface).
+// View builds the clean, minimalist styled modal dialog string.
 func (m ConfirmModal) View() string {
 	boxWidth := 52
 	innerWidth := boxWidth - 6 // 52 - 2(borders) - 4(paddings) = 46 exact content space
@@ -464,7 +125,7 @@ func (m ConfirmModal) View() string {
 	sb.WriteString(lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(m.Question))
 	sb.WriteString("\n\n")
 
-	// 2. Command Preview Box (crisp, transparent, rendered only if command is provided)
+	// 2. Command Preview Box (rendered only if command is provided)
 	if m.Command != "" {
 		cmdContent := theme.Current.MutedText.Render("$ ") + theme.Current.AccentText.Bold(true).Render(m.Command)
 		cmdBox := lipgloss.NewStyle().
@@ -515,7 +176,7 @@ func (m ConfirmModal) View() string {
 	hintText := "y: Yes  •  n/Esc: No  •  Tab: Switch"
 	sb.WriteString(lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Foreground(theme.Current.Palette.TextDark).Render(hintText))
 
-	// Outer Dialog Box (clean border, transparent background without murky tint)
+	// Outer Dialog Box
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).

@@ -8,7 +8,6 @@ import (
 	mobyimage "github.com/moby/moby/api/types/image"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -26,11 +25,8 @@ func TestNew(t *testing.T) {
 	if m.focusZone != FocusImagesList {
 		t.Errorf("focusZone = %v, want FocusImagesList", m.focusZone)
 	}
-	if m.IsModalActive() {
-		t.Error("New model should have inactive modal")
-	}
-	if m.IsActionRunning() {
-		t.Error("New model should not have running action")
+	if m.IsLoading() {
+		t.Error("New model should not be loading")
 	}
 }
 
@@ -125,29 +121,16 @@ func TestModel_FilterImages(t *testing.T) {
 	}
 }
 
-func TestModel_IsModalActive(t *testing.T) {
+func TestModel_IsLoading(t *testing.T) {
 	mockCli := &mocks.MockImageService{}
 	m := New(mockCli)
-	if m.IsModalActive() {
-		t.Error("IsModalActive should be false initially")
+	if m.IsLoading() {
+		t.Error("IsLoading should be false initially")
 	}
 
-	m.confirmModal.ShowImageAction(modal.ActionRemove, "img-1", "alpine:latest")
-	if !m.IsModalActive() {
-		t.Error("IsModalActive should be true when modal is shown")
-	}
-}
-
-func TestModel_IsActionRunning(t *testing.T) {
-	mockCli := &mocks.MockImageService{}
-	m := New(mockCli)
-	if m.IsActionRunning() {
-		t.Error("IsActionRunning should be false initially")
-	}
-
-	m.action.Start(modal.ActionRemove, "img-1", "alpine:latest", "Removing image")
-	if !m.IsActionRunning() {
-		t.Error("IsActionRunning should be true after action.Start")
+	m.runningIDs["img-1"] = true
+	if !m.IsLoading() {
+		t.Error("IsLoading should be true when runningIDs is set")
 	}
 }
 

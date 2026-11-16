@@ -182,7 +182,7 @@ func (s *StatsPane) Reset() {
 	s.blockWrite = 0
 }
 
-func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, actionLoading, actionType, spinnerView string) string {
+func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, isRunning bool, spinnerView string) string {
 	if selected == nil {
 		return theme.Current.MutedText.Padding(2).Render("No container selected.")
 	}
@@ -190,18 +190,9 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, act
 	var b strings.Builder
 
 	var statusBadge string
-	switch actionType {
-	case "restart":
-		statusBadge = theme.Current.StatusPaused.Render(spinnerView + " RESTARTS")
-	case "stop":
-		statusBadge = theme.Current.StatusStopped.Render(spinnerView + " STOPPING")
-	case "start":
-		statusBadge = theme.Current.StatusRunning.Render(spinnerView + " STARTING")
-	case "pause":
-		statusBadge = theme.Current.StatusPaused.Render(spinnerView + " PAUSING")
-	case "unpause":
-		statusBadge = theme.Current.StatusRunning.Render(spinnerView + " RESUMING")
-	default:
+	if isRunning {
+		statusBadge = theme.Current.StatusRunning.Render(spinnerView + " BUSY")
+	} else {
 		statusBadge = RenderStatusBadge(string(selected.State))
 	}
 
@@ -418,9 +409,9 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, act
 	b.WriteString("\n")
 
 	// Status feedback when action is executing
-	if actionLoading != "" {
+	if isRunning {
 		b.WriteString(labelStyle.Render("Status:  "))
-		b.WriteString(actionLoading)
+		b.WriteString(theme.Current.ActionLoading.Render(spinnerView + " BUSY"))
 		b.WriteString("\n")
 	}
 
