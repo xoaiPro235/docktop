@@ -101,7 +101,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.runningIDs == nil {
 			m.runningIDs = make(map[string]bool)
 		}
+		// Reject if this target already has an action running
 		if m.runningIDs[msg.TargetID] {
+			return m, nil
+		}
+		// Reject prune if any individual container action is currently running
+		if msg.TargetID == ActionTargetAll && len(m.runningIDs) > 0 {
+			return m, nil
+		}
+		// Reject individual container action if prune is currently running
+		if msg.TargetID != ActionTargetAll && m.runningIDs[ActionTargetAll] {
 			return m, nil
 		}
 		wasEmpty := len(m.runningIDs) == 0
@@ -679,7 +688,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Prune):
-				if !m.isContainerActionRunning(ActionTargetAll) {
+				// Only permit prune when no container action is currently running
+				if !m.IsActionRunning() {
 					return m, func() tea.Msg {
 						return modal.ShowConfirmMsg{
 							Question: "Are you sure you want to remove all stopped containers?",

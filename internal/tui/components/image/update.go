@@ -21,7 +21,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.runningIDs == nil {
 			m.runningIDs = make(map[string]bool)
 		}
+		// Reject if this target already has an action running
 		if m.runningIDs[msg.TargetID] {
+			return m, nil
+		}
+		// Reject prune if any individual image action is currently running
+		if msg.TargetID == ActionTargetAll && len(m.runningIDs) > 0 {
+			return m, nil
+		}
+		// Reject individual image action if prune is currently running
+		if msg.TargetID != ActionTargetAll && m.runningIDs[ActionTargetAll] {
 			return m, nil
 		}
 		wasEmpty := len(m.runningIDs) == 0
@@ -157,7 +166,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, keys.ImageKeys.Prune):
-			if !m.isImageActionRunning(ActionTargetAll) {
+			// Only permit prune when no image action is currently running
+			if !m.IsLoading() {
 				return m, func() tea.Msg {
 					return modal.ShowConfirmMsg{
 						Question: "Are you sure you want to remove all dangling images?",

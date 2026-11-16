@@ -221,9 +221,27 @@ func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
 		t.Fatal("first RunCmdMsg should return a command")
 	}
 
+	// 1. Duplicate exact target
 	_, cmd = m.Update(RunCmdMsg{TargetID: "c1", Cmd: dummyCmd})
 	if cmd != nil {
 		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
+	}
+
+	// 2. Prune while c1 is running should be rejected
+	_, cmd = m.Update(RunCmdMsg{TargetID: ActionTargetAll, Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("RunCmdMsg prune while c1 is running should return nil cmd, got %v", cmd)
+	}
+
+	// 3. Individual action while Prune is running should be rejected
+	m2 := New(&mocks.MockContainerService{})
+	m2, cmd = m2.Update(RunCmdMsg{TargetID: ActionTargetAll, Cmd: dummyCmd})
+	if cmd == nil {
+		t.Fatal("first prune RunCmdMsg should return a command")
+	}
+	_, cmd = m2.Update(RunCmdMsg{TargetID: "c1", Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("RunCmdMsg c1 while Prune is running should return nil cmd, got %v", cmd)
 	}
 }
 
@@ -264,5 +282,9 @@ func TestModel_ActionsBlockedWhilePruningOrRunning(t *testing.T) {
 	_, cmd = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd != nil {
 		t.Errorf("expected start key to be blocked while container action is running, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'P', Text: "P"})
+	if cmd != nil {
+		t.Errorf("expected prune key to be blocked while container c1 is running, got %v", cmd)
 	}
 }
