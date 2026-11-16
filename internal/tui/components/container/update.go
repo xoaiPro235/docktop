@@ -570,7 +570,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Start):
-				if selectedContainer != nil {
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) {
 					c := selectedContainer
 					if c.State == docker.StateRunning || c.State == docker.StatePaused {
 						return m, func() tea.Msg {
@@ -603,7 +603,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Pause):
-				if selectedContainer != nil {
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) {
 					c := selectedContainer
 					if c.State == docker.StatePaused {
 						return m, func() tea.Msg {
@@ -636,7 +636,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Restart):
-				if selectedContainer != nil {
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) {
 					c := selectedContainer
 					return m, func() tea.Msg {
 						return modal.ShowConfirmMsg{
@@ -654,7 +654,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Remove):
-				if selectedContainer != nil {
+				if selectedContainer != nil && !m.isContainerActionRunning(selectedContainer.ID) {
 					c := selectedContainer
 					force := c.State == docker.StateRunning || c.State == docker.StatePaused
 					q := fmt.Sprintf("Are you sure you want to remove %q?", c.Name)
@@ -679,17 +679,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.ContainerKeys.Prune):
-				return m, func() tea.Msg {
-					return modal.ShowConfirmMsg{
-						Question: "Are you sure you want to remove all stopped containers?",
-						Command:  "docker container prune -f",
-						Style:    modal.StyleWarning,
-						OnConfirm: func() tea.Msg {
-							return RunCmdMsg{
-								TargetID: ActionTargetAll,
-								Cmd:      m.pruneContainersCmd(),
-							}
-						},
+				if !m.isContainerActionRunning(ActionTargetAll) {
+					return m, func() tea.Msg {
+						return modal.ShowConfirmMsg{
+							Question: "Are you sure you want to remove all stopped containers?",
+							Command:  "docker container prune -f",
+							Style:    modal.StyleWarning,
+							OnConfirm: func() tea.Msg {
+								return RunCmdMsg{
+									TargetID: ActionTargetAll,
+									Cmd:      m.pruneContainersCmd(),
+								}
+							},
+						}
 					}
 				}
 

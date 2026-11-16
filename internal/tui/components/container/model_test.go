@@ -226,3 +226,43 @@ func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
 		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
 	}
 }
+
+func TestModel_ActionsBlockedWhilePruningOrRunning(t *testing.T) {
+	mockCli := &mocks.MockContainerService{
+		StreamContainerStatsFunc: func(ctx context.Context, id string) <-chan docker.ContainerMetrics {
+			return make(chan docker.ContainerMetrics)
+		},
+	}
+	m := New(mockCli)
+	m.SetContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "app1", State: docker.StateRunning},
+	})
+	m.focusZone = FocusLeftTree
+
+	// 1. When ActionTargetAll is running (pruning)
+	m.runningIDs[ActionTargetAll] = true
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	if cmd != nil {
+		t.Errorf("expected start key to be blocked while pruning, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	if cmd != nil {
+		t.Errorf("expected restart key to be blocked while pruning, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	if cmd != nil {
+		t.Errorf("expected remove key to be blocked while pruning, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'P', Text: "P"})
+	if cmd != nil {
+		t.Errorf("expected prune key to be blocked while pruning, got %v", cmd)
+	}
+
+	// 2. When container itself is running an action
+	delete(m.runningIDs, ActionTargetAll)
+	m.runningIDs["c1"] = true
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	if cmd != nil {
+		t.Errorf("expected start key to be blocked while container action is running, got %v", cmd)
+	}
+}
