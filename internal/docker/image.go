@@ -38,10 +38,6 @@ type ImageLayer struct {
 // CleanLayerCommand returns a single-line, Dockerfile-like instruction
 // from a history CreatedBy string.
 func CleanLayerCommand(cmd string) string {
-	return strings.Join(strings.Fields(cleanLayerCommand(cmd)), " ")
-}
-
-func cleanLayerCommand(cmd string) string {
 	cmd = strings.TrimSpace(cmd)
 	if cmd == "" {
 		return "<missing>"
@@ -63,7 +59,7 @@ func cleanLayerCommand(cmd string) string {
 		return cmd
 	}
 
-	return cmd
+	return strings.Join(strings.Fields(cmd), " ") 
 }
 
 // FormatTimeAgo formats a time into a relative "X ago" string.
