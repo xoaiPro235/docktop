@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/moby/moby/api/types/container"
 	"github.com/xoaiPro235/docktop/internal/docker"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
 type PollTopMsg struct {
@@ -51,23 +50,18 @@ type AttachFinishedMsg struct {
 
 type ContainerActionMsg struct {
 	ContainerID string
-	Action      modal.Action
 	Err         error
 }
 
 // ComposeActionMsg indicates the completion of an asynchronous compose operation.
 type ComposeActionMsg struct {
-	TargetKey  string
-	TargetName string
-	Action     string
-	Err        error
+	TargetKey string
+	Err       error
 }
 
-// ExecuteActionMsg triggers an asynchronous container lifecycle action.
-type ExecuteActionMsg struct {
-	Action     modal.Action
-	TargetID   string
-	TargetName string
+type RunCmdMsg struct {
+	TargetID string
+	Cmd      tea.Cmd
 }
 
 // pollTopAfter schedules a PollTopMsg after duration d
@@ -116,7 +110,7 @@ func (m Model) startContainerCmd(id string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err := m.dockerClient.StartContainer(ctx, id)
-		return ContainerActionMsg{ContainerID: id, Action: modal.ActionStart, Err: err}
+		return ContainerActionMsg{ContainerID: id, Err: err}
 	}
 }
 
@@ -125,7 +119,7 @@ func (m Model) stopContainerCmd(id string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		err := m.dockerClient.StopContainer(ctx, id)
-		return ContainerActionMsg{ContainerID: id, Action: modal.ActionStop, Err: err}
+		return ContainerActionMsg{ContainerID: id, Err: err}
 	}
 }
 
@@ -134,7 +128,7 @@ func (m Model) restartContainerCmd(id string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		err := m.dockerClient.RestartContainer(ctx, id)
-		return ContainerActionMsg{ContainerID: id, Action: modal.ActionRestart, Err: err}
+		return ContainerActionMsg{ContainerID: id, Err: err}
 	}
 }
 
@@ -143,7 +137,7 @@ func (m Model) pauseContainerCmd(id string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err := m.dockerClient.PauseContainer(ctx, id)
-		return ContainerActionMsg{ContainerID: id, Action: modal.ActionPause, Err: err}
+		return ContainerActionMsg{ContainerID: id, Err: err}
 	}
 }
 
@@ -152,7 +146,7 @@ func (m Model) unpauseContainerCmd(id string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err := m.dockerClient.UnpauseContainer(ctx, id)
-		return ContainerActionMsg{ContainerID: id, Action: modal.ActionUnpause, Err: err}
+		return ContainerActionMsg{ContainerID: id, Err: err}
 	}
 }
 
@@ -163,11 +157,7 @@ func (m Model) removeContainerCmd(id string, force bool) tea.Cmd {
 		err := m.dockerClient.RemoveContainer(ctx, id, docker.RemoveContainerOpts{
 			Force: force,
 		})
-		action := modal.ActionRemove
-		if force {
-			action = modal.ActionRemoveForce
-		}
-		return ContainerActionMsg{ContainerID: id, Action: action, Err: err}
+		return ContainerActionMsg{ContainerID: id, Err: err}
 	}
 }
 
@@ -176,7 +166,7 @@ func (m Model) pruneContainersCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		_, err := m.dockerClient.PruneContainers(ctx)
-		return ContainerActionMsg{ContainerID: "", Action: modal.ActionPrune, Err: err}
+		return ContainerActionMsg{ContainerID: ActionTargetAll, Err: err}
 	}
 }
 
@@ -285,13 +275,11 @@ func WaitForNextStat(sub <-chan docker.ContainerMetrics, containerID string) tea
 	}
 }
 
-func runComposeExec(cmd *exec.Cmd, targetKey, targetName, action string, err error) ComposeActionMsg {
+func runComposeExec(cmd *exec.Cmd, targetKey string, err error) ComposeActionMsg {
 	if err != nil {
 		return ComposeActionMsg{
-			TargetKey:  targetKey,
-			TargetName: targetName,
-			Action:     action,
-			Err:        err,
+			TargetKey: targetKey,
+			Err:       err,
 		}
 	}
 
@@ -304,72 +292,70 @@ func runComposeExec(cmd *exec.Cmd, targetKey, targetName, action string, err err
 	}
 
 	return ComposeActionMsg{
-		TargetKey:  targetKey,
-		TargetName: targetName,
-		Action:     action,
-		Err:        err,
+		TargetKey: targetKey,
+		Err:       err,
 	}
 }
 
-func (m Model) composeUpCmd(targetKey, targetName string, opts docker.ComposeOpts) tea.Cmd {
+func (m Model) composeUpCmd(targetKey string, opts docker.ComposeOpts) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cmd, err := m.dockerClient.ComposeUpCmd(ctx, opts)
-		return runComposeExec(cmd, targetKey, targetName, "Up", err)
+		return runComposeExec(cmd, targetKey, err)
 	}
 }
 
-func (m Model) composeBuildCmd(targetKey, targetName string, opts docker.ComposeOpts) tea.Cmd {
+func (m Model) composeBuildCmd(targetKey string, opts docker.ComposeOpts) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cmd, err := m.dockerClient.ComposeBuildCmd(ctx, opts)
-		return runComposeExec(cmd, targetKey, targetName, "Build", err)
+		return runComposeExec(cmd, targetKey, err)
 	}
 }
 
-func (m Model) composeDownCmd(targetKey, targetName string, opts docker.ComposeOpts) tea.Cmd {
+func (m Model) composeDownCmd(targetKey string, opts docker.ComposeOpts) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cmd, err := m.dockerClient.ComposeDownCmd(ctx, opts)
-		return runComposeExec(cmd, targetKey, targetName, "Down", err)
+		return runComposeExec(cmd, targetKey, err)
 	}
 }
 
-func (m Model) composeRestartCmd(targetKey, targetName string, opts docker.ComposeOpts) tea.Cmd {
+func (m Model) composeRestartCmd(targetKey string, opts docker.ComposeOpts) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cmd, err := m.dockerClient.ComposeRestartCmd(ctx, opts)
-		return runComposeExec(cmd, targetKey, targetName, "Restart", err)
+		return runComposeExec(cmd, targetKey, err)
 	}
 }
 
-func (m Model) composeStopCmd(targetKey, targetName string, opts docker.ComposeOpts) tea.Cmd {
+func (m Model) composeStopCmd(targetKey string, opts docker.ComposeOpts) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cmd, err := m.dockerClient.ComposeStopCmd(ctx, opts)
-		return runComposeExec(cmd, targetKey, targetName, "Stop", err)
+		return runComposeExec(cmd, targetKey, err)
 	}
 }
 
-func (m Model) composeStartCmd(targetKey, targetName string, opts docker.ComposeOpts) tea.Cmd {
+func (m Model) composeStartCmd(targetKey string, opts docker.ComposeOpts) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cmd, err := m.dockerClient.ComposeStartCmd(ctx, opts)
-		return runComposeExec(cmd, targetKey, targetName, "Start", err)
+		return runComposeExec(cmd, targetKey, err)
 	}
 }
 
-func (m Model) composeRmCmd(targetKey, targetName string, opts docker.ComposeOpts) tea.Cmd {
+func (m Model) composeRmCmd(targetKey string, opts docker.ComposeOpts) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cmd, err := m.dockerClient.ComposeRmCmd(ctx, opts)
-		return runComposeExec(cmd, targetKey, targetName, "Remove", err)
+		return runComposeExec(cmd, targetKey, err)
 	}
 }

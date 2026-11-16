@@ -10,7 +10,6 @@ import (
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/layout"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -20,6 +19,8 @@ const (
 	FocusImagesList FocusZone = iota
 	FocusLayersPane
 )
+
+const ActionTargetAll = "*"
 
 type Model struct {
 	dockerClient    docker.ImageService
@@ -34,9 +35,8 @@ type Model struct {
 	viewportReady  bool
 	activeImageID  string
 
-	confirmModal modal.ConfirmModal
-	spinner      spinner.Model
-	action       modal.ActionState
+	spinner    spinner.Model
+	runningIDs map[string]bool
 
 	width  int
 	height int
@@ -51,8 +51,8 @@ func New(cli docker.ImageService) Model {
 	m := Model{
 		dockerClient: cli,
 		focusZone:    FocusImagesList,
-		confirmModal: modal.NewConfirmModal(),
 		spinner:      sp,
+		runningIDs:   make(map[string]bool),
 		searchBar:    searchbar.New("Filter images..."),
 	}
 	m.applyFilter()
@@ -138,16 +138,27 @@ func (m *Model) SetImages(images []docker.ImageInfo) tea.Cmd {
 	return nil
 }
 
-func (m *Model) IsModalActive() bool {
-	return m.confirmModal.Active
-}
-
 func (m *Model) IsSearching() bool {
 	return m.searchBar.IsActive()
 }
 
-func (m *Model) IsActionRunning() bool {
-	return m.action.IsRunning()
+func (m *Model) IsLoading() bool {
+	return len(m.runningIDs) > 0
+}
+
+func (m *Model) isImageActionRunning(id string) bool {
+	if m.runningIDs == nil {
+		return false
+	}
+	return m.runningIDs[id] || m.runningIDs[ActionTargetAll]
+}
+
+func (m Model) IsPruning() bool {
+	return m.runningIDs != nil && m.runningIDs[ActionTargetAll]
+}
+
+func (m Model) SpinnerView() string {
+	return m.spinner.View()
 }
 
 func (m *Model) SelectedImage() *docker.ImageInfo {

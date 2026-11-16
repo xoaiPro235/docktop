@@ -17,15 +17,41 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case ImageActionMsg:
-		m.action.Finish()
+	case RunCmdMsg:
+		if m.runningIDs == nil {
+			m.runningIDs = make(map[string]bool)
+		}
+		// Reject if this target already has an action running
+		if m.runningIDs[msg.TargetID] {
+			return m, nil
+		}
+		// Reject prune if any individual image action is currently running
+		if msg.TargetID == ActionTargetAll && len(m.runningIDs) > 0 {
+			return m, nil
+		}
+		// Reject individual image action if prune is currently running
+		if msg.TargetID != ActionTargetAll && m.runningIDs[ActionTargetAll] {
+			return m, nil
+		}
+		wasEmpty := len(m.runningIDs) == 0
+		m.runningIDs[msg.TargetID] = true
+		if wasEmpty {
+			cmds = append(cmds, m.spinner.Tick)
+		}
+		cmds = append(cmds, msg.Cmd)
+		return m, tea.Batch(cmds...)
+
+	case ImageResultMsg:
+		delete(m.runningIDs, msg.TargetID)
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.action.IsRunning() {
+		if len(m.runningIDs) > 0 {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
-			cmds = append(cmds, cmd)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 
 	case ImageDetailsMsg:
@@ -46,23 +72,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.KeyPressMsg:
-		if m.confirmModal.Active {
-			m.confirmModal, _ = m.confirmModal.Update(msg)
-			if m.confirmModal.Confirmed {
-				action := m.confirmModal.Action
-				targetID := m.confirmModal.TargetID
-				switch action {
-				case modal.ActionRemove:
-					m.action.Start(action, targetID, "", fmt.Sprintf("%s image...", action.Title()))
-					return m, tea.Batch(m.removeImageCmd(targetID), m.spinner.Tick)
-				case modal.ActionPrune:
-					m.action.StartPrune("Pruning dangling images...")
-					return m, tea.Batch(m.pruneImagesCmd(), m.spinner.Tick)
-				}
-			}
-			return m, nil
-		}
-
 		if m.searchBar.IsActive() {
 			var cmd tea.Cmd
 			var evt searchbar.Event
@@ -76,7 +85,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 		switch {
-		case m.focusZone == FocusImagesList && !m.action.IsRunning() && key.Matches(msg, keys.SearchBarKeys.Activate):
+		case m.focusZone == FocusImagesList && !m.IsLoading() && key.Matches(msg, keys.SearchBarKeys.Activate):
 			cmd := m.searchBar.Activate()
 			return m, cmd
 
@@ -138,19 +147,37 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.ImageKeys.Remove):
 			selected := m.SelectedImage()
-			if selected != nil && !m.action.IsRunning() {
+			if selected != nil && !m.isImageActionRunning(selected.ID) {
 				targetDisplay := selected.Tag
 				if targetDisplay == "<none>:<none>" {
 					targetDisplay = docker.CleanImageID(selected.ID)
 				}
-				m.confirmModal.ShowImageAction(modal.ActionRemove, selected.ID, targetDisplay)
-				return m, nil
+				targetID := selected.ID
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: fmt.Sprintf("Are you sure you want to remove image %q?", targetDisplay),
+						Command:  fmt.Sprintf("docker rmi %s", targetID),
+						Style:    modal.StyleDanger,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{TargetID: targetID, Cmd: m.removeImageCmd(targetID)}
+						},
+					}
+				}
 			}
 
 		case key.Matches(msg, keys.ImageKeys.Prune):
-			if !m.action.IsRunning() {
-				m.confirmModal.ShowImagePrune()
-				return m, nil
+			// Only permit prune when no image action is currently running
+			if !m.IsLoading() {
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: "Are you sure you want to remove all dangling images?",
+						Command:  "docker image prune -f",
+						Style:    modal.StyleWarning,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{TargetID: ActionTargetAll, Cmd: m.pruneImagesCmd()}
+						},
+					}
+				}
 			}
 
 		default:
@@ -162,9 +189,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseClickMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
 		leftWidth := (m.width * 52) / 100
 		if msg.X < leftWidth {
 			m.focusZone = FocusImagesList
@@ -185,9 +209,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseWheelMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
 		if m.focusZone == FocusImagesList {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
 				m.cursorIndex--

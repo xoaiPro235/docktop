@@ -9,7 +9,6 @@ import (
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/layout"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -37,7 +36,7 @@ const (
 )
 
 // ActionTargetAll represents the special target identifier when pruning all stopped containers.
-const ActionTargetAll = modal.TargetAll
+const ActionTargetAll = "*"
 
 type Model struct {
 	dockerClient docker.ContainerService
@@ -67,19 +66,11 @@ type Model struct {
 	inspectPane InspectPane
 	composePane ComposePane
 
-	confirmModal   modal.ConfirmModal
-	spinner        spinner.Model
-	runningActions map[string]RunningAction
+	spinner    spinner.Model
+	runningIDs map[string]bool
 
 	width  int
 	height int
-}
-
-// RunningAction describes an ongoing asynchronous Docker operation on a container.
-type RunningAction struct {
-	Action      modal.Action
-	TargetName  string
-	Description string
 }
 
 func New(cli docker.ContainerService) Model {
@@ -89,19 +80,18 @@ func New(cli docker.ContainerService) Model {
 	)
 
 	return Model{
-		dockerClient:   cli,
-		expandedState:  make(map[string]bool),
-		runningActions: make(map[string]RunningAction),
-		focusZone:      FocusLeftTree,
-		activePane:     SubPaneStats,
-		statsPane:      NewStatsPane(),
-		logsPane:       NewLogsPane(),
-		topPane:        NewTopPane(),
-		inspectPane:    NewInspectPane(),
-		composePane:    NewComposePane(),
-		confirmModal:   modal.NewConfirmModal(),
-		spinner:        sp,
-		searchBar:      searchbar.New("Filter containers..."),
+		dockerClient:  cli,
+		expandedState: make(map[string]bool),
+		runningIDs:    make(map[string]bool),
+		focusZone:     FocusLeftTree,
+		activePane:    SubPaneStats,
+		statsPane:     NewStatsPane(),
+		logsPane:      NewLogsPane(),
+		topPane:       NewTopPane(),
+		inspectPane:   NewInspectPane(),
+		composePane:   NewComposePane(),
+		spinner:       sp,
+		searchBar:     searchbar.New("Filter containers..."),
 	}
 }
 
@@ -236,20 +226,23 @@ func (m *Model) Resume() tea.Cmd {
 	return m.syncActivePane()
 }
 
-func (m *Model) IsModalActive() bool {
-	return m.confirmModal.Active
-}
-
 func (m *Model) isContainerActionRunning(id string) bool {
-	if m.runningActions == nil {
+	if m.runningIDs == nil {
 		return false
 	}
-	_, ok := m.runningActions[id]
-	return ok
+	return m.runningIDs[id] || m.runningIDs[ActionTargetAll]
 }
 
 func (m *Model) IsActionRunning() bool {
-	return len(m.runningActions) > 0
+	return len(m.runningIDs) > 0
+}
+
+func (m Model) IsPruning() bool {
+	return m.runningIDs != nil && m.runningIDs[ActionTargetAll]
+}
+
+func (m Model) SpinnerView() string {
+	return m.spinner.View()
 }
 
 func (m *Model) SetSize(w, h int) {

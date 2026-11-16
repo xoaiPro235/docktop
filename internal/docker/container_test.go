@@ -1,43 +1,12 @@
 package docker
 
 import (
-	"errors"
 	"os/exec"
 	"reflect"
 	"testing"
 
 	"github.com/moby/moby/api/types/container"
 )
-
-type mockStatusCodeError struct {
-	code int
-	msg  string
-}
-
-func (m mockStatusCodeError) Error() string   { return m.msg }
-func (m mockStatusCodeError) StatusCode() int { return m.code }
-
-func Test_isConflictError(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"nil error", nil, false},
-		{"status code 409 error", mockStatusCodeError{code: 409, msg: "conflict"}, true},
-		{"status code 500 error", mockStatusCodeError{code: 500, msg: "server error"}, false},
-		{"container is running string", errors.New("container is running, cannot remove"), true},
-		{"conflict string", errors.New("conflict: name already in use"), true},
-		{"unrelated error", errors.New("connection reset by peer"), false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isConflictError(tt.err); got != tt.want {
-				t.Errorf("isConflictError() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 
 func TestShortID(t *testing.T) {
 	tests := []struct {

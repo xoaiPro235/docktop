@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -27,9 +26,6 @@ func TestNew(t *testing.T) {
 	}
 	if m.activePane != SubPaneStats {
 		t.Errorf("activePane = %v, want SubPaneStats", m.activePane)
-	}
-	if m.IsModalActive() {
-		t.Error("New model should have inactive modal")
 	}
 }
 
@@ -148,19 +144,6 @@ func TestModel_PauseAndResume(t *testing.T) {
 	m.Resume()
 }
 
-func TestModel_IsModalActive(t *testing.T) {
-	mockCli := &mocks.MockContainerService{}
-	m := New(mockCli)
-	if m.IsModalActive() {
-		t.Error("IsModalActive() should be false initially")
-	}
-
-	m.confirmModal.ShowContainerAction(modal.ActionRestart, "c1", "web")
-	if !m.IsModalActive() {
-		t.Error("IsModalActive() should be true when modal is shown")
-	}
-}
-
 func TestModel_ActionsRunning(t *testing.T) {
 	mockCli := &mocks.MockContainerService{}
 	m := New(mockCli)
@@ -172,9 +155,9 @@ func TestModel_ActionsRunning(t *testing.T) {
 		t.Error("isContainerActionRunning(c1) should be false initially")
 	}
 
-	m.runningActions["c1"] = RunningAction{Action: modal.ActionStop, TargetName: "web"}
+	m.runningIDs["c1"] = true
 	if !m.IsActionRunning() {
-		t.Error("IsActionRunning() should be true when runningActions has items")
+		t.Error("IsActionRunning() should be true when runningIDs has items")
 	}
 	if !m.isContainerActionRunning("c1") {
 		t.Error("isContainerActionRunning(c1) should be true")
@@ -225,5 +208,83 @@ func TestModel_Streams(t *testing.T) {
 	m.stopLogStream()
 	if m.logCancel != nil {
 		t.Error("logCancel should be nil after stopLogStream")
+	}
+}
+
+func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
+	m := New(&mocks.MockContainerService{})
+	dummyCmd := func() tea.Msg { return nil }
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(RunCmdMsg{TargetID: "c1", Cmd: dummyCmd})
+	if cmd == nil {
+		t.Fatal("first RunCmdMsg should return a command")
+	}
+
+	// 1. Duplicate exact target
+	_, cmd = m.Update(RunCmdMsg{TargetID: "c1", Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
+	}
+
+	// 2. Prune while c1 is running should be rejected
+	_, cmd = m.Update(RunCmdMsg{TargetID: ActionTargetAll, Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("RunCmdMsg prune while c1 is running should return nil cmd, got %v", cmd)
+	}
+
+	// 3. Individual action while Prune is running should be rejected
+	m2 := New(&mocks.MockContainerService{})
+	m2, cmd = m2.Update(RunCmdMsg{TargetID: ActionTargetAll, Cmd: dummyCmd})
+	if cmd == nil {
+		t.Fatal("first prune RunCmdMsg should return a command")
+	}
+	_, cmd = m2.Update(RunCmdMsg{TargetID: "c1", Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("RunCmdMsg c1 while Prune is running should return nil cmd, got %v", cmd)
+	}
+}
+
+func TestModel_ActionsBlockedWhilePruningOrRunning(t *testing.T) {
+	mockCli := &mocks.MockContainerService{
+		StreamContainerStatsFunc: func(ctx context.Context, id string) <-chan docker.ContainerMetrics {
+			return make(chan docker.ContainerMetrics)
+		},
+	}
+	m := New(mockCli)
+	m.SetContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "app1", State: docker.StateRunning},
+	})
+	m.focusZone = FocusLeftTree
+
+	// 1. When ActionTargetAll is running (pruning)
+	m.runningIDs[ActionTargetAll] = true
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	if cmd != nil {
+		t.Errorf("expected start key to be blocked while pruning, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	if cmd != nil {
+		t.Errorf("expected restart key to be blocked while pruning, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	if cmd != nil {
+		t.Errorf("expected remove key to be blocked while pruning, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'P', Text: "P"})
+	if cmd != nil {
+		t.Errorf("expected prune key to be blocked while pruning, got %v", cmd)
+	}
+
+	// 2. When container itself is running an action
+	delete(m.runningIDs, ActionTargetAll)
+	m.runningIDs["c1"] = true
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	if cmd != nil {
+		t.Errorf("expected start key to be blocked while container action is running, got %v", cmd)
+	}
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'P', Text: "P"})
+	if cmd != nil {
+		t.Errorf("expected prune key to be blocked while container c1 is running, got %v", cmd)
 	}
 }

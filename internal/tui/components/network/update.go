@@ -16,36 +16,44 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case NetworkActionMsg:
-		m.action.Finish()
+	case RunCmdMsg:
+		if m.runningIDs == nil {
+			m.runningIDs = make(map[string]bool)
+		}
+		// Reject if this target already has an action running
+		if m.runningIDs[msg.TargetID] {
+			return m, nil
+		}
+		// Reject prune if any individual network action is currently running
+		if msg.TargetID == ActionTargetAll && len(m.runningIDs) > 0 {
+			return m, nil
+		}
+		// Reject individual network action if prune is currently running
+		if msg.TargetID != ActionTargetAll && m.runningIDs[ActionTargetAll] {
+			return m, nil
+		}
+		wasEmpty := len(m.runningIDs) == 0
+		m.runningIDs[msg.TargetID] = true
+		if wasEmpty {
+			cmds = append(cmds, m.spinner.Tick)
+		}
+		cmds = append(cmds, msg.Cmd)
+		return m, tea.Batch(cmds...)
+
+	case NetworkResultMsg:
+		delete(m.runningIDs, msg.TargetID)
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.action.IsRunning() {
+		if len(m.runningIDs) > 0 {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
-			cmds = append(cmds, cmd)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 
 	case tea.KeyPressMsg:
-		if m.confirmModal.Active {
-			m.confirmModal, _ = m.confirmModal.Update(msg)
-			if m.confirmModal.Confirmed {
-				action := m.confirmModal.Action
-				targetID := m.confirmModal.TargetID
-				targetName := m.confirmModal.TargetName
-				switch action {
-				case modal.ActionDelete, modal.ActionRemove:
-					m.action.Start(action, targetID, targetName, fmt.Sprintf("Deleting network %s...", targetName))
-					return m, tea.Batch(m.removeNetworkCmd(targetID), m.spinner.Tick)
-				case modal.ActionPrune:
-					m.action.StartPrune("Pruning unused networks...")
-					return m, tea.Batch(m.pruneNetworksCmd(), m.spinner.Tick)
-				}
-			}
-			return m, nil
-		}
-
 		if m.searchBar.IsActive() {
 			var cmd tea.Cmd
 			var evt searchbar.Event
@@ -58,7 +66,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 		switch {
-		case m.focusZone == FocusNetworksList && !m.action.IsRunning() && key.Matches(msg, keys.SearchBarKeys.Activate):
+		case m.focusZone == FocusNetworksList && !m.IsLoading() && key.Matches(msg, keys.SearchBarKeys.Activate):
 			cmd := m.searchBar.Activate()
 			return m, cmd
 
@@ -120,37 +128,47 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.NetworkKeys.Delete):
 			selected := m.SelectedNetwork()
-			if selected != nil && !m.action.IsRunning() {
-				if selected.IsSystem {
-					return m, func() tea.Msg {
-						return modal.ShowErrorMsg{
-							Title:   "Delete Network Failed",
-							Message: fmt.Sprintf("Cannot delete default system network '%s'", selected.Name),
-						}
-					}
-				}
-
+			if selected != nil && !m.isNetworkActionRunning(selected.ID) {
 				netID := selected.ID
 				netName := selected.Name
+				var question string
 				if selected.ConnectedCount > 0 {
-					m.confirmModal.Show(
-						fmt.Sprintf("Network '%s' has %d connected container(s)! Force remove?", netName, selected.ConnectedCount),
-						fmt.Sprintf("docker network rm %s", netName),
-						modal.StyleDanger,
-						modal.ActionDelete,
-						netID,
-						netName,
-					)
+					question = fmt.Sprintf("Network '%s' has %d connected container(s)! Force remove?", netName, selected.ConnectedCount)
 				} else {
-					m.confirmModal.ShowNetworkAction(modal.ActionDelete, netID, netName)
+					question = fmt.Sprintf("Are you sure you want to remove network %q?", netName)
 				}
-				return m, nil
+				cmdStr := fmt.Sprintf("docker network rm %s", netID)
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: question,
+						Command:  cmdStr,
+						Style:    modal.StyleDanger,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: netID,
+								Cmd:      m.removeNetworkCmd(netID),
+							}
+						},
+					}
+				}
 			}
 
 		case key.Matches(msg, keys.NetworkKeys.Prune):
-			if !m.action.IsRunning() {
-				m.confirmModal.ShowNetworkPrune()
-				return m, nil
+			// Only permit prune when no network action is currently running
+			if !m.IsLoading() {
+				return m, func() tea.Msg {
+					return modal.ShowConfirmMsg{
+						Question: "Are you sure you want to remove all unused networks?",
+						Command:  "docker network prune -f",
+						Style:    modal.StyleWarning,
+						OnConfirm: func() tea.Msg {
+							return RunCmdMsg{
+								TargetID: ActionTargetAll,
+								Cmd:      m.pruneNetworksCmd(),
+							}
+						},
+					}
+				}
 			}
 
 		default:
@@ -162,10 +180,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseClickMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
-
 		leftWidth := (m.width * 52) / 100
 		if msg.X < leftWidth {
 			m.focusZone = FocusNetworksList
@@ -186,9 +200,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseWheelMsg:
-		if m.confirmModal.Active {
-			return m, nil
-		}
 		if m.focusZone == FocusNetworksList {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
 				m.cursorIndex--

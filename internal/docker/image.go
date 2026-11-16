@@ -59,7 +59,7 @@ func CleanLayerCommand(cmd string) string {
 		return cmd
 	}
 
-	return strings.Join(strings.Fields(cmd), " ") 
+	return strings.Join(strings.Fields(cmd), " ")
 }
 
 // FormatTimeAgo formats a time into a relative "X ago" string.

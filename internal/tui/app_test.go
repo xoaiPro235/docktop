@@ -12,6 +12,7 @@ import (
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
 	"github.com/xoaiPro235/docktop/internal/tui/components/container"
+	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -565,5 +566,54 @@ func TestAppModel_View(t *testing.T) {
 
 	if !strings.Contains(renderStr, "Containers") {
 		t.Errorf("View should render tab header Containers, got %q", renderStr)
+	}
+}
+
+func TestAppModel_ModalMouseWheel(t *testing.T) {
+	mockSvc := helperMockService()
+	app := NewApp(mockSvc)
+	app.ready = true
+	newM, _ := app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	app = newM.(AppModel)
+
+	// Populate at least 2 container rows
+	newM, _ = app.Update(ContainerListMsg{
+		{ID: "c1", Name: "app1"},
+		{ID: "c2", Name: "app2"},
+	})
+	app = newM.(AppModel)
+
+	if app.containerModel.SelectedContainer() == nil || app.containerModel.SelectedContainer().ID != "c1" {
+		t.Fatalf("expected initial selected container to be c1")
+	}
+
+	// When confirmModal is active
+	app.confirmModal.Show("Question", "cmd", modal.StyleDanger, nil)
+	newModel, cmd := app.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if cmd != nil {
+		t.Errorf("MouseWheelMsg on active confirmModal should return nil cmd, got %v", cmd)
+	}
+	app = newModel.(AppModel)
+	if app.containerModel.SelectedContainer() == nil || app.containerModel.SelectedContainer().ID != "c1" {
+		t.Errorf("selection changed during active confirmModal: got %v, want c1", app.containerModel.SelectedContainer())
+	}
+
+	// Move cursor down to c2 while modal is inactive
+	app.confirmModal.Hide()
+	newM, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	app = newM.(AppModel)
+	if app.containerModel.SelectedContainer() == nil || app.containerModel.SelectedContainer().ID != "c2" {
+		t.Fatalf("expected selection to move to c2, got %v", app.containerModel.SelectedContainer())
+	}
+
+	// When errorModal is active
+	app.errorModal.Show("Error", "something failed")
+	newModel, cmd = app.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	if cmd != nil {
+		t.Errorf("MouseWheelMsg on active errorModal should return nil cmd, got %v", cmd)
+	}
+	app = newModel.(AppModel)
+	if app.containerModel.SelectedContainer() == nil || app.containerModel.SelectedContainer().ID != "c2" {
+		t.Errorf("selection changed during active errorModal: got %v, want c2", app.containerModel.SelectedContainer())
 	}
 }

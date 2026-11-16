@@ -157,8 +157,8 @@ func (m Model) View() string {
 			rowContent := fmt.Sprintf("%s %s %s %s", tagDisplay, idDisplay, sizeDisplay, statusDisplay)
 
 			var line string
-			if m.action.IsRunning() && img.ID == m.action.TargetID {
-				line = m.spinner.View() + " " + theme.Current.TreeSelected.Render(rowContent)
+			if m.runningIDs[img.ID] {
+				line = theme.Current.ActionLoading.Render(m.spinner.View() + " " + rowContent)
 			} else if i == m.cursorIndex && m.focusZone == FocusImagesList {
 				line = theme.Current.TreeSelected.Render(cursorMark + rowContent)
 			} else if i == m.cursorIndex {
@@ -187,18 +187,10 @@ func (m Model) View() string {
 		rightStyle.Render(rightContent),
 	)
 
-	if m.confirmModal.Active {
-		return m.confirmModal.Overlay(baseView, m.width, m.height)
-	}
-
 	return baseView
 }
 
 func (m Model) FooterBindings() []key.Binding {
-	if m.confirmModal.Active {
-		return m.confirmModal.FooterBindings()
-	}
-
 	if m.searchBar.IsActive() {
 		return []key.Binding{
 			keys.CommonHelpKeys.HelpFilterActive,

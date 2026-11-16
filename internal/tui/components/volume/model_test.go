@@ -7,7 +7,6 @@ import (
 	"github.com/moby/moby/api/types/volume"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -25,11 +24,8 @@ func TestNew(t *testing.T) {
 	if m.focusZone != FocusVolumesList {
 		t.Errorf("focusZone = %v, want FocusVolumesList", m.focusZone)
 	}
-	if m.IsModalActive() {
-		t.Error("New model should have inactive modal")
-	}
-	if m.IsActionRunning() {
-		t.Error("New model should not have active action")
+	if m.IsLoading() {
+		t.Error("New model should not be loading")
 	}
 }
 
@@ -117,29 +113,16 @@ func TestModel_FilterVolumes(t *testing.T) {
 	}
 }
 
-func TestModel_IsModalActive(t *testing.T) {
+func TestModel_IsLoading(t *testing.T) {
 	mockCli := &mocks.MockVolumeService{}
 	m := New(mockCli)
-	if m.IsModalActive() {
-		t.Error("IsModalActive() should be false initially")
+	if m.IsLoading() {
+		t.Error("IsLoading() should be false initially")
 	}
 
-	m.confirmModal.ShowVolumeAction(modal.ActionRemove, "vol-1")
-	if !m.IsModalActive() {
-		t.Error("IsModalActive() should be true when modal is shown")
-	}
-}
-
-func TestModel_IsActionRunning(t *testing.T) {
-	mockCli := &mocks.MockVolumeService{}
-	m := New(mockCli)
-	if m.IsActionRunning() {
-		t.Error("IsActionRunning() should be false initially")
-	}
-
-	m.action.Start(modal.ActionRemove, "vol-1", "vol-1", "Removing volume")
-	if !m.IsActionRunning() {
-		t.Error("IsActionRunning() should be true after action.Start")
+	m.runningIDs["vol-1"] = true
+	if !m.IsLoading() {
+		t.Error("IsLoading() should be true when runningIDs is set")
 	}
 }
 
@@ -192,4 +175,39 @@ func TestModel_updateViewportContent(t *testing.T) {
 	}
 	m.applyFilter()
 	m.updateViewportContent()
+}
+
+func TestModel_VolumeNamedAllNotPrune(t *testing.T) {
+	m := New(&mocks.MockVolumeService{})
+	m.runningIDs["all"] = true
+	if m.IsPruning() {
+		t.Error("a volume named 'all' in runningIDs should not trigger IsPruning()")
+	}
+	if m.isVolumeActionRunning("other-volume") {
+		t.Error("a volume named 'all' in runningIDs should not block other-volume")
+	}
+
+	m.runningIDs[ActionTargetAll] = true
+	if !m.IsPruning() {
+		t.Error("ActionTargetAll in runningIDs should trigger IsPruning()")
+	}
+	if !m.isVolumeActionRunning("other-volume") {
+		t.Error("ActionTargetAll in runningIDs should block other-volume")
+	}
+}
+
+func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
+	m := New(&mocks.MockVolumeService{})
+	dummyCmd := func() tea.Msg { return nil }
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(RunCmdMsg{TargetID: "vol-1", Cmd: dummyCmd})
+	if cmd == nil {
+		t.Fatal("first RunCmdMsg should return a command")
+	}
+
+	_, cmd = m.Update(RunCmdMsg{TargetID: "vol-1", Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
+	}
 }

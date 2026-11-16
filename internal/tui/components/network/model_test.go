@@ -6,7 +6,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
-	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -24,11 +23,8 @@ func TestNew(t *testing.T) {
 	if m.focusZone != FocusNetworksList {
 		t.Errorf("focusZone = %v, want FocusNetworksList", m.focusZone)
 	}
-	if m.IsModalActive() {
-		t.Error("New model should have inactive modal")
-	}
-	if m.IsActionRunning() {
-		t.Error("New model should not have active action")
+	if m.IsLoading() {
+		t.Error("New model should not be loading")
 	}
 }
 
@@ -116,29 +112,16 @@ func TestModel_FilterNetworks(t *testing.T) {
 	}
 }
 
-func TestModel_IsModalActive(t *testing.T) {
+func TestModel_IsLoading(t *testing.T) {
 	mockCli := &mocks.MockNetworkService{}
 	m := New(mockCli)
-	if m.IsModalActive() {
-		t.Error("IsModalActive() should be false initially")
+	if m.IsLoading() {
+		t.Error("IsLoading() should be false initially")
 	}
 
-	m.confirmModal.ShowNetworkAction(modal.ActionDelete, "net-1", "custom_net")
-	if !m.IsModalActive() {
-		t.Error("IsModalActive() should be true when modal is shown")
-	}
-}
-
-func TestModel_IsActionRunning(t *testing.T) {
-	mockCli := &mocks.MockNetworkService{}
-	m := New(mockCli)
-	if m.IsActionRunning() {
-		t.Error("IsActionRunning() should be false initially")
-	}
-
-	m.action.Start(modal.ActionDelete, "net-1", "custom_net", "Deleting network")
-	if !m.IsActionRunning() {
-		t.Error("IsActionRunning() should be true after action.Start")
+	m.runningIDs["net-1"] = true
+	if !m.IsLoading() {
+		t.Error("IsLoading() should be true when runningIDs is set")
 	}
 }
 
