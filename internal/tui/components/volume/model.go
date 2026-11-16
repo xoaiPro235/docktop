@@ -19,7 +19,7 @@ const (
 	FocusDetailsPane
 )
 
-const ActionTargetAll = "all"
+const ActionTargetAll = "*"
 
 type Model struct {
 	dockerClient    docker.VolumeService

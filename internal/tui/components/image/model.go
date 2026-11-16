@@ -20,7 +20,7 @@ const (
 	FocusLayersPane
 )
 
-const ActionTargetAll = "all"
+const ActionTargetAll = "*"
 
 type Model struct {
 	dockerClient    docker.ImageService

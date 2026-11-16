@@ -210,3 +210,19 @@ func TestModel_Streams(t *testing.T) {
 		t.Error("logCancel should be nil after stopLogStream")
 	}
 }
+
+func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
+	m := New(&mocks.MockContainerService{})
+	dummyCmd := func() tea.Msg { return nil }
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(RunCmdMsg{TargetID: "c1", Cmd: dummyCmd})
+	if cmd == nil {
+		t.Fatal("first RunCmdMsg should return a command")
+	}
+
+	_, cmd = m.Update(RunCmdMsg{TargetID: "c1", Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
+	}
+}

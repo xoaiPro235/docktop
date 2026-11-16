@@ -12,6 +12,7 @@ import (
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
 	"github.com/xoaiPro235/docktop/internal/tui/components/container"
+	"github.com/xoaiPro235/docktop/internal/tui/modal"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -565,5 +566,29 @@ func TestAppModel_View(t *testing.T) {
 
 	if !strings.Contains(renderStr, "Containers") {
 		t.Errorf("View should render tab header Containers, got %q", renderStr)
+	}
+}
+
+func TestAppModel_ModalMouseWheel(t *testing.T) {
+	mockSvc := helperMockService()
+	app := NewApp(mockSvc)
+	app.ready = true
+	newM, _ := app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	app = newM.(AppModel)
+
+	// When confirmModal is active
+	app.confirmModal.Show("Question", "cmd", modal.StyleDanger, nil)
+	newModel, cmd := app.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if cmd != nil {
+		t.Errorf("MouseWheelMsg on active confirmModal should return nil cmd, got %v", cmd)
+	}
+	app = newModel.(AppModel)
+
+	// When errorModal is active
+	app.confirmModal.Hide()
+	app.errorModal.Show("Error", "something failed")
+	_, cmd = app.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	if cmd != nil {
+		t.Errorf("MouseWheelMsg on active errorModal should return nil cmd, got %v", cmd)
 	}
 }

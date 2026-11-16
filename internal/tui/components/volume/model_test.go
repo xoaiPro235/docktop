@@ -176,3 +176,38 @@ func TestModel_updateViewportContent(t *testing.T) {
 	m.applyFilter()
 	m.updateViewportContent()
 }
+
+func TestModel_VolumeNamedAllNotPrune(t *testing.T) {
+	m := New(&mocks.MockVolumeService{})
+	m.runningIDs["all"] = true
+	if m.IsPruning() {
+		t.Error("a volume named 'all' in runningIDs should not trigger IsPruning()")
+	}
+	if m.isVolumeActionRunning("other-volume") {
+		t.Error("a volume named 'all' in runningIDs should not block other-volume")
+	}
+
+	m.runningIDs[ActionTargetAll] = true
+	if !m.IsPruning() {
+		t.Error("ActionTargetAll in runningIDs should trigger IsPruning()")
+	}
+	if !m.isVolumeActionRunning("other-volume") {
+		t.Error("ActionTargetAll in runningIDs should block other-volume")
+	}
+}
+
+func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
+	m := New(&mocks.MockVolumeService{})
+	dummyCmd := func() tea.Msg { return nil }
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(RunCmdMsg{TargetID: "vol-1", Cmd: dummyCmd})
+	if cmd == nil {
+		t.Fatal("first RunCmdMsg should return a command")
+	}
+
+	_, cmd = m.Update(RunCmdMsg{TargetID: "vol-1", Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
+	}
+}

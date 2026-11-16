@@ -293,7 +293,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			a.confirmModal, cmd = a.confirmModal.Update(msg)
 			return a, cmd
-		case tea.MouseClickMsg:
+		case tea.MouseClickMsg, tea.MouseWheelMsg:
 			return a, nil
 		}
 	}
@@ -304,6 +304,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			a.errorModal, cmd = a.errorModal.Update(msg)
 			return a, cmd
+		case tea.MouseWheelMsg:
+			return a, nil
 		}
 	}
 

@@ -101,6 +101,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.runningIDs == nil {
 			m.runningIDs = make(map[string]bool)
 		}
+		if m.runningIDs[msg.TargetID] {
+			return m, nil
+		}
 		wasEmpty := len(m.runningIDs) == 0
 		m.runningIDs[msg.TargetID] = true
 		if wasEmpty {

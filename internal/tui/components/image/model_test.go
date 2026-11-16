@@ -195,3 +195,19 @@ func TestModel_syncDetails(t *testing.T) {
 		t.Error("syncDetails should return fetch cmd when details are missing")
 	}
 }
+
+func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
+	m := New(&mocks.MockImageService{})
+	dummyCmd := func() tea.Msg { return nil }
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(RunCmdMsg{TargetID: "img-1", Cmd: dummyCmd})
+	if cmd == nil {
+		t.Fatal("first RunCmdMsg should return a command")
+	}
+
+	_, cmd = m.Update(RunCmdMsg{TargetID: "img-1", Cmd: dummyCmd})
+	if cmd != nil {
+		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
+	}
+}

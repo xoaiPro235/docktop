@@ -36,7 +36,7 @@ const (
 )
 
 // ActionTargetAll represents the special target identifier when pruning all stopped containers.
-const ActionTargetAll = "all"
+const ActionTargetAll = "*"
 
 type Model struct {
 	dockerClient docker.ContainerService
