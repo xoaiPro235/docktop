@@ -17,8 +17,8 @@ func (m Model) View() string {
 		return ""
 	}
 
-	leftWidth := (m.width * 52) / 100
-	rightWidth := m.width - leftWidth
+	leftWidth := m.leftWidth()
+	rightWidth := m.rightWidth()
 
 	leftBorderColor := theme.Current.Palette.BorderNormal
 	rightBorderColor := theme.Current.Palette.BorderNormal
@@ -51,7 +51,11 @@ func (m Model) View() string {
 	scopeColWidth := 7
 	connColWidth := 14
 
-	nameColWidth := max(innerLeftWidth-cursorColWidth-driverColWidth-scopeColWidth-connColWidth-6, 14)
+	availableNameWidth := max(innerLeftWidth-cursorColWidth-driverColWidth-scopeColWidth-connColWidth-6, 14)
+	nameColWidth := availableNameWidth
+	if m.isLeftZoomed() {
+		nameColWidth = min(availableNameWidth, 50)
+	}
 
 	var leftSB strings.Builder
 
@@ -153,6 +157,13 @@ func (m Model) View() string {
 	leftStr := layout.ClampLines(leftSB.String(), innerLeftWidth, maxLines)
 	rightContent = layout.ClampLines(rightContent, innerRightWidth, maxLines)
 
+	if m.isLeftZoomed() {
+		return leftStyle.Render(leftStr)
+	}
+	if m.isRightZoomed() {
+		return rightStyle.Render(rightContent)
+	}
+
 	baseView := lipgloss.JoinHorizontal(lipgloss.Top,
 		leftStyle.Render(leftStr),
 		rightStyle.Render(rightContent),
@@ -168,24 +179,32 @@ func (m Model) FooterBindings() []key.Binding {
 		}
 	}
 
+	var bindings []key.Binding
+	bindings = append(bindings, keys.AppKeys.FocusToggle)
+	if m.isZoomed {
+		bindings = append(bindings, keys.CommonHelpKeys.HelpUnzoom)
+	} else {
+		bindings = append(bindings, keys.CommonHelpKeys.HelpZoom)
+	}
+
 	if m.focusZone == FocusDetailsPane {
-		return []key.Binding{
-			keys.AppKeys.FocusToggle,
+		bindings = append(bindings,
 			keys.CommonHelpKeys.HelpScroll,
 			keys.CommonHelpKeys.HelpScrollX,
 			keys.NetworkKeys.ToggleWrap,
 			keys.NetworkKeys.Delete,
 			keys.NetworkKeys.Prune,
 			keys.AppKeys.Quit,
-		}
+		)
+		return bindings
 	}
 
-	return []key.Binding{
-		keys.AppKeys.FocusToggle,
+	bindings = append(bindings,
 		keys.CommonHelpKeys.HelpMove,
 		keys.CommonHelpKeys.HelpFilter,
 		keys.NetworkKeys.Delete,
 		keys.NetworkKeys.Prune,
 		keys.AppKeys.Quit,
-	}
+	)
+	return bindings
 }

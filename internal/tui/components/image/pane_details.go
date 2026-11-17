@@ -55,15 +55,17 @@ func HighlightCommand(cmd string, maxWidth int) string {
 }
 
 // FormatImageDetailsContent formats the entire right panel (metadata + layer history) for the scrollable viewport.
-func FormatImageDetailsContent(selected *docker.ImageInfo, width int) string {
+func FormatImageDetailsContent(selected *docker.ImageInfo, width int, isZoomed ...bool) string {
 	if selected == nil {
 		return theme.Current.MutedText.Render("No image selected")
 	}
 
 	var sb strings.Builder
 
+	title := "IMAGE DETAILS"
+
 	// 1. Details Section Header
-	sb.WriteString(theme.Current.SectionHeader("IMAGE DETAILS", width))
+	sb.WriteString(theme.Current.SectionHeader(title, width))
 
 	// Full ID (not truncated, allows horizontal scroll)
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("ID:         "), theme.Current.Value.Render(selected.ID))

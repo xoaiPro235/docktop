@@ -288,3 +288,131 @@ func TestModel_ActionsBlockedWhilePruningOrRunning(t *testing.T) {
 		t.Errorf("expected prune key to be blocked while container c1 is running, got %v", cmd)
 	}
 }
+
+func TestModel_ZoomToggle(t *testing.T) {
+	mockCli := &mocks.MockContainerService{}
+	m := New(mockCli)
+	m.SetSize(100, 30)
+
+	if m.IsZoomed() {
+		t.Fatal("expected initially unzoomed")
+	}
+	origLeft := m.leftWidth()
+	origRight := m.rightWidth()
+	if origLeft == 0 || origRight == 0 {
+		t.Fatalf("expected non-zero widths initially, got left=%d, right=%d", origLeft, origRight)
+	}
+
+	// 1. Press 'z' to zoom left pane
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if !m.IsZoomed() {
+		t.Fatal("expected zoomed after 'z'")
+	}
+	if !m.isLeftZoomed() {
+		t.Fatal("expected left pane to be zoomed")
+	}
+	if m.leftWidth() != 100 {
+		t.Errorf("expected leftWidth=100, got %d", m.leftWidth())
+	}
+	if m.rightWidth() != 0 {
+		t.Errorf("expected rightWidth=0, got %d", m.rightWidth())
+	}
+
+	// 2. Tab to switch focus to right pane while zoomed
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	if !m.isRightZoomed() {
+		t.Fatal("expected right pane to be zoomed after tab")
+	}
+	if m.leftWidth() != 0 {
+		t.Errorf("expected leftWidth=0, got %d", m.leftWidth())
+	}
+	if m.rightWidth() != 100 {
+		t.Errorf("expected rightWidth=100, got %d", m.rightWidth())
+	}
+
+	// 3. Press 'z' again to unzoom
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if m.IsZoomed() {
+		t.Fatal("expected unzoomed after second 'z'")
+	}
+	if m.leftWidth() != origLeft || m.rightWidth() != origRight {
+		t.Errorf("expected restored widths (%d, %d), got (%d, %d)", origLeft, origRight, m.leftWidth(), m.rightWidth())
+	}
+
+	// 4. When search bar is active, 'z' should NOT toggle zoom
+	_ = m.searchBar.Activate()
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if m.IsZoomed() {
+		t.Fatal("expected zoom not to toggle when search bar is active")
+	}
+	if m.searchBar.Value() != "z" {
+		t.Errorf("expected searchBar value 'z', got %q", m.searchBar.Value())
+	}
+}
+
+func TestModel_StatsHistoryPreservedWhileLeftZoomed(t *testing.T) {
+	mockCli := &mocks.MockContainerService{}
+	m := New(mockCli)
+	m.SetSize(100, 30)
+	m.selectedContainerID = "c1"
+	m.activePane = SubPaneStats
+
+	// Seed 60 samples before zoom to verify that retention capacity
+	// does not drop to the 20-point minimum while the left pane is zoomed.
+	for i := 0; i < 60; i++ {
+		m.statsPane.AddCPUData(float64(i), 120)
+	}
+
+	// Zoom left pane
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if !m.isLeftZoomed() {
+		t.Fatal("expected left pane to be zoomed")
+	}
+
+	// Deliver stats message while right pane is hidden
+	m, _ = m.Update(StatsResultMsg{
+		ContainerID: "c1",
+		Metrics: docker.ContainerMetrics{
+			CPUPercent: 25.5,
+			MemUsage:   100 * 1024 * 1024,
+		},
+	})
+
+	if len(m.statsPane.cpuHistory) != 61 {
+		t.Fatalf("expected 61 cpu history points preserved, got %d", len(m.statsPane.cpuHistory))
+	}
+}
+
+func TestModel_MouseClickAtColumnZeroWhileRightZoomed(t *testing.T) {
+	mockCli := &mocks.MockContainerService{
+		StreamContainerStatsFunc: func(ctx context.Context, id string) <-chan docker.ContainerMetrics {
+			return make(chan docker.ContainerMetrics)
+		},
+	}
+	m := New(mockCli)
+	m.SetSize(100, 30)
+	m.SetContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "app1", State: docker.StateRunning},
+		{ID: "c2", Name: "app2", State: docker.StateRunning},
+	})
+
+	// Switch focus to right pane and zoom it
+	m.focusZone = FocusRightPane
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if !m.isRightZoomed() {
+		t.Fatal("expected right pane to be zoomed")
+	}
+
+	// Mouse click at X = 0 (left edge of screen)
+	m, _ = m.Update(tea.MouseClickMsg{X: 0, Y: 5})
+	if m.focusZone != FocusRightPane {
+		t.Errorf("focusZone = %v, want FocusRightPane (should not switch to hidden tree)", m.focusZone)
+	}
+
+	// Mouse wheel at X = 0
+	initialCursor := m.cursorIndex
+	m, _ = m.Update(tea.MouseWheelMsg{X: 0, Y: 5, Button: tea.MouseWheelDown})
+	if m.cursorIndex != initialCursor {
+		t.Errorf("cursorIndex = %d, want %d (wheel should not scroll hidden tree)", m.cursorIndex, initialCursor)
+	}
+}

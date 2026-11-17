@@ -14,8 +14,12 @@ import (
 )
 
 func (m Model) View() string {
-	leftWidth := max(m.width*35/100, 25)
-	rightWidth := max(m.width-leftWidth-1, 20)
+	if m.width <= 0 || m.height <= 0 {
+		return ""
+	}
+
+	leftWidth := m.leftWidth()
+	rightWidth := m.rightWidth()
 
 	leftBorderColor := theme.Current.Palette.BorderNormal
 	rightBorderColor := theme.Current.Palette.BorderNormal
@@ -199,6 +203,13 @@ func (m Model) View() string {
 	// Same for right pane.
 	rightContent = layout.ClampLines(rightContent, innerRightWidth, maxLines)
 
+	if m.isLeftZoomed() {
+		return leftStyle.Render(leftStr)
+	}
+	if m.isRightZoomed() {
+		return rightStyle.Render(rightContent)
+	}
+
 	baseView := lipgloss.JoinHorizontal(lipgloss.Top,
 		leftStyle.Render(leftStr),
 		rightStyle.Render(rightContent),
@@ -219,6 +230,11 @@ func (m Model) FooterBindings() []key.Binding {
 	var bindings []key.Binding
 
 	bindings = append(bindings, keys.AppKeys.FocusToggle)
+	if m.isZoomed {
+		bindings = append(bindings, keys.CommonHelpKeys.HelpUnzoom)
+	} else {
+		bindings = append(bindings, keys.CommonHelpKeys.HelpZoom)
+	}
 
 	// If a project or service is selected (docker-compose config / logs view)
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {

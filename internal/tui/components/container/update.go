@@ -22,10 +22,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case StatsResultMsg:
 		if m.activePane == SubPaneStats && msg.ContainerID == m.selectedContainerID {
-			rightWidth := m.width - (m.width * 35 / 100) - 1
+			rightWidth := m.rightWidth()
+			if rightWidth == 0 {
+				// When the right pane is hidden (e.g. left tree is zoomed), preserve
+				// retention capacity based on unzoomed split width so history isn't discarded.
+				leftW := max(m.width*35/100, 25)
+				rightWidth = max(m.width-leftW-1, 20)
+			}
 			// graphWidth inside Render() = (rightWidth-2) - 4 = rightWidth-6
 			// totalPointsNeeded inside renderBtopBraille = graphWidth * 2
-			graphWidth := rightWidth - 6
+			graphWidth := max(rightWidth-6, 10)
 			m.statsPane.AddCPUData(msg.Metrics.CPUPercent, graphWidth*2)
 			m.statsPane.AddMemData(msg.Metrics.MemUsage, graphWidth*2)
 			m.statsPane.SetMem(msg.Metrics.MemUsage, msg.Metrics.MemLimit, msg.Metrics.HasMemLimit)
@@ -148,9 +154,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, m.syncActivePane()
 
 	case tea.MouseClickMsg:
-		leftWidth := max(m.width*35/100, 25)
+		leftWidth := m.leftWidth()
 
-		if msg.X <= leftWidth {
+		// Route to left tree only if it is actually displayed and hit by the cursor.
+		// When right pane is zoomed (leftWidth == 0), clicks at X == 0 must not hit the hidden left tree.
+		isLeftClick := !m.isRightZoomed() && (m.isLeftZoomed() || msg.X < leftWidth)
+		if isLeftClick {
 			m.focusZone = FocusLeftTree
 			if targetIdx, ok := layout.ListClickTarget(
 				msg.Y,
@@ -227,9 +236,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseWheelMsg:
-		leftWidth := max(m.width*35/100, 25)
+		leftWidth := m.leftWidth()
 
-		if msg.X <= leftWidth {
+		isLeftWheel := !m.isRightZoomed() && (m.isLeftZoomed() || msg.X < leftWidth)
+		if isLeftWheel {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
 				m.cursorIndex--
 				m.syncScroll()
@@ -285,6 +295,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			} else {
 				m.focusZone = FocusLeftTree
 			}
+			m.updatePaneSizes()
+			return m, nil
+
+		case key.Matches(msg, keys.AppKeys.ZoomToggle):
+			m.isZoomed = !m.isZoomed
+			m.updatePaneSizes()
 			return m, nil
 
 		// Inspect pane: Toggle Raw / Formatted JSON

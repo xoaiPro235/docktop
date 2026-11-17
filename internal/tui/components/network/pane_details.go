@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -19,15 +20,17 @@ func RenderNetworkDetails(selected *docker.NetworkInfo, vp *viewport.Model, widt
 }
 
 // FormatNetworkViewportContent formats the full network topology and connected endpoints into a scrollable string.
-func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) string {
+func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoomed ...bool) string {
 	if selected == nil {
 		return theme.Current.MutedText.Render("No network selected")
 	}
 
 	var sb strings.Builder
 
+	title := "NETWORK TOPOLOGY & SUBNET"
+
 	// 1. Details Section Header
-	sb.WriteString(theme.Current.SectionHeader("NETWORK TOPOLOGY & SUBNET", width))
+	sb.WriteString(theme.Current.SectionHeader(title, width))
 
 	// Name
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Name:       "), theme.Current.AccentText.Render(selected.Name))
@@ -129,27 +132,38 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int) strin
 			sb.WriteString("\n")
 		}
 	} else {
-		ipColW := 17
-		portColW := 10
-		nameColW := max(width-ipColW-portColW-8, 14)
+		zoomed := len(isZoomed) > 0 && isZoomed[0]
+
+		ipColW := 18
+		nameColW := 22
+		if zoomed {
+			ipColW = 28
+			nameColW = 36
+		}
 
 		headerIP := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", ipColW, "IP ADDRESS"))
 		headerName := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", nameColW, "CONTAINER NAME"))
-		headerPorts := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", portColW, "PORTS"))
+		headerPorts := theme.Current.TreeHeader.Render("PORTS")
 		fmt.Fprintf(&sb, "  %s  %s  %s\n", headerIP, headerName, headerPorts)
 
-		tableSepWidth := width - 4
-		if minW := ipColW + nameColW + portColW + 4; tableSepWidth < minW {
-			tableSepWidth = minW
-		}
+		tableSepWidth := max(ipColW+nameColW+12, width-4)
 		sb.WriteString("  ")
-		sb.WriteString(theme.Current.LineNumber.Render(strings.Repeat("─", tableSepWidth)))
+		sb.WriteString(theme.Current.LineNumber.Render(strings.Repeat("─", max(tableSepWidth, 10))))
 		sb.WriteString("\n")
 
 		for _, ep := range selected.Containers {
-			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ep.IP))
-			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, ep.Name))
-			portDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", portColW, ep.Ports))
+			ipStr := ep.IP
+			if ipStr == "" {
+				ipStr = "-"
+			}
+			portStr := ep.Ports
+			if portStr == "" {
+				portStr = "-"
+			}
+
+			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ansi.Truncate(ipStr, ipColW, "…")))
+			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, ansi.Truncate(ep.Name, nameColW, "…")))
+			portDisplay := theme.Current.Value.Render(portStr)
 
 			fmt.Fprintf(&sb, "  %s  %s  %s\n", ipDisplay, nameDisplay, portDisplay)
 		}
