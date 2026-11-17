@@ -357,6 +357,12 @@ func TestModel_StatsHistoryPreservedWhileLeftZoomed(t *testing.T) {
 	m.selectedContainerID = "c1"
 	m.activePane = SubPaneStats
 
+	// Seed 60 samples before zoom to verify that retention capacity
+	// does not drop to the 20-point minimum while the left pane is zoomed.
+	for i := 0; i < 60; i++ {
+		m.statsPane.AddCPUData(float64(i), 120)
+	}
+
 	// Zoom left pane
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
 	if !m.isLeftZoomed() {
@@ -372,8 +378,8 @@ func TestModel_StatsHistoryPreservedWhileLeftZoomed(t *testing.T) {
 		},
 	})
 
-	if len(m.statsPane.cpuHistory) == 0 {
-		t.Fatal("expected cpu history to have data point")
+	if len(m.statsPane.cpuHistory) != 61 {
+		t.Fatalf("expected 61 cpu history points preserved, got %d", len(m.statsPane.cpuHistory))
 	}
 }
 

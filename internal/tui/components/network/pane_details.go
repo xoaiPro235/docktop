@@ -134,8 +134,8 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 			sb.WriteString("\n")
 		}
 	} else {
-		ipColW := 18
-		nameColW := 30
+		ipColW := 28
+		nameColW := 36
 
 		headerIP := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", ipColW, "IP ADDRESS"))
 		headerName := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", nameColW, "CONTAINER NAME"))
