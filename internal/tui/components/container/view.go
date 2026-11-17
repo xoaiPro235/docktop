@@ -53,9 +53,6 @@ func (m Model) View() string {
 	}
 
 	headerTitle := ansi.Truncate("PROJECT / SERVICE / CONTAINER", innerLeftWidth, "…")
-	if m.isLeftZoomed() {
-		headerTitle += "  " + theme.Current.AccentText.Render("[ZOOMED]")
-	}
 	leftContent.WriteString(theme.Current.TreeHeader.Render(headerTitle))
 	leftContent.WriteString("\n\n")
 
@@ -145,9 +142,6 @@ func (m Model) View() string {
 				}
 			}
 			headerBar := strings.Join(subTabs, " | ")
-			if m.isRightZoomed() {
-				headerBar += "  " + theme.Current.AccentText.Render("[ZOOMED]")
-			}
 			badge := ""
 			if selectedNode.Type == NodeProject {
 				badge = "  " + theme.Current.TreeProject.Render("Project: "+selectedNode.Name)
@@ -176,9 +170,6 @@ func (m Model) View() string {
 			}
 		}
 		headerBar := strings.Join(subTabs, " | ")
-		if m.isRightZoomed() {
-			headerBar += "  " + theme.Current.AccentText.Render("[ZOOMED]")
-		}
 
 		var selectedContainer *docker.ContainerInfo
 		if selectedNode != nil {

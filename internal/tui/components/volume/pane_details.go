@@ -30,9 +30,6 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int, isZoome
 	var sb strings.Builder
 
 	title := "VOLUME DETAILS"
-	if len(isZoomed) > 0 && isZoomed[0] {
-		title += "  " + theme.Current.AccentText.Render("[ZOOMED]")
-	}
 
 	// 1. Details Section
 	sb.WriteString(theme.Current.SectionHeader(title, width))

@@ -28,9 +28,6 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 	var sb strings.Builder
 
 	title := "NETWORK TOPOLOGY & SUBNET"
-	if len(isZoomed) > 0 && isZoomed[0] {
-		title += "  " + theme.Current.AccentText.Render("[ZOOMED]")
-	}
 
 	// 1. Details Section Header
 	sb.WriteString(theme.Current.SectionHeader(title, width))
@@ -164,15 +161,8 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 				portStr = "-"
 			}
 
-			ipFormatted := ipStr
-			nameFormatted := ep.Name
-			if !zoomed {
-				ipFormatted = ansi.Truncate(ipStr, ipColW, "…")
-				nameFormatted = ansi.Truncate(ep.Name, nameColW, "…")
-			}
-
-			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ipFormatted))
-			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, nameFormatted))
+			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ansi.Truncate(ipStr, ipColW, "…")))
+			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, ansi.Truncate(ep.Name, nameColW, "…")))
 			portDisplay := theme.Current.Value.Render(portStr)
 
 			fmt.Fprintf(&sb, "  %s  %s  %s\n", ipDisplay, nameDisplay, portDisplay)

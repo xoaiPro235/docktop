@@ -52,14 +52,7 @@ func (m Model) View() string {
 	statusColWidth := 10
 	cursorColWidth := 2
 
-	extraZoomWidth := 0
-	zoomedBadge := ""
-	if m.isLeftZoomed() {
-		extraZoomWidth = 11
-		zoomedBadge = "  " + theme.Current.AccentText.Render("[ZOOMED]")
-	}
-
-	availableTagWidth := max(innerLeftWidth-cursorColWidth-idColWidth-sizeColWidth-statusColWidth-3-extraZoomWidth, 14)
+	availableTagWidth := max(innerLeftWidth-cursorColWidth-idColWidth-sizeColWidth-statusColWidth-3, 14)
 	tagColWidth := availableTagWidth
 	if m.isLeftZoomed() {
 		tagColWidth = min(availableTagWidth, 50)
@@ -78,7 +71,7 @@ func (m Model) View() string {
 	headerSize := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", sizeColWidth, "SIZE"))
 	headerStatus := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", statusColWidth, "STATUS"))
 
-	fmt.Fprintf(&leftSB, "  %s %s %s %s%s\n\n", headerTag, headerID, headerSize, headerStatus, zoomedBadge)
+	fmt.Fprintf(&leftSB, "  %s %s %s %s\n\n", headerTag, headerID, headerSize, headerStatus)
 
 	if len(m.filteredIndices) == 0 {
 		if m.searchBar.HasFilter() {

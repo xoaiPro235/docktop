@@ -51,14 +51,7 @@ func (m Model) View() string {
 	scopeColWidth := 7
 	connColWidth := 14
 
-	extraZoomWidth := 0
-	zoomedBadge := ""
-	if m.isLeftZoomed() {
-		extraZoomWidth = 11
-		zoomedBadge = "  " + theme.Current.AccentText.Render("[ZOOMED]")
-	}
-
-	availableNameWidth := max(innerLeftWidth-cursorColWidth-driverColWidth-scopeColWidth-connColWidth-6-extraZoomWidth, 14)
+	availableNameWidth := max(innerLeftWidth-cursorColWidth-driverColWidth-scopeColWidth-connColWidth-6, 14)
 	nameColWidth := availableNameWidth
 	if m.isLeftZoomed() {
 		nameColWidth = min(availableNameWidth, 50)
@@ -76,7 +69,7 @@ func (m Model) View() string {
 	headerScope := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", scopeColWidth, "SCOPE"))
 	headerConn := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", connColWidth, "CONTAINERS"))
 
-	fmt.Fprintf(&leftSB, "  %s  %s  %s  %s%s\n\n", headerName, headerDriver, headerScope, headerConn, zoomedBadge)
+	fmt.Fprintf(&leftSB, "  %s  %s  %s  %s\n\n", headerName, headerDriver, headerScope, headerConn)
 
 	if len(m.filteredIndices) == 0 {
 		if m.searchBar.HasFilter() {

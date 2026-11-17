@@ -63,9 +63,6 @@ func FormatImageDetailsContent(selected *docker.ImageInfo, width int, isZoomed .
 	var sb strings.Builder
 
 	title := "IMAGE DETAILS"
-	if len(isZoomed) > 0 && isZoomed[0] {
-		title += "  " + theme.Current.AccentText.Render("[ZOOMED]")
-	}
 
 	// 1. Details Section Header
 	sb.WriteString(theme.Current.SectionHeader(title, width))
