@@ -59,9 +59,10 @@ func (m Model) View() string {
 		zoomedBadge = "  " + theme.Current.AccentText.Render("[ZOOMED]")
 	}
 
-	tagColWidth := max(innerLeftWidth-cursorColWidth-idColWidth-sizeColWidth-statusColWidth-3-extraZoomWidth, 14)
+	availableTagWidth := max(innerLeftWidth-cursorColWidth-idColWidth-sizeColWidth-statusColWidth-3-extraZoomWidth, 14)
+	tagColWidth := availableTagWidth
 	if m.isLeftZoomed() {
-		tagColWidth = min(tagColWidth, 50)
+		tagColWidth = min(availableTagWidth, 50)
 	}
 
 	var leftSB strings.Builder

@@ -349,3 +349,64 @@ func TestModel_ZoomToggle(t *testing.T) {
 		t.Errorf("expected searchBar value 'z', got %q", m.searchBar.Value())
 	}
 }
+
+func TestModel_StatsHistoryPreservedWhileLeftZoomed(t *testing.T) {
+	mockCli := &mocks.MockContainerService{}
+	m := New(mockCli)
+	m.SetSize(100, 30)
+	m.selectedContainerID = "c1"
+	m.activePane = SubPaneStats
+
+	// Zoom left pane
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if !m.isLeftZoomed() {
+		t.Fatal("expected left pane to be zoomed")
+	}
+
+	// Deliver stats message while right pane is hidden
+	m, _ = m.Update(StatsResultMsg{
+		ContainerID: "c1",
+		Metrics: docker.ContainerMetrics{
+			CPUPercent: 25.5,
+			MemUsage:   100 * 1024 * 1024,
+		},
+	})
+
+	if len(m.statsPane.cpuHistory) == 0 {
+		t.Fatal("expected cpu history to have data point")
+	}
+}
+
+func TestModel_MouseClickAtColumnZeroWhileRightZoomed(t *testing.T) {
+	mockCli := &mocks.MockContainerService{
+		StreamContainerStatsFunc: func(ctx context.Context, id string) <-chan docker.ContainerMetrics {
+			return make(chan docker.ContainerMetrics)
+		},
+	}
+	m := New(mockCli)
+	m.SetSize(100, 30)
+	m.SetContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "app1", State: docker.StateRunning},
+		{ID: "c2", Name: "app2", State: docker.StateRunning},
+	})
+
+	// Switch focus to right pane and zoom it
+	m.focusZone = FocusRightPane
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if !m.isRightZoomed() {
+		t.Fatal("expected right pane to be zoomed")
+	}
+
+	// Mouse click at X = 0 (left edge of screen)
+	m, _ = m.Update(tea.MouseClickMsg{X: 0, Y: 5})
+	if m.focusZone != FocusRightPane {
+		t.Errorf("focusZone = %v, want FocusRightPane (should not switch to hidden tree)", m.focusZone)
+	}
+
+	// Mouse wheel at X = 0
+	initialCursor := m.cursorIndex
+	m, _ = m.Update(tea.MouseWheelMsg{X: 0, Y: 5, Button: tea.MouseWheelDown})
+	if m.cursorIndex != initialCursor {
+		t.Errorf("cursorIndex = %d, want %d (wheel should not scroll hidden tree)", m.cursorIndex, initialCursor)
+	}
+}

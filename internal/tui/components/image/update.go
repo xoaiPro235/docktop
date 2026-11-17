@@ -196,7 +196,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case tea.MouseClickMsg:
 		leftWidth := m.leftWidth()
-		if msg.X < leftWidth {
+		isLeftClick := !m.isRightZoomed() && (m.isLeftZoomed() || msg.X < leftWidth)
+		if isLeftClick {
 			m.focusZone = FocusImagesList
 			if targetIdx, ok := layout.ListClickTarget(
 				msg.Y,

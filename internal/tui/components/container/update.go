@@ -23,6 +23,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case StatsResultMsg:
 		if m.activePane == SubPaneStats && msg.ContainerID == m.selectedContainerID {
 			rightWidth := m.rightWidth()
+			if rightWidth == 0 {
+				// When the right pane is hidden (e.g. left tree is zoomed), preserve
+				// retention capacity based on unzoomed split width so history isn't discarded.
+				leftW := max(m.width*35/100, 25)
+				rightWidth = max(m.width-leftW-1, 20)
+			}
 			// graphWidth inside Render() = (rightWidth-2) - 4 = rightWidth-6
 			// totalPointsNeeded inside renderBtopBraille = graphWidth * 2
 			graphWidth := max(rightWidth-6, 10)
@@ -150,7 +156,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		leftWidth := m.leftWidth()
 
-		if msg.X <= leftWidth {
+		// Route to left tree only if it is actually displayed and hit by the cursor.
+		// When right pane is zoomed (leftWidth == 0), clicks at X == 0 must not hit the hidden left tree.
+		isLeftClick := !m.isRightZoomed() && (m.isLeftZoomed() || msg.X < leftWidth)
+		if isLeftClick {
 			m.focusZone = FocusLeftTree
 			if targetIdx, ok := layout.ListClickTarget(
 				msg.Y,
@@ -229,7 +238,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		leftWidth := m.leftWidth()
 
-		if msg.X <= leftWidth {
+		isLeftWheel := !m.isRightZoomed() && (m.isLeftZoomed() || msg.X < leftWidth)
+		if isLeftWheel {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
 				m.cursorIndex--
 				m.syncScroll()

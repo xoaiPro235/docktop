@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -135,22 +134,15 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 			sb.WriteString("\n")
 		}
 	} else {
-		ipColW := 17
-		portColW := min(max(width*25/100, 16), 32)
-		nameColW := min(max(width-ipColW-portColW-8, 14), 36)
-		if width < 65 {
-			nameColW = max(width-ipColW-portColW-8, 14)
-		}
+		ipColW := 18
+		nameColW := 30
 
 		headerIP := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", ipColW, "IP ADDRESS"))
 		headerName := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", nameColW, "CONTAINER NAME"))
-		headerPorts := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", portColW, "PORTS"))
+		headerPorts := theme.Current.TreeHeader.Render("PORTS")
 		fmt.Fprintf(&sb, "  %s  %s  %s\n", headerIP, headerName, headerPorts)
 
-		tableSepWidth := ipColW + nameColW + portColW + 4
-		if tableSepWidth > width-4 {
-			tableSepWidth = width - 4
-		}
+		tableSepWidth := max(ipColW+nameColW+12, width-4)
 		sb.WriteString("  ")
 		sb.WriteString(theme.Current.LineNumber.Render(strings.Repeat("─", max(tableSepWidth, 10))))
 		sb.WriteString("\n")
@@ -165,9 +157,9 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 				portStr = "-"
 			}
 
-			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ansi.Truncate(ipStr, ipColW, "…")))
-			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, ansi.Truncate(ep.Name, nameColW, "…")))
-			portDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", portColW, ansi.Truncate(portStr, portColW, "…")))
+			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ipStr))
+			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, ep.Name))
+			portDisplay := theme.Current.Value.Render(portStr)
 
 			fmt.Fprintf(&sb, "  %s  %s  %s\n", ipDisplay, nameDisplay, portDisplay)
 		}
