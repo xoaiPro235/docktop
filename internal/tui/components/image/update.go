@@ -95,12 +95,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			cmds = append(cmds, m.syncDetails())
 			return m, tea.Batch(cmds...)
 
+		case key.Matches(msg, keys.AppKeys.ZoomToggle):
+			m.isZoomed = !m.isZoomed
+			m.updateViewportSizes()
+			return m, nil
+
 		case key.Matches(msg, keys.AppKeys.FocusToggle):
 			if m.focusZone == FocusImagesList {
 				m.focusZone = FocusLayersPane
 			} else {
 				m.focusZone = FocusImagesList
 			}
+			m.updateViewportSizes()
 			return m, nil
 
 		case key.Matches(msg, keys.ImageKeys.Up):
@@ -189,7 +195,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseClickMsg:
-		leftWidth := (m.width * 52) / 100
+		leftWidth := m.leftWidth()
 		if msg.X < leftWidth {
 			m.focusZone = FocusImagesList
 			if targetIdx, ok := layout.ListClickTarget(

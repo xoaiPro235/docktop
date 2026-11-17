@@ -22,15 +22,20 @@ func RenderVolumeDetails(selected *docker.VolumeInfo, vp *viewport.Model, width,
 }
 
 // FormatVolumeViewportContent formats the complete volume details, labels, and mounted containers for the scrollable viewport.
-func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int) string {
+func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int, isZoomed ...bool) string {
 	if selected == nil {
 		return theme.Current.MutedText.Render("No volume selected.")
 	}
 
 	var sb strings.Builder
 
+	title := "VOLUME DETAILS"
+	if len(isZoomed) > 0 && isZoomed[0] {
+		title += "  " + theme.Current.AccentText.Render("[ZOOMED]")
+	}
+
 	// 1. Details Section
-	sb.WriteString(theme.Current.SectionHeader("VOLUME DETAILS", width))
+	sb.WriteString(theme.Current.SectionHeader(title, width))
 
 	// Volume Name
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Name:       "), theme.Current.AccentText.Render(selected.Name))

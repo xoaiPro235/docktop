@@ -37,8 +37,9 @@ type Model struct {
 	spinner    spinner.Model
 	runningIDs map[string]bool
 
-	width  int
-	height int
+	width    int
+	height   int
+	isZoomed bool
 }
 
 func New(cli docker.NetworkService) Model {
@@ -65,11 +66,46 @@ func (m Model) Init() tea.Cmd {
 func (m *Model) SetSize(w, h int) {
 	m.width = w
 	m.height = h
+	m.updateViewportSizes()
+}
 
-	leftWidth := (w * 52) / 100
-	rightWidth := w - leftWidth
+func (m Model) IsZoomed() bool {
+	return m.isZoomed
+}
+
+func (m Model) isLeftZoomed() bool {
+	return m.isZoomed && m.focusZone == FocusNetworksList
+}
+
+func (m Model) isRightZoomed() bool {
+	return m.isZoomed && m.focusZone == FocusDetailsPane
+}
+
+func (m Model) leftWidth() int {
+	if m.isLeftZoomed() {
+		return m.width
+	}
+	if m.isRightZoomed() {
+		return 0
+	}
+	return (m.width * 52) / 100
+}
+
+func (m Model) rightWidth() int {
+	if m.isRightZoomed() {
+		return m.width
+	}
+	if m.isLeftZoomed() {
+		return 0
+	}
+	leftW := (m.width * 52) / 100
+	return m.width - leftW
+}
+
+func (m *Model) updateViewportSizes() {
+	rightWidth := m.rightWidth()
 	innerRightWidth := max(rightWidth-2, 10)
-	innerRightHeight := max(h-2, 1)
+	innerRightHeight := max(m.height-2, 1)
 
 	if !m.viewportReady {
 		m.viewport = viewport.New(viewport.WithWidth(innerRightWidth), viewport.WithHeight(innerRightHeight))
@@ -182,7 +218,7 @@ func (m *Model) updateViewportContent() {
 
 	prevOffset := m.viewport.YOffset()
 	prevXOffset := m.viewport.XOffset()
-	m.viewport.SetContent(FormatNetworkViewportContent(selected, m.viewport.Width()))
+	m.viewport.SetContent(FormatNetworkViewportContent(selected, m.viewport.Width(), m.isRightZoomed()))
 
 	if m.activeNetworkID == selected.ID {
 		m.viewport.SetYOffset(prevOffset)

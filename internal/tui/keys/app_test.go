@@ -85,6 +85,7 @@ func TestAppKeys_Bindings(t *testing.T) {
 		{"TabVolumes", AppKeys.TabVolumes},
 		{"TabNetworks", AppKeys.TabNetworks},
 		{"FocusToggle", AppKeys.FocusToggle},
+		{"ZoomToggle", AppKeys.ZoomToggle},
 	}
 
 	for _, tc := range bindings {

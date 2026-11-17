@@ -38,8 +38,9 @@ type Model struct {
 	spinner    spinner.Model
 	runningIDs map[string]bool
 
-	width  int
-	height int
+	width    int
+	height   int
+	isZoomed bool
 }
 
 func New(cli docker.ImageService) Model {
@@ -66,11 +67,46 @@ func (m Model) Init() tea.Cmd {
 func (m *Model) SetSize(w, h int) {
 	m.width = w
 	m.height = h
+	m.updateViewportSizes()
+}
 
-	leftWidth := (w * 52) / 100
-	rightWidth := w - leftWidth
+func (m Model) IsZoomed() bool {
+	return m.isZoomed
+}
+
+func (m Model) isLeftZoomed() bool {
+	return m.isZoomed && m.focusZone == FocusImagesList
+}
+
+func (m Model) isRightZoomed() bool {
+	return m.isZoomed && m.focusZone == FocusLayersPane
+}
+
+func (m Model) leftWidth() int {
+	if m.isLeftZoomed() {
+		return m.width
+	}
+	if m.isRightZoomed() {
+		return 0
+	}
+	return (m.width * 52) / 100
+}
+
+func (m Model) rightWidth() int {
+	if m.isRightZoomed() {
+		return m.width
+	}
+	if m.isLeftZoomed() {
+		return 0
+	}
+	leftW := (m.width * 52) / 100
+	return m.width - leftW
+}
+
+func (m *Model) updateViewportSizes() {
+	rightWidth := m.rightWidth()
 	innerRightWidth := max(rightWidth-2, 10)
-	innerRightHeight := max(h-2, 1)
+	innerRightHeight := max(m.height-2, 1)
 
 	if !m.viewportReady {
 		m.layersViewport = viewport.New(viewport.WithWidth(innerRightWidth), viewport.WithHeight(innerRightHeight))
@@ -215,7 +251,7 @@ func (m *Model) updateViewportContent() {
 		return
 	}
 
-	content := FormatImageDetailsContent(selected, m.layersViewport.Width())
+	content := FormatImageDetailsContent(selected, m.layersViewport.Width(), m.isRightZoomed())
 	prevOffset := m.layersViewport.YOffset()
 	prevXOffset := m.layersViewport.XOffset()
 	m.layersViewport.SetContent(content)

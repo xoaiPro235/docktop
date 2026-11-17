@@ -17,6 +17,7 @@ type AppKeyMap struct {
 	TabVolumes    key.Binding
 	TabNetworks   key.Binding
 	FocusToggle   key.Binding
+	ZoomToggle    key.Binding
 }
 
 // AppKeys is the default instance of AppKeyMap.
@@ -53,6 +54,10 @@ var AppKeys = AppKeyMap{
 		key.WithKeys("tab"),
 		key.WithHelp("Tab", "Focus"),
 	),
+	ZoomToggle: key.NewBinding(
+		key.WithKeys("z", "Z"),
+		key.WithHelp("z", "Zoom"),
+	),
 }
 
 // CommonHelpKeyMap holds reusable help-only bindings for rendering consistent footer hints across components.
@@ -67,6 +72,8 @@ type CommonHelpKeyMap struct {
 	HelpSubpane      key.Binding
 	HelpFilter       key.Binding
 	HelpFilterActive key.Binding
+	HelpZoom         key.Binding
+	HelpUnzoom       key.Binding
 }
 
 var CommonHelpKeys = CommonHelpKeyMap{
@@ -109,6 +116,14 @@ var CommonHelpKeys = CommonHelpKeyMap{
 	HelpFilterActive: key.NewBinding(
 		key.WithKeys("esc", "enter"),
 		key.WithHelp("Esc/Enter", "Cancel/Done"),
+	),
+	HelpZoom: key.NewBinding(
+		key.WithKeys("z"),
+		key.WithHelp("z", "Zoom"),
+	),
+	HelpUnzoom: key.NewBinding(
+		key.WithKeys("z"),
+		key.WithHelp("z", "Unzoom"),
 	),
 }
 
