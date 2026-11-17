@@ -211,3 +211,61 @@ func TestModel_RejectDuplicateRunCmdMsg(t *testing.T) {
 		t.Errorf("duplicate RunCmdMsg for running target should return nil cmd, got %v", cmd)
 	}
 }
+
+func TestModel_ZoomToggle(t *testing.T) {
+	mockCli := &mocks.MockVolumeService{}
+	m := New(mockCli)
+	m.SetSize(100, 30)
+
+	if m.IsZoomed() {
+		t.Fatal("expected initially unzoomed")
+	}
+	origLeft := m.leftWidth()
+	origRight := m.rightWidth()
+
+	// 1. Press 'z' to zoom left pane
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if !m.IsZoomed() {
+		t.Fatal("expected zoomed after 'z'")
+	}
+	if !m.isLeftZoomed() {
+		t.Fatal("expected left pane to be zoomed")
+	}
+	if m.leftWidth() != 100 {
+		t.Errorf("expected leftWidth=100, got %d", m.leftWidth())
+	}
+	if m.rightWidth() != 0 {
+		t.Errorf("expected rightWidth=0, got %d", m.rightWidth())
+	}
+
+	// 2. Tab to switch focus to right pane while zoomed
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	if !m.isRightZoomed() {
+		t.Fatal("expected right pane to be zoomed after tab")
+	}
+	if m.leftWidth() != 0 {
+		t.Errorf("expected leftWidth=0, got %d", m.leftWidth())
+	}
+	if m.rightWidth() != 100 {
+		t.Errorf("expected rightWidth=100, got %d", m.rightWidth())
+	}
+
+	// 3. Press 'z' again to unzoom
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if m.IsZoomed() {
+		t.Fatal("expected unzoomed after second 'z'")
+	}
+	if m.leftWidth() != origLeft || m.rightWidth() != origRight {
+		t.Errorf("expected restored widths (%d, %d), got (%d, %d)", origLeft, origRight, m.leftWidth(), m.rightWidth())
+	}
+
+	// 4. When search bar is active, 'z' should NOT toggle zoom
+	_ = m.searchBar.Activate()
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if m.IsZoomed() {
+		t.Fatal("expected zoom not to toggle when search bar is active")
+	}
+	if m.searchBar.Value() != "z" {
+		t.Errorf("expected searchBar value 'z', got %q", m.searchBar.Value())
+	}
+}

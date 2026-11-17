@@ -76,12 +76,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.updateViewportContent()
 			return m, nil
 
-		case key.Matches(msg, keys.NetworkKeys.Focus):
+		case key.Matches(msg, keys.AppKeys.ZoomToggle):
+			m.isZoomed = !m.isZoomed
+			m.updateViewportSizes()
+			return m, nil
+
+		case key.Matches(msg, keys.NetworkKeys.Focus, keys.AppKeys.FocusToggle):
 			if m.focusZone == FocusNetworksList {
 				m.focusZone = FocusDetailsPane
 			} else {
 				m.focusZone = FocusNetworksList
 			}
+			m.updateViewportSizes()
 			return m, nil
 
 		case key.Matches(msg, keys.NetworkKeys.Up):
@@ -180,7 +186,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseClickMsg:
-		leftWidth := (m.width * 52) / 100
+		leftWidth := m.leftWidth()
 		if msg.X < leftWidth {
 			m.focusZone = FocusNetworksList
 			if targetIdx, ok := layout.ListClickTarget(

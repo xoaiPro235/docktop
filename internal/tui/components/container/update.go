@@ -22,10 +22,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case StatsResultMsg:
 		if m.activePane == SubPaneStats && msg.ContainerID == m.selectedContainerID {
-			rightWidth := m.width - (m.width * 35 / 100) - 1
+			rightWidth := m.rightWidth()
 			// graphWidth inside Render() = (rightWidth-2) - 4 = rightWidth-6
 			// totalPointsNeeded inside renderBtopBraille = graphWidth * 2
-			graphWidth := rightWidth - 6
+			graphWidth := max(rightWidth-6, 10)
 			m.statsPane.AddCPUData(msg.Metrics.CPUPercent, graphWidth*2)
 			m.statsPane.AddMemData(msg.Metrics.MemUsage, graphWidth*2)
 			m.statsPane.SetMem(msg.Metrics.MemUsage, msg.Metrics.MemLimit, msg.Metrics.HasMemLimit)
@@ -148,7 +148,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, m.syncActivePane()
 
 	case tea.MouseClickMsg:
-		leftWidth := max(m.width*35/100, 25)
+		leftWidth := m.leftWidth()
 
 		if msg.X <= leftWidth {
 			m.focusZone = FocusLeftTree
@@ -227,7 +227,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case tea.MouseWheelMsg:
-		leftWidth := max(m.width*35/100, 25)
+		leftWidth := m.leftWidth()
 
 		if msg.X <= leftWidth {
 			if msg.Button == tea.MouseWheelUp && m.cursorIndex > 0 {
@@ -285,6 +285,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			} else {
 				m.focusZone = FocusLeftTree
 			}
+			m.updatePaneSizes()
+			return m, nil
+
+		case key.Matches(msg, keys.AppKeys.ZoomToggle):
+			m.isZoomed = !m.isZoomed
+			m.updatePaneSizes()
 			return m, nil
 
 		// Inspect pane: Toggle Raw / Formatted JSON

@@ -69,8 +69,9 @@ type Model struct {
 	spinner    spinner.Model
 	runningIDs map[string]bool
 
-	width  int
-	height int
+	width    int
+	height   int
+	isZoomed bool
 }
 
 func New(cli docker.ContainerService) Model {
@@ -245,16 +246,44 @@ func (m Model) SpinnerView() string {
 	return m.spinner.View()
 }
 
-func (m *Model) SetSize(w, h int) {
-	m.width = w
-	m.height = h
+func (m Model) IsZoomed() bool {
+	return m.isZoomed
+}
 
-	leftWidth := max(w*35/100, 25)
-	rightWidth := max(w-leftWidth-1, 20)
+func (m Model) isLeftZoomed() bool {
+	return m.isZoomed && m.focusZone == FocusLeftTree
+}
 
+func (m Model) isRightZoomed() bool {
+	return m.isZoomed && m.focusZone == FocusRightPane
+}
+
+func (m Model) leftWidth() int {
+	if m.isLeftZoomed() {
+		return m.width
+	}
+	if m.isRightZoomed() {
+		return 0
+	}
+	return max(m.width*35/100, 25)
+}
+
+func (m Model) rightWidth() int {
+	if m.isRightZoomed() {
+		return m.width
+	}
+	if m.isLeftZoomed() {
+		return 0
+	}
+	leftW := max(m.width*35/100, 25)
+	return max(m.width-leftW-1, 20)
+}
+
+func (m *Model) updatePaneSizes() {
+	rightWidth := m.rightWidth()
 	// Inner dimensions subtracting borders
-	innerRightWidth := rightWidth - 2
-	innerRightHeight := h - 2
+	innerRightWidth := max(rightWidth-2, 1)
+	innerRightHeight := max(m.height-2, 1)
 	// Subtract header tab row and footer info line
 	viewportHeight := max(innerRightHeight-2, 1)
 
@@ -263,6 +292,12 @@ func (m *Model) SetSize(w, h int) {
 	m.topPane.SetSize(innerRightWidth, viewportHeight)
 	m.composePane.SetSize(innerRightWidth, viewportHeight)
 	m.syncScroll()
+}
+
+func (m *Model) SetSize(w, h int) {
+	m.width = w
+	m.height = h
+	m.updatePaneSizes()
 }
 
 func (m *Model) syncComposeNode(node *TreeNode) tea.Cmd {
