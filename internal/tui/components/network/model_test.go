@@ -1,6 +1,7 @@
 package network
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -229,5 +230,32 @@ func TestModel_ZoomToggle(t *testing.T) {
 	}
 	if m.searchBar.Value() != "z" {
 		t.Errorf("expected searchBar value 'z', got %q", m.searchBar.Value())
+	}
+}
+
+func TestFormatNetworkViewportContent_IPv6AndZoom(t *testing.T) {
+	net := &docker.NetworkInfo{
+		ID:     "net1",
+		Name:   "test-net",
+		Driver: "bridge",
+		Containers: []docker.NetworkEndpointInfo{
+			{
+				Name:  "my-super-long-container-name-example-worker",
+				IP:    "2001:db8:1234:5678::2/64",
+				Ports: "8080:80",
+			},
+		},
+	}
+
+	// Unzoomed: truncates with ellipsis so columns stay aligned and PORTS is visible
+	unzoomedContent := FormatNetworkViewportContent(net, 60, false)
+	if !strings.Contains(unzoomedContent, "…") {
+		t.Errorf("expected ellipsis in unzoomed content, got: %s", unzoomedContent)
+	}
+
+	// Zoomed: shows complete IPv6 address
+	zoomedContent := FormatNetworkViewportContent(net, 120, true)
+	if !strings.Contains(zoomedContent, "2001:db8:1234:5678::2/64") {
+		t.Errorf("expected full IPv6 address in zoomed content, got: %s", zoomedContent)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
@@ -134,8 +135,14 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 			sb.WriteString("\n")
 		}
 	} else {
-		ipColW := 28
-		nameColW := 36
+		zoomed := len(isZoomed) > 0 && isZoomed[0]
+
+		ipColW := 18
+		nameColW := 22
+		if zoomed {
+			ipColW = 28
+			nameColW = 36
+		}
 
 		headerIP := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", ipColW, "IP ADDRESS"))
 		headerName := theme.Current.TreeHeader.Render(fmt.Sprintf("%-*s", nameColW, "CONTAINER NAME"))
@@ -157,8 +164,15 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 				portStr = "-"
 			}
 
-			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ipStr))
-			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, ep.Name))
+			ipFormatted := ipStr
+			nameFormatted := ep.Name
+			if !zoomed {
+				ipFormatted = ansi.Truncate(ipStr, ipColW, "…")
+				nameFormatted = ansi.Truncate(ep.Name, nameColW, "…")
+			}
+
+			ipDisplay := theme.Current.AccentText.Render(fmt.Sprintf("%-*s", ipColW, ipFormatted))
+			nameDisplay := theme.Current.TreeSelected.Render(fmt.Sprintf("%-*s", nameColW, nameFormatted))
 			portDisplay := theme.Current.Value.Render(portStr)
 
 			fmt.Fprintf(&sb, "  %s  %s  %s\n", ipDisplay, nameDisplay, portDisplay)
