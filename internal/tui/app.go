@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/moby/moby/api/types/events"
+	"github.com/xoaiPro235/docktop/internal/config"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/container"
 	"github.com/xoaiPro235/docktop/internal/tui/components/image"
@@ -89,12 +90,14 @@ var Tabs = []TabDef{
 
 type AppModel struct {
 	dockerClient      docker.Service
+	cfg               *config.Config
 	containerModel    container.Model
 	imageModel        image.Model
 	volumeModel       volume.Model
 	networkModel      network.Model
 	confirmModal      modal.ConfirmModal
 	errorModal        modal.ErrorModal
+	actionMenuModal   modal.ActionMenuModal
 	activeTab         Tab
 	eventCancel       context.CancelFunc
 	eventChan         <-chan events.Message
@@ -108,17 +111,26 @@ type AppModel struct {
 }
 
 func NewApp(cli docker.Service) AppModel {
+	return NewAppWithConfig(cli, config.Default())
+}
+
+func NewAppWithConfig(cli docker.Service, cfg *config.Config) AppModel {
+	if cfg == nil {
+		cfg = config.Default()
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	eventCh, errCh := cli.StreamEvents(ctx)
 
 	return AppModel{
 		dockerClient:      cli,
+		cfg:               cfg,
 		containerModel:    container.New(cli),
 		imageModel:        image.New(cli),
 		volumeModel:       volume.New(cli),
 		networkModel:      network.New(cli),
 		confirmModal:      modal.NewConfirmModal(),
 		errorModal:        modal.NewErrorModal(),
+		actionMenuModal:   modal.NewActionMenuModal(),
 		activeTab:         TabContainers,
 		eventCancel:       cancel,
 		eventChan:         eventCh,
@@ -276,7 +288,7 @@ func (a AppModel) Init() tea.Cmd {
 }
 
 func (a AppModel) isAnyModalActive() bool {
-	return a.errorModal.Active || a.confirmModal.Active
+	return a.errorModal.Active || a.confirmModal.Active || a.actionMenuModal.Active
 }
 
 func (a AppModel) isAnySearching() bool {
@@ -292,6 +304,17 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyPressMsg:
 			var cmd tea.Cmd
 			a.confirmModal, cmd = a.confirmModal.Update(msg)
+			return a, cmd
+		case tea.MouseClickMsg, tea.MouseWheelMsg:
+			return a, nil
+		}
+	}
+
+	if a.actionMenuModal.Active {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			var cmd tea.Cmd
+			a.actionMenuModal, cmd = a.actionMenuModal.Update(msg)
 			return a, cmd
 		case tea.MouseClickMsg, tea.MouseWheelMsg:
 			return a, nil
@@ -358,6 +381,12 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.AppKeys.TabNetworks):
 			if !a.isAnyModalActive() {
 				return a, a.switchTab(TabNetworks)
+			}
+
+		case key.Matches(msg, keys.AppKeys.Menu):
+			if !a.isAnyModalActive() && !a.isAnySearching() {
+				cmd := a.openActionMenu()
+				return a, cmd
 			}
 		}
 
@@ -493,6 +522,12 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case modal.ShowErrorMsg:
 		a.errorModal.Show(msg.Title, msg.Message)
+		return a, nil
+
+	case CustomCommandFinishedMsg:
+		if msg.Err != nil {
+			a.errorModal.Show("Custom Command Error", msg.Err.Error())
+		}
 		return a, nil
 
 	case container.RunCmdMsg:
@@ -717,6 +752,9 @@ func (a AppModel) FooterBindings() []key.Binding {
 	if a.errorModal.Active {
 		return a.errorModal.FooterBindings()
 	}
+	if a.actionMenuModal.Active {
+		return a.actionMenuModal.FooterBindings()
+	}
 
 	var bindings []key.Binding
 	switch a.activeTab {
@@ -841,6 +879,8 @@ func (a AppModel) View() tea.View {
 		out = a.confirmModal.Overlay(out, a.width, a.height)
 	} else if a.errorModal.Active {
 		out = a.errorModal.Overlay(out, a.width, a.height)
+	} else if a.actionMenuModal.Active {
+		out = a.actionMenuModal.Overlay(out, a.width, a.height)
 	}
 
 	v := tea.NewView(out)

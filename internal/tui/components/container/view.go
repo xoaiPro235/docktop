@@ -229,138 +229,53 @@ func (m Model) FooterBindings() []key.Binding {
 	selectedNode := m.SelectedNode()
 	var bindings []key.Binding
 
-	bindings = append(bindings, keys.AppKeys.FocusToggle)
-	if m.isZoomed {
-		bindings = append(bindings, keys.CommonHelpKeys.HelpUnzoom)
-	} else {
-		bindings = append(bindings, keys.CommonHelpKeys.HelpZoom)
-	}
-
-	// If a project or service is selected (docker-compose config / logs view)
+	// If a compose project or service is selected
 	if selectedNode != nil && (selectedNode.Type == NodeProject || selectedNode.Type == NodeService) {
-		if m.focusZone == FocusLeftTree {
-
-			bindings = append(bindings,
-				keys.CommonHelpKeys.HelpNavigate,
-				keys.CommonHelpKeys.HelpFilter,
-				keys.ContainerKeys.ToggleExpand,
-			)
-
-			if selectedNode.IsCompose() {
-				startOrStop := keys.ComposeKeys.Start
-				if selectedNode.HasRunningContainers() {
-					startOrStop = keys.ComposeKeys.Stop
-				}
-
-				switch selectedNode.Type {
-				case NodeProject:
-					bindings = append(bindings,
-						keys.ComposeKeys.Up,
-						keys.ComposeKeys.Build,
-						keys.ComposeKeys.Restart,
-						startOrStop,
-						keys.ComposeKeys.Down,
-					)
-				case NodeService:
-					bindings = append(bindings,
-						keys.ComposeKeys.Up,
-						keys.ComposeKeys.Build,
-						keys.ComposeKeys.Restart,
-						startOrStop,
-						keys.ComposeKeys.Remove,
-					)
-				}
+		if selectedNode.IsCompose() {
+			if selectedNode.HasRunningContainers() {
+				bindings = append(bindings, keys.ComposeKeys.Stop, keys.ComposeKeys.Restart)
+			} else {
+				bindings = append(bindings, keys.ComposeKeys.Start, keys.ComposeKeys.Restart)
 			}
 		}
 		if selectedNode.Name != StandaloneProjectName {
 			bindings = append(bindings, keys.CommonHelpKeys.HelpSubpane)
 		}
-		if m.focusZone == FocusRightPane {
-			if m.composeActivePane == ComposeSubPaneLogs {
-				bindings = append(bindings, keys.ContainerKeys.FollowLogs, keys.ContainerKeys.TopLogs)
-			}
-			bindings = append(bindings, keys.CommonHelpKeys.HelpScrollBoth, keys.ContainerKeys.ToggleWrap)
-		}
-		bindings = append(bindings, keys.AppKeys.Quit)
+		bindings = append(bindings, keys.AppKeys.Menu, keys.AppKeys.Quit)
 		return bindings
 	}
 
 	// Container is selected
-	if m.focusZone == FocusLeftTree {
-		bindings = append(bindings,
-			keys.CommonHelpKeys.HelpMove,
-			keys.ContainerKeys.ToggleExpand,
-		)
-	}
-
-	// Subpane cycling
-	bindings = append(bindings,
-		keys.CommonHelpKeys.HelpSubpane,
-	)
-
-	// Specific to active subpane
-	switch m.activePane {
-	case SubPaneStats:
-		selected := m.SelectedContainer()
-		if selected != nil {
-			switch selected.State {
-			case docker.StateRunning:
-				bindings = append(bindings,
-					keys.ContainerKeys.Stop,
-					keys.ContainerKeys.Pause,
-					keys.ContainerKeys.Restart,
-					keys.ContainerKeys.Remove,
-					keys.ContainerKeys.Prune,
-					keys.ContainerKeys.Exec,
-					keys.ContainerKeys.Attach,
-					keys.ContainerKeys.OpenBrowser,
-				)
-			case docker.StatePaused:
-				bindings = append(bindings,
-					keys.ContainerKeys.Unpause,
-					keys.ContainerKeys.Stop,
-					keys.ContainerKeys.Restart,
-					keys.ContainerKeys.Remove,
-					keys.ContainerKeys.Prune,
-				)
-			default: // stopped, exited, created
-				bindings = append(bindings,
-					keys.ContainerKeys.Start,
-					keys.ContainerKeys.Restart,
-					keys.ContainerKeys.Remove,
-					keys.ContainerKeys.Prune,
-				)
-			}
-			bindings = append(bindings, keys.ContainerKeys.ToggleBraille)
-		}
-
-	case SubPaneLogs:
-		bindings = append(bindings,
-			keys.ContainerKeys.FollowLogs,
-			keys.ContainerKeys.ToggleWrap,
-		)
-		if m.focusZone == FocusRightPane {
-			bindings = append(bindings, keys.CommonHelpKeys.HelpScrollUp)
-		}
-
-	case SubPaneTop:
-		bindings = append(bindings,
-			keys.ContainerKeys.ToggleWrap,
-		)
-		if m.focusZone == FocusRightPane {
-			bindings = append(bindings, keys.CommonHelpKeys.HelpScroll)
-		}
-
-	case SubPaneInspect:
-		bindings = append(bindings,
-			keys.ContainerKeys.ToggleRaw,
-			keys.ContainerKeys.ToggleWrap,
-		)
-		if m.focusZone == FocusRightPane {
-			bindings = append(bindings, keys.CommonHelpKeys.HelpScroll)
+	selected := m.SelectedContainer()
+	if selected != nil {
+		switch selected.State {
+		case docker.StateRunning:
+			bindings = append(bindings,
+				keys.ContainerKeys.Stop,
+				keys.ContainerKeys.Restart,
+				keys.ContainerKeys.Remove,
+			)
+		case docker.StatePaused:
+			bindings = append(bindings,
+				keys.ContainerKeys.Unpause,
+				keys.ContainerKeys.Stop,
+				keys.ContainerKeys.Remove,
+			)
+		default: // stopped, exited, created
+			bindings = append(bindings,
+				keys.ContainerKeys.Start,
+				keys.ContainerKeys.Remove,
+			)
 		}
 	}
 
-	bindings = append(bindings, keys.AppKeys.Quit)
+	// Subpane cycling & Navigation hint
+	bindings = append(bindings, keys.CommonHelpKeys.HelpSubpane)
+
+	if m.activePane == SubPaneLogs {
+		bindings = append(bindings, keys.ContainerKeys.FollowLogs)
+	}
+
+	bindings = append(bindings, keys.AppKeys.Menu, keys.AppKeys.Quit)
 	return bindings
 }

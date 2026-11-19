@@ -18,6 +18,7 @@ type AppKeyMap struct {
 	TabNetworks   key.Binding
 	FocusToggle   key.Binding
 	ZoomToggle    key.Binding
+	Menu          key.Binding
 }
 
 // AppKeys is the default instance of AppKeyMap.
@@ -57,6 +58,10 @@ var AppKeys = AppKeyMap{
 	ZoomToggle: key.NewBinding(
 		key.WithKeys("z", "Z"),
 		key.WithHelp("z", "Zoom"),
+	),
+	Menu: key.NewBinding(
+		key.WithKeys("x", "X"),
+		key.WithHelp("x", "Menu"),
 	),
 }
 
