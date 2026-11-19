@@ -39,19 +39,6 @@ func sendKey(b key.Binding) modal.ActionItem {
 	}
 }
 
-func getImageDisplayName(img docker.ImageInfo) string {
-	if img.Tag != "" && img.Tag != "<none>:<none>" {
-		return img.Tag
-	}
-	if len(img.RepoTags) > 0 && img.RepoTags[0] != "<none>:<none>" {
-		return img.RepoTags[0]
-	}
-	if len(img.ID) > 12 {
-		return img.ID[:12]
-	}
-	return img.ID
-}
-
 // openActionMenu builds the contextual action menu for the active tab and opens the modal.
 func (a *AppModel) openActionMenu() tea.Cmd {
 	var title string
@@ -187,7 +174,7 @@ func (a *AppModel) buildImageActionMenu() (string, []modal.ActionItem, []modal.A
 	var customCmds []modal.ActionItem
 
 	if selected != nil {
-		imgName := getImageDisplayName(*selected)
+		imgName := selected.DisplayName()
 		title = fmt.Sprintf("Actions (%s)", imgName)
 
 		if a.cfg != nil && len(a.cfg.CustomCommands.Images) > 0 {

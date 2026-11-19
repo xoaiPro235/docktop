@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/format"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -71,9 +72,9 @@ func FormatImageDetailsContent(selected *docker.ImageInfo, width int, isZoomed .
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("ID:         "), theme.Current.Value.Render(selected.ID))
 
 	// Created
-	createdStr := docker.FormatTimeAgo(selected.Created)
+	createdStr := format.TimeAgo(selected.Created)
 	if !selected.Created.IsZero() {
-		createdStr = fmt.Sprintf("%s (%s)", docker.FormatTimeAgo(selected.Created), selected.Created.Format("2006-01-02 15:04"))
+		createdStr = fmt.Sprintf("%s (%s)", format.TimeAgo(selected.Created), selected.Created.Format("2006-01-02 15:04"))
 	}
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Created:    "), theme.Current.Value.Render(createdStr))
 
@@ -88,7 +89,7 @@ func FormatImageDetailsContent(selected *docker.ImageInfo, width int, isZoomed .
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("OS/Arch:    "), theme.Current.Value.Render(osArch))
 
 	// Size
-	sizeStr := fmt.Sprintf("%s (%d bytes)", docker.FormatImageSize(selected.Size), selected.Size)
+	sizeStr := fmt.Sprintf("%s (%d bytes)", format.Size(selected.Size), selected.Size)
 	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Size:       "), theme.Current.Value.Render(sizeStr))
 
 	// Tags
@@ -152,7 +153,7 @@ func FormatImageDetailsContent(selected *docker.ImageInfo, width int, isZoomed .
 	// 3. Layer rows (full command un-truncated to allow horizontal scroll)
 	for _, layer := range selected.Layers {
 		numStr := fmt.Sprintf("%-*d", colNumWidth, layer.Index)
-		sizeStr := fmt.Sprintf("%-*s", colSizeWidth, docker.FormatImageSize(selected.Size))
+		sizeStr := fmt.Sprintf("%-*s", colSizeWidth, format.Size(layer.Size))
 		cmdStr := HighlightCommand(layer.Command, 0)
 		fmt.Fprintf(&sb, "  %s %s %s\n",
 			theme.Current.LineNumber.Render(numStr),

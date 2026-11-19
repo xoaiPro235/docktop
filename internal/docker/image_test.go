@@ -89,6 +89,35 @@ func TestCleanImageID(t *testing.T) {
 	}
 }
 
+func TestImageInfo_Methods(t *testing.T) {
+	t.Run("ShortID", func(t *testing.T) {
+		img := ImageInfo{ID: "sha256:719f31ab9820bcde"}
+		if got := img.ShortID(); got != "719f31ab98" {
+			t.Errorf("img.ShortID() = %q, want %q", got, "719f31ab98")
+		}
+	})
+
+	t.Run("DisplayName priority", func(t *testing.T) {
+		// 1. Tag is valid
+		img1 := ImageInfo{ID: "sha256:1234567890abcdef", Tag: "nginx:alpine", RepoTags: []string{"nginx:alpine"}}
+		if got := img1.DisplayName(); got != "nginx:alpine" {
+			t.Errorf("DisplayName() = %q, want %q", got, "nginx:alpine")
+		}
+
+		// 2. Tag is empty or none, RepoTags has a valid tag
+		img2 := ImageInfo{ID: "sha256:1234567890abcdef", Tag: "<none>:<none>", RepoTags: []string{"<none>:<none>", "redis:latest"}}
+		if got := img2.DisplayName(); got != "redis:latest" {
+			t.Errorf("DisplayName() = %q, want %q", got, "redis:latest")
+		}
+
+		// 3. Fallback to ShortID
+		img3 := ImageInfo{ID: "sha256:1234567890abcdef", Tag: "<none>:<none>", RepoTags: []string{"<none>:<none>"}}
+		if got := img3.DisplayName(); got != "1234567890" {
+			t.Errorf("DisplayName() = %q, want %q", got, "1234567890")
+		}
+	})
+}
+
 func Test_displayTag(t *testing.T) {
 	tests := []struct {
 		name         string

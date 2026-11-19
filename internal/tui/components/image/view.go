@@ -7,7 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/format"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
@@ -141,10 +141,10 @@ func (m Model) View() string {
 			}
 
 			// Styled ID
-			idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, docker.CleanImageID(img.ID)))
+			idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, img.ShortID()))
 
 			// Styled Size
-			sizeDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", sizeColWidth, docker.FormatImageSize(img.Size)))
+			sizeDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", sizeColWidth, format.Size(img.Size)))
 
 			// Styled Status
 			var statusDisplay string
