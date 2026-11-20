@@ -82,9 +82,66 @@ theme: "terminal"
 #   host: "ssh://user@remote-vps:22"
 #   host: "tcp://192.168.1.100:2376"
 # host: ""
+
+# Container Icons:
+# Maps image names, full container names, or keywords to custom Nerd Font glyphs in the container tree.
+# Docktop includes standard built-in icons for common databases, web servers, and runtimes.
+# You can customize or add your own mappings below:
+# Examples:
+# icons:
+#   postgres: "󰆼"
+#   redis: "󰟆"
+#   mysql: "󰆚"
+#   nginx: "󱏿"
+#   node: "󰎙"
+#   python: "󰌠"
+#   default: "󰡨"
+
+# Custom Commands:
+# User-defined shell commands shown in the Action Menu ('x' key).
+# Commands execute in the terminal with template variables:
+#   Containers: {{ .ID }}, {{ .Name }}, {{ .Image }}
+#   Images:     {{ .ID }}, {{ .Repository }}, {{ .Tag }}
+#   Volumes:    {{ .Name }}
+#   Networks:   {{ .ID }}, {{ .Name }}
+#
+# Options:
+#   pause: true - Waits for user to press Enter before returning to docktop.
+#                 Recommended for informational commands (e.g., inspect, history, top).
+#
+# Examples:
+# customCommands:
+#   containers:
+#     - name: "Bash Shell"
+#       command: "docker exec -it {{ .ID }} bash"
+#     - name: "Inspect Container JSON"
+#       command: "docker inspect {{ .ID }}"
+#       pause: true
+#     - name: "Top Processes"
+#       command: "docker top {{ .ID }}"
+#       pause: true
+#   images:
+#     - name: "Image History"
+#       command: "docker history {{ .ID }}"
+#       pause: true
+#     - name: "Inspect Image"
+#       command: "docker image inspect {{ .ID }}"
+#       pause: true
+#   volumes:
+#     - name: "Browse Files (Busybox)"
+#       command: "docker run --rm -it -v {{ .Name }}:/v busybox ls -la /v"
+#       pause: true
+#   networks:
+#     - name: "Inspect Network"
+#       command: "docker network inspect {{ .Name }}"
+#       pause: true
 ```
 
 > **Tip:** Setting `theme: "terminal"` will make `docktop` automatically inherit whatever colors your terminal emulator (Kitty, Alacritty, iTerm2, WezTerm) is configured with!
+>
+> **Action Menu (`x` key):** Press `x` anywhere to open the Action Menu for the selected container, image, volume, or network to execute built-in actions or your own `customCommands`.
+>
+> **Nerd Font Icons:** Docktop uses Nerd Font glyphs to display intuitive service/container icons in the tree. Ensure your terminal has a [Nerd Font](https://www.nerdfonts.com/) installed (e.g., JetBrainsMono, FiraCode) for best appearance.
 >
 > **Remote Docker / SSH:** You can specify a remote Docker endpoint via `-H / --host`, the `host` config option, or `DOCKER_HOST`:
 > ```bash
