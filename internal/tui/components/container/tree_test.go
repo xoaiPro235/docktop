@@ -86,11 +86,13 @@ func TestTreeNode_DisplayTitle(t *testing.T) {
 
 func TestMatchIcon(t *testing.T) {
 	icons := map[string]string{
-		"postgres": "󰆼",
-		"redis":    "󰟆",
-		"mysql":    "󰆚",
-		"node":     "󰎙",
-		"default":  "󰡨",
+		"postgres":      "󰆼",
+		"redis":         "󰟆",
+		"mysql":         "󰆚",
+		"node":          "󰎙",
+		"my-custom-app": "🚀",
+		"web_worker":    "⚙️",
+		"default":       "󰡨",
 	}
 
 	tests := []struct {
@@ -105,6 +107,8 @@ func TestMatchIcon(t *testing.T) {
 		{"digest stripped properly", "mysql:8.0@sha256:abcdef1234567890", "db", "󰆚"},
 		{"token in repo name", "ghcr.io/org/my-node-service:v2", "api", "󰎙"},
 		{"token in container name", "custom-internal-image:latest", "prod-mysql-slave", "󰆚"},
+		{"delimiter-containing container name exact match (hyphen)", "custom-image:latest", "my-custom-app", "🚀"},
+		{"delimiter-containing container name exact match (underscore)", "scratch:latest", "web_worker", "⚙️"},
 		{"token false-positive avoidance", "algo-service:latest", "trader", "󰡨"},
 		{"fallback to default", "unknown-vendor/secret-app:1.0", "worker", "󰡨"},
 	}

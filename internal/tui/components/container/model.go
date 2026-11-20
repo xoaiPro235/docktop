@@ -116,7 +116,7 @@ func (m *Model) SelectedContainer() *docker.ContainerInfo {
 	return nil
 }
 
-// SetIcons sets the mapping of keywords to Nerd Font icons and rebuilds the tree.
+// SetIcons sets the mapping of image/container names and keywords to Nerd Font icons and rebuilds the tree.
 func (m *Model) SetIcons(icons map[string]string) {
 	m.icons = icons
 	m.rebuildTree()

@@ -267,7 +267,7 @@ theme: "tokyo-night"
 # host: ""
 
 # Container Icons:
-# Maps image name or container name keywords to custom Nerd Font glyphs in the container tree.
+# Maps image names, full container names, or keywords to custom Nerd Font glyphs in the container tree.
 # Docktop includes standard built-in icons for common databases, web servers, and runtimes.
 # You can customize or add your own mappings below:
 # Examples:

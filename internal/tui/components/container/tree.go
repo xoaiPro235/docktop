@@ -213,8 +213,8 @@ func findOrCreateChild(parent *TreeNode, name string, nodeType NodeType, stateMa
 }
 
 // MatchIcon finds an appropriate Nerd Font icon for a container given its image and container name.
-// It prioritizes exact repository match, token keyword match on image repo and container name,
-// and falls back to icons["default"].
+// It prioritizes exact repository match, full container name match, token keyword match
+// on image repo and container name, and falls back to icons["default"].
 func MatchIcon(imageName, containerName string, icons map[string]string) string {
 	if len(icons) == 0 {
 		return ""
@@ -241,26 +241,31 @@ func MatchIcon(imageName, containerName string, icons map[string]string) string 
 	}
 
 	// 1. Direct exact match on base repository
-	if icon, ok := icons[baseRepo]; ok && icon != "" {
+	if icon, ok := icons[baseRepo]; ok && baseRepo != "default" && icon != "" {
 		return icon
 	}
 
-	// 2. Token match on base repository (e.g. "postgres-exporter" -> ["postgres", "exporter"])
+	// 2. Direct exact match on normalized container name (supports delimiter-containing keys)
+	cName := strings.ToLower(strings.TrimSpace(containerName))
+	if icon, ok := icons[cName]; ok && cName != "default" && icon != "" {
+		return icon
+	}
+
+	// 3. Token match on base repository (e.g. "postgres-exporter" -> ["postgres", "exporter"])
 	for _, token := range splitNameTokens(baseRepo) {
 		if icon, ok := icons[token]; ok && token != "default" && icon != "" {
 			return icon
 		}
 	}
 
-	// 3. Token match on container name (e.g. "my_redis_cache" -> ["my", "redis", "cache"])
-	cName := strings.ToLower(strings.TrimSpace(containerName))
+	// 4. Token match on container name (e.g. "my_redis_cache" -> ["my", "redis", "cache"])
 	for _, token := range splitNameTokens(cName) {
 		if icon, ok := icons[token]; ok && token != "default" && icon != "" {
 			return icon
 		}
 	}
 
-	// 4. Fallback to default icon
+	// 5. Fallback to default icon
 	if def, ok := icons["default"]; ok {
 		return def
 	}
