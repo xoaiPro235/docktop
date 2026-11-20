@@ -213,19 +213,25 @@ func findOrCreateChild(parent *TreeNode, name string, nodeType NodeType, stateMa
 }
 
 // MatchIcon finds an appropriate Nerd Font icon for a container given its image and container name.
-// It prioritizes exact repository match, full container name match, token keyword match
-// on image repo and container name, and falls back to icons["default"].
+// It prioritizes exact container name match, exact repository match (full path then base repo),
+// token keyword match on image repo and container name, and falls back to icons["default"].
 func MatchIcon(imageName, containerName string, icons map[string]string) string {
 	if len(icons) == 0 {
 		return ""
 	}
 
+	// 1. Direct exact match on normalized container name (custom per-container icon wins over image)
+	cName := strings.ToLower(strings.TrimSpace(containerName))
+	if icon, ok := icons[cName]; ok && cName != "default" && icon != "" {
+		return icon
+	}
+
 	img := strings.ToLower(strings.TrimSpace(imageName))
-	// 1. Strip digest (@sha256:...)
+	// Strip digest (@sha256:...)
 	if idx := strings.Index(img, "@"); idx != -1 {
 		img = img[:idx]
 	}
-	// 2. Strip tag (:latest) after the last slash (retains registry:port intact)
+	// Strip tag (:latest) after the last slash (retains registry:port intact)
 	lastSlash := strings.LastIndex(img, "/")
 	if lastSlash != -1 {
 		if idx := strings.Index(img[lastSlash+1:], ":"); idx != -1 {
@@ -235,37 +241,48 @@ func MatchIcon(imageName, containerName string, icons map[string]string) string 
 		img = img[:idx]
 	}
 
-	baseRepo := img
-	if lastSlash != -1 {
-		baseRepo = img[lastSlash+1:]
+	// Extract repository path by stripping registry host if present
+	firstSlash := strings.Index(img, "/")
+	repoPath := img
+	if firstSlash != -1 {
+		domain := img[:firstSlash]
+		if strings.Contains(domain, ".") || strings.Contains(domain, ":") || domain == "localhost" {
+			repoPath = img[firstSlash+1:]
+		}
 	}
 
-	// 1. Direct exact match on base repository
-	if icon, ok := icons[baseRepo]; ok && baseRepo != "default" && icon != "" {
+	baseRepo := repoPath
+	if idx := strings.LastIndex(repoPath, "/"); idx != -1 {
+		baseRepo = repoPath[idx+1:]
+	}
+
+	// 2. Direct exact match on full repository path (e.g. "mssql/server", "bitnami/redis")
+	if icon, ok := icons[repoPath]; ok && repoPath != "default" && icon != "" {
 		return icon
 	}
 
-	// 2. Direct exact match on normalized container name (supports delimiter-containing keys)
-	cName := strings.ToLower(strings.TrimSpace(containerName))
-	if icon, ok := icons[cName]; ok && cName != "default" && icon != "" {
-		return icon
+	// 3. Direct exact match on base repository (e.g. "postgres", "redis", "nginx")
+	if baseRepo != repoPath {
+		if icon, ok := icons[baseRepo]; ok && baseRepo != "default" && icon != "" {
+			return icon
+		}
 	}
 
-	// 3. Token match on base repository (e.g. "postgres-exporter" -> ["postgres", "exporter"])
-	for _, token := range splitNameTokens(baseRepo) {
+	// 4. Token match on repository path (e.g. "mssql/server" -> ["mssql", "server"], "postgres-exporter" -> ["postgres", "exporter"])
+	for _, token := range splitNameTokens(repoPath) {
 		if icon, ok := icons[token]; ok && token != "default" && icon != "" {
 			return icon
 		}
 	}
 
-	// 4. Token match on container name (e.g. "my_redis_cache" -> ["my", "redis", "cache"])
+	// 5. Token match on container name (e.g. "my_redis_cache" -> ["my", "redis", "cache"])
 	for _, token := range splitNameTokens(cName) {
 		if icon, ok := icons[token]; ok && token != "default" && icon != "" {
 			return icon
 		}
 	}
 
-	// 5. Fallback to default icon
+	// 6. Fallback to default icon
 	if def, ok := icons["default"]; ok {
 		return def
 	}
