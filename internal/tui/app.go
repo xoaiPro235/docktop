@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -325,15 +324,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if a.actionMenuModal.Active {
 		switch msg := msg.(type) {
 		case tea.KeyPressMsg:
-			wasActive := a.actionMenuModal.Active
 			var cmd tea.Cmd
 			a.actionMenuModal, cmd = a.actionMenuModal.Update(msg)
-			if wasActive && !a.actionMenuModal.Active && cmd != nil {
-				// Normalize focus to left tree so container and compose actions run properly
-				if a.activeTab == TabContainers {
-					a.containerModel.SetFocus(container.FocusLeftTree)
-				}
-			}
 			return a, cmd
 		case tea.MouseWheelMsg:
 			var cmd tea.Cmd
@@ -489,6 +481,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		a.ready = true
+		a.actionMenuModal.SetHeight(msg.Height)
 		// Subtract 3 lines for header tab bar and footer help
 		a.containerModel.SetSize(msg.Width, msg.Height-3)
 		a.imageModel.SetSize(msg.Width, msg.Height-3)
@@ -501,14 +494,26 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
 		if a.actionMenuModal.Active && a.activeTab == TabContainers && a.actionMenuModal.TargetID != "" {
+			targetID := a.actionMenuModal.TargetID
 			targetStillExists := false
 			for _, c := range msg {
-				if c.ID == a.actionMenuModal.TargetID ||
-					c.ProjectName == a.actionMenuModal.TargetID ||
-					"proj:"+c.ProjectName == a.actionMenuModal.TargetID ||
-					strings.HasPrefix(a.actionMenuModal.TargetID, "svc:"+c.ProjectName) {
+				if c.ID == targetID {
 					targetStillExists = true
 					break
+				}
+				if c.ProjectName != "" {
+					if targetID == c.ProjectName || targetID == "proj:"+c.ProjectName {
+						targetStillExists = true
+						break
+					}
+					svcName := c.Service
+					if svcName == "" {
+						svcName = "other"
+					}
+					if targetID == fmt.Sprintf("svc:%s/%s", c.ProjectName, svcName) {
+						targetStillExists = true
+						break
+					}
 				}
 			}
 			if !targetStillExists {

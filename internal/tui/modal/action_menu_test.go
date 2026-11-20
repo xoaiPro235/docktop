@@ -189,6 +189,7 @@ func TestActionMenuModal_CaseSensitiveShortcuts(t *testing.T) {
 
 func TestActionMenuModal_ScrollWithViewport(t *testing.T) {
 	m := NewActionMenuModal()
+	m.SetHeight(24)
 	var actions []ActionItem
 	for i := 1; i <= 20; i++ {
 		actions = append(actions, ActionItem{
@@ -205,12 +206,15 @@ func TestActionMenuModal_ScrollWithViewport(t *testing.T) {
 		t.Errorf("Modal height %d exceeds maximum height 24", len(lines))
 	}
 
-	// Navigate down to item 18
+	// Navigate down to item 18 (below the first page)
 	for i := 0; i < 18; i++ {
 		m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
 	}
 	if m.SelectedIndex != 18 {
 		t.Fatalf("SelectedIndex = %d, want 18", m.SelectedIndex)
+	}
+	if m.ScrollOffset == 0 {
+		t.Fatalf("ScrollOffset should be > 0 after navigating to item 18, got %d", m.ScrollOffset)
 	}
 
 	// In the constrained view, selected item must be present
@@ -219,7 +223,32 @@ func TestActionMenuModal_ScrollWithViewport(t *testing.T) {
 		t.Errorf("Selected item 'Action Item S' not visible in constrained view: %s", viewWithSelected)
 	}
 
-	// Mouse wheel up/down
+	idxBefore := m.SelectedIndex
+
+	// Mouse wheel UP moves SelectedIndex up (matching tree behavior)
 	m, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
-	m, _ = m.Update(tea.MouseWheelDown)
+	if m.SelectedIndex != idxBefore-1 {
+		t.Errorf("SelectedIndex after wheel-up = %d, want %d", m.SelectedIndex, idxBefore-1)
+	}
+
+	// Mouse wheel DOWN moves SelectedIndex back down (matching tree behavior)
+	m, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if m.SelectedIndex != idxBefore {
+		t.Errorf("SelectedIndex after wheel-down = %d, want %d", m.SelectedIndex, idxBefore)
+	}
+
+	// Scrolling up to the top should adjust ScrollOffset to 0 and show top items
+	for i := 0; i < 18; i++ {
+		m, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	}
+	if m.SelectedIndex != 0 {
+		t.Errorf("SelectedIndex after scrolling to top = %d, want 0", m.SelectedIndex)
+	}
+	if m.ScrollOffset != 0 {
+		t.Errorf("ScrollOffset at top = %d, want 0", m.ScrollOffset)
+	}
+	topView := m.ViewWithHeight(24)
+	if !strings.Contains(topView, "Action Item A") {
+		t.Errorf("First item should be visible at top: %s", topView)
+	}
 }

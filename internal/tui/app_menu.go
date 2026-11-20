@@ -61,6 +61,7 @@ func (a *AppModel) openActionMenu() tea.Cmd {
 		return nil
 	}
 
+	a.actionMenuModal.SetHeight(a.height)
 	a.actionMenuModal.Show(title, actions, customCmds, a.buildAppActions(), targetID)
 	return nil
 }

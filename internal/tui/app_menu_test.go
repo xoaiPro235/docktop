@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/config"
 	"github.com/xoaiPro235/docktop/internal/docker"
-	"github.com/xoaiPro235/docktop/internal/tui/components/container"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
@@ -277,44 +276,6 @@ func TestShellEscape(t *testing.T) {
 	}
 }
 
-func TestAppModel_ActionMenu_FocusNormalization(t *testing.T) {
-	mockCli := helperMockService()
-	app := NewApp(mockCli)
-	app.ready = true
-	app.width = 100
-	app.height = 30
-
-	app.containerModel.SetContainers([]docker.ContainerInfo{
-		{ID: "c1", Name: "my-app", State: docker.StateRunning},
-	})
-
-	// Set focus to right pane
-	app.containerModel.SetFocus(container.FocusRightPane)
-	if app.containerModel.FocusZone() != container.FocusRightPane {
-		t.Fatal("Focus should be on right pane")
-	}
-
-	// Open action menu
-	updatedApp, _ := app.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
-	app = updatedApp.(AppModel)
-
-	if !app.actionMenuModal.Active {
-		t.Fatal("Action menu should be active")
-	}
-
-	// Trigger 's' (Stop action)
-	updatedApp, _ = app.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
-	app = updatedApp.(AppModel)
-
-	// Menu should be closed and focus normalized to Left Tree
-	if app.actionMenuModal.Active {
-		t.Error("Action menu should be dismissed")
-	}
-	if app.containerModel.FocusZone() != container.FocusLeftTree {
-		t.Errorf("Focus zone = %v, want FocusLeftTree (%v)", app.containerModel.FocusZone(), container.FocusLeftTree)
-	}
-}
-
 func TestAppModel_ActionMenu_TargetResourceInvalidation(t *testing.T) {
 	mockCli := helperMockService()
 	app := NewApp(mockCli)
@@ -346,6 +307,27 @@ func TestAppModel_ActionMenu_TargetResourceInvalidation(t *testing.T) {
 	// Action menu must be invalidated and hidden!
 	if app.actionMenuModal.Active {
 		t.Error("Action menu should be hidden when target container disappears")
+	}
+
+	// Test compose service exact matching: TargetID = "svc:shop/db"
+	app.actionMenuModal.Show("Compose Actions", nil, nil, nil, "svc:shop/db")
+	// If refresh only contains "shop/web", "svc:shop/db" must be invalidated
+	updatedApp, _ = app.Update(ContainerListMsg([]docker.ContainerInfo{
+		{ID: "c3", Name: "shop_web_1", ProjectName: "shop", Service: "web", State: docker.StateRunning},
+	}))
+	app = updatedApp.(AppModel)
+	if app.actionMenuModal.Active {
+		t.Error("Action menu should close when exact compose service disappears")
+	}
+
+	// Standalone container with empty ProjectName should NOT match compose service
+	app.actionMenuModal.Show("Compose Actions", nil, nil, nil, "svc:shop/db")
+	updatedApp, _ = app.Update(ContainerListMsg([]docker.ContainerInfo{
+		{ID: "c4", Name: "standalone-app", ProjectName: "", State: docker.StateRunning},
+	}))
+	app = updatedApp.(AppModel)
+	if app.actionMenuModal.Active {
+		t.Error("Action menu should close when only standalone container is present")
 	}
 }
 
