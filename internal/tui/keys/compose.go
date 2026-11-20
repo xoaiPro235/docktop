@@ -40,7 +40,7 @@ var ComposeKeys = ComposeKeyMap{
 		key.WithHelp("s", "Start"),
 	),
 	Remove: key.NewBinding(
-		key.WithKeys("x", "X"),
-		key.WithHelp("x", "Remove"),
+		key.WithKeys("d", "D"),
+		key.WithHelp("d", "Remove"),
 	),
 }

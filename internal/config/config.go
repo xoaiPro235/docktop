@@ -16,17 +16,34 @@ const (
 	ConfigDirName  = "docktop"
 )
 
+// CustomCommand represents a user-defined shell command in the configuration.
+type CustomCommand struct {
+	Name    string `yaml:"name"`
+	Command string `yaml:"command"`
+	Pause   bool   `yaml:"pause,omitempty"`
+}
+
+// CustomCommandsConfig holds custom commands categorized by target tab.
+type CustomCommandsConfig struct {
+	Containers []CustomCommand `yaml:"containers,omitempty"`
+	Images     []CustomCommand `yaml:"images,omitempty"`
+	Volumes    []CustomCommand `yaml:"volumes,omitempty"`
+	Networks   []CustomCommand `yaml:"networks,omitempty"`
+}
+
 // Config represents the application configuration.
 type Config struct {
-	Theme string `yaml:"theme"`
-	Host  string `yaml:"host,omitempty"`
+	Theme          string               `yaml:"theme"`
+	Host           string               `yaml:"host,omitempty"`
+	CustomCommands CustomCommandsConfig `yaml:"customCommands,omitempty"`
 }
 
 // Default returns a Config struct initialized with default values.
 func Default() *Config {
 	return &Config{
-		Theme: DefaultTheme,
-		Host:  "",
+		Theme:          DefaultTheme,
+		Host:           "",
+		CustomCommands: CustomCommandsConfig{},
 	}
 }
 
@@ -110,6 +127,46 @@ theme: "tokyo-night"
 #   host: "ssh://user@remote-vps:22"
 #   host: "tcp://192.168.1.100:2376"
 # host: ""
+
+# Custom Commands:
+# User-defined shell commands shown in the Action Menu ('x' key).
+# Commands execute in the terminal with template variables:
+#   Containers: {{ .ID }}, {{ .Name }}, {{ .Image }}
+#   Images:     {{ .ID }}, {{ .Repository }}, {{ .Tag }}
+#   Volumes:    {{ .Name }}
+#   Networks:   {{ .ID }}, {{ .Name }}
+#
+# Options:
+#   pause: true - Waits for user to press Enter before returning to docktop.
+#                 Recommended for informational commands (e.g., inspect, history, top).
+#
+# Examples:
+# customCommands:
+#   containers:
+#     - name: "Bash Shell"
+#       command: "docker exec -it {{ .ID }} bash"
+#     - name: "Inspect Container JSON"
+#       command: "docker inspect {{ .ID }}"
+#       pause: true
+#     - name: "Top Processes"
+#       command: "docker top {{ .ID }}"
+#       pause: true
+#   images:
+#     - name: "Image History"
+#       command: "docker history {{ .ID }}"
+#       pause: true
+#     - name: "Inspect Image"
+#       command: "docker image inspect {{ .ID }}"
+#       pause: true
+#   volumes:
+#     - name: "Browse Files (Busybox)"
+#       command: "docker run --rm -it -v {{ .Name }}:/v busybox ls -la /v"
+#       pause: true
+#   networks:
+#     - name: "Inspect Network"
+#       command: "docker network inspect {{ .Name }}"
+#       pause: true
+
 `
 	return os.WriteFile(path, []byte(template), 0o644)
 }

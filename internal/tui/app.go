@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/moby/moby/api/types/events"
+	"github.com/xoaiPro235/docktop/internal/config"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/container"
 	"github.com/xoaiPro235/docktop/internal/tui/components/image"
@@ -89,12 +90,14 @@ var Tabs = []TabDef{
 
 type AppModel struct {
 	dockerClient      docker.Service
+	cfg               *config.Config
 	containerModel    container.Model
 	imageModel        image.Model
 	volumeModel       volume.Model
 	networkModel      network.Model
 	confirmModal      modal.ConfirmModal
 	errorModal        modal.ErrorModal
+	actionMenuModal   modal.ActionMenuModal
 	activeTab         Tab
 	eventCancel       context.CancelFunc
 	eventChan         <-chan events.Message
@@ -108,17 +111,26 @@ type AppModel struct {
 }
 
 func NewApp(cli docker.Service) AppModel {
+	return NewAppWithConfig(cli, config.Default())
+}
+
+func NewAppWithConfig(cli docker.Service, cfg *config.Config) AppModel {
+	if cfg == nil {
+		cfg = config.Default()
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	eventCh, errCh := cli.StreamEvents(ctx)
 
 	return AppModel{
 		dockerClient:      cli,
+		cfg:               cfg,
 		containerModel:    container.New(cli),
 		imageModel:        image.New(cli),
 		volumeModel:       volume.New(cli),
 		networkModel:      network.New(cli),
 		confirmModal:      modal.NewConfirmModal(),
 		errorModal:        modal.NewErrorModal(),
+		actionMenuModal:   modal.NewActionMenuModal(),
 		activeTab:         TabContainers,
 		eventCancel:       cancel,
 		eventChan:         eventCh,
@@ -276,7 +288,7 @@ func (a AppModel) Init() tea.Cmd {
 }
 
 func (a AppModel) isAnyModalActive() bool {
-	return a.errorModal.Active || a.confirmModal.Active
+	return a.errorModal.Active || a.confirmModal.Active || a.actionMenuModal.Active
 }
 
 func (a AppModel) isAnySearching() bool {
@@ -305,6 +317,21 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.errorModal, cmd = a.errorModal.Update(msg)
 			return a, cmd
 		case tea.MouseWheelMsg:
+			return a, nil
+		}
+	}
+
+	if a.actionMenuModal.Active {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			var cmd tea.Cmd
+			a.actionMenuModal, cmd = a.actionMenuModal.Update(msg)
+			return a, cmd
+		case tea.MouseWheelMsg:
+			var cmd tea.Cmd
+			a.actionMenuModal, cmd = a.actionMenuModal.Update(msg)
+			return a, cmd
+		case tea.MouseClickMsg:
 			return a, nil
 		}
 	}
@@ -358,6 +385,12 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.AppKeys.TabNetworks):
 			if !a.isAnyModalActive() {
 				return a, a.switchTab(TabNetworks)
+			}
+
+		case key.Matches(msg, keys.AppKeys.Menu):
+			if !a.isAnyModalActive() && !a.isAnySearching() {
+				cmd := a.openActionMenu()
+				return a, cmd
 			}
 		}
 
@@ -448,6 +481,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		a.ready = true
+		a.actionMenuModal.SetHeight(msg.Height)
 		// Subtract 3 lines for header tab bar and footer help
 		a.containerModel.SetSize(msg.Width, msg.Height-3)
 		a.imageModel.SetSize(msg.Width, msg.Height-3)
@@ -459,6 +493,33 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
+		if a.actionMenuModal.Active && a.activeTab == TabContainers && a.actionMenuModal.TargetID != "" {
+			targetID := a.actionMenuModal.TargetID
+			targetStillExists := false
+			for _, c := range msg {
+				if c.ID == targetID {
+					targetStillExists = true
+					break
+				}
+				if c.ProjectName != "" {
+					if targetID == c.ProjectName || targetID == "proj:"+c.ProjectName {
+						targetStillExists = true
+						break
+					}
+					svcName := c.Service
+					if svcName == "" {
+						svcName = "other"
+					}
+					if targetID == fmt.Sprintf("svc:%s/%s", c.ProjectName, svcName) {
+						targetStillExists = true
+						break
+					}
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
+		}
 		if cmd := a.containerModel.SetContainers(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -466,6 +527,18 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ImageListMsg:
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
+		}
+		if a.actionMenuModal.Active && a.activeTab == TabImages && a.actionMenuModal.TargetID != "" {
+			targetStillExists := false
+			for _, img := range msg {
+				if img.ID == a.actionMenuModal.TargetID {
+					targetStillExists = true
+					break
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
 		}
 		if cmd := a.imageModel.SetImages(msg); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -475,6 +548,18 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
+		if a.actionMenuModal.Active && a.activeTab == TabVolumes && a.actionMenuModal.TargetID != "" {
+			targetStillExists := false
+			for _, vol := range msg {
+				if vol.Name == a.actionMenuModal.TargetID {
+					targetStillExists = true
+					break
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
+		}
 		if cmd := a.volumeModel.SetVolumes(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -482,6 +567,18 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case NetworkListMsg:
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
+		}
+		if a.actionMenuModal.Active && a.activeTab == TabNetworks && a.actionMenuModal.TargetID != "" {
+			targetStillExists := false
+			for _, net := range msg {
+				if net.ID == a.actionMenuModal.TargetID {
+					targetStillExists = true
+					break
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
 		}
 		if cmd := a.networkModel.SetNetworks(msg); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -493,6 +590,12 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case modal.ShowErrorMsg:
 		a.errorModal.Show(msg.Title, msg.Message)
+		return a, nil
+
+	case CustomCommandFinishedMsg:
+		if msg.Err != nil {
+			a.errorModal.Show("Custom Command Error", msg.Err.Error())
+		}
 		return a, nil
 
 	case container.RunCmdMsg:
@@ -717,6 +820,9 @@ func (a AppModel) FooterBindings() []key.Binding {
 	if a.errorModal.Active {
 		return a.errorModal.FooterBindings()
 	}
+	if a.actionMenuModal.Active {
+		return a.actionMenuModal.FooterBindings()
+	}
 
 	var bindings []key.Binding
 	switch a.activeTab {
@@ -841,6 +947,8 @@ func (a AppModel) View() tea.View {
 		out = a.confirmModal.Overlay(out, a.width, a.height)
 	} else if a.errorModal.Active {
 		out = a.errorModal.Overlay(out, a.width, a.height)
+	} else if a.actionMenuModal.Active {
+		out = a.actionMenuModal.Overlay(out, a.width, a.height)
 	}
 
 	v := tea.NewView(out)

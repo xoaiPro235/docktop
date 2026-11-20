@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
+	"github.com/xoaiPro235/docktop/internal/format"
 )
 
 type ImageInfo struct {
@@ -64,15 +64,11 @@ func CleanLayerCommand(cmd string) string {
 
 // FormatTimeAgo formats a time into a relative "X ago" string.
 func FormatTimeAgo(t time.Time) string {
-	d := time.Since(t)
-	if d < time.Minute {
-		return "just now"
-	}
-	return units.HumanDuration(d) + " ago"
+	return format.TimeAgo(t)
 }
 
 func FormatImageSize(size int64) string {
-	return units.HumanSize(float64(size))
+	return format.Size(size)
 }
 
 func CleanImageID(id string) string {
@@ -81,6 +77,25 @@ func CleanImageID(id string) string {
 		return id[:10]
 	}
 	return id
+}
+
+// ShortID returns the cleaned and truncated 10-character image ID without the "sha256:" prefix.
+func (img ImageInfo) ShortID() string {
+	return CleanImageID(img.ID)
+}
+
+// DisplayName returns a human-friendly representation of the image:
+// prioritized by Tag, the first non-empty/non-none RepoTag, or fallback to ShortID.
+func (img ImageInfo) DisplayName() string {
+	if img.Tag != "" && img.Tag != "<none>:<none>" {
+		return img.Tag
+	}
+	for _, t := range img.RepoTags {
+		if t != "" && t != "<none>:<none>" {
+			return t
+		}
+	}
+	return img.ShortID()
 }
 
 func displayTag(raw image.Summary) (string, bool) {

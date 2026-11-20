@@ -6,7 +6,6 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
-	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/tui/components/searchbar"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/layout"
@@ -154,10 +153,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case key.Matches(msg, keys.ImageKeys.Remove):
 			selected := m.SelectedImage()
 			if selected != nil && !m.isImageActionRunning(selected.ID) {
-				targetDisplay := selected.Tag
-				if targetDisplay == "<none>:<none>" {
-					targetDisplay = docker.CleanImageID(selected.ID)
-				}
+				targetDisplay := selected.DisplayName()
 				targetID := selected.ID
 				return m, func() tea.Msg {
 					return modal.ShowConfirmMsg{
