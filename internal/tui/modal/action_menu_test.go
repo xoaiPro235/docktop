@@ -164,3 +164,62 @@ func TestActionMenuModal_FooterBindings(t *testing.T) {
 		t.Fatalf("FooterBindings should return 4 bindings, got %d", len(bindings))
 	}
 }
+
+func TestActionMenuModal_CaseSensitiveShortcuts(t *testing.T) {
+	m := NewActionMenuModal()
+	actions := []ActionItem{
+		{Key: "p", Title: "Pause", Action: func() tea.Msg { return testActionMsg{id: "pause"} }},
+		{Key: "P", Title: "Prune", Action: func() tea.Msg { return testActionMsg{id: "prune"} }},
+	}
+	m.Show("Actions", actions, nil, nil)
+
+	// Pressing 'P' must trigger Prune, NOT Pause
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'P', Text: "P"})
+	if cmd == nil || cmd() != (testActionMsg{id: "prune"}) {
+		t.Errorf("Expected 'prune' for 'P', got %v", cmd)
+	}
+
+	// Pressing 'p' must trigger Pause
+	m.Show("Actions", actions, nil, nil)
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
+	if cmd == nil || cmd() != (testActionMsg{id: "pause"}) {
+		t.Errorf("Expected 'pause' for 'p', got %v", cmd)
+	}
+}
+
+func TestActionMenuModal_ScrollWithViewport(t *testing.T) {
+	m := NewActionMenuModal()
+	var actions []ActionItem
+	for i := 1; i <= 20; i++ {
+		actions = append(actions, ActionItem{
+			Key:   string(rune('a' + i - 1)),
+			Title: "Action Item " + string(rune('A'+i-1)),
+		})
+	}
+	m.Show("Many Actions", actions, nil, nil)
+
+	// Terminal height 24 rows
+	viewConstrained := m.ViewWithHeight(24)
+	lines := strings.Split(viewConstrained, "\n")
+	if len(lines) > 24 {
+		t.Errorf("Modal height %d exceeds maximum height 24", len(lines))
+	}
+
+	// Navigate down to item 18
+	for i := 0; i < 18; i++ {
+		m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
+	}
+	if m.SelectedIndex != 18 {
+		t.Fatalf("SelectedIndex = %d, want 18", m.SelectedIndex)
+	}
+
+	// In the constrained view, selected item must be present
+	viewWithSelected := m.ViewWithHeight(24)
+	if !strings.Contains(viewWithSelected, "Action Item S") {
+		t.Errorf("Selected item 'Action Item S' not visible in constrained view: %s", viewWithSelected)
+	}
+
+	// Mouse wheel up/down
+	m, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	m, _ = m.Update(tea.MouseWheelDown)
+}

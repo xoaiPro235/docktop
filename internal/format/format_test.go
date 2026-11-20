@@ -26,14 +26,14 @@ func TestSize(t *testing.T) {
 		want  string
 	}{
 		{0, "0B"},
-		{1024, "1kB"},
+		{1024, "1.024kB"},
 		{1024 * 1024 * 150, "157.3MB"},
 	}
 
 	for _, tt := range tests {
 		got := Size(tt.bytes)
-		if len(got) == 0 {
-			t.Errorf("Size(%d) returned empty string", tt.bytes)
+		if got != tt.want {
+			t.Errorf("Size(%d) = %q, want %q", tt.bytes, got, tt.want)
 		}
 	}
 }

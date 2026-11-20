@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/xoaiPro235/docktop/internal/config"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/tui/components/container"
 	"github.com/xoaiPro235/docktop/internal/tui/modal"
 )
 
@@ -224,7 +225,12 @@ func TestBuildCustomCommandExec(t *testing.T) {
 		if cmd == nil {
 			t.Fatal("Expected non-nil *exec.Cmd")
 		}
-		wantArgs := []string{"docker", "history", "abc123"}
+		var wantArgs []string
+		if runtime.GOOS == "windows" {
+			wantArgs = []string{"cmd.exe", "/c", "docker history abc123"}
+		} else {
+			wantArgs = []string{"sh", "-c", "docker history abc123"}
+		}
 		if !reflect.DeepEqual(cmd.Args, wantArgs) {
 			t.Errorf("cmd.Args = %v, want %v", cmd.Args, wantArgs)
 		}
@@ -237,17 +243,110 @@ func TestBuildCustomCommandExec(t *testing.T) {
 		}
 
 		if runtime.GOOS == "windows" {
-			wantArgs := []string{"cmd.exe", "/c", "docker inspect abc123 & echo. & pause"}
+			wantArgs := []string{"cmd.exe", "/c", "docker inspect abc123 & set status=%ERRORLEVEL% & echo. & pause & exit /b %status%"}
 			if !reflect.DeepEqual(cmd.Args, wantArgs) {
 				t.Errorf("cmd.Args = %v, want %v", cmd.Args, wantArgs)
 			}
 		} else {
-			wantArgs := []string{"sh", "-c", "docker inspect abc123; printf \"\\n\\033[1;36m[Press Enter to return to docktop]\\033[0m \"; read -r _"}
+			wantArgs := []string{"sh", "-c", "docker inspect abc123; status=$?; printf \"\\n\\033[1;36m[Press Enter to return to docktop]\\033[0m \"; read -r _; exit $status"}
 			if !reflect.DeepEqual(cmd.Args, wantArgs) {
 				t.Errorf("cmd.Args = %v, want %v", cmd.Args, wantArgs)
 			}
 		}
 	})
+}
+
+func TestShellEscape(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", ""},
+		{"simple-name", "simple-name"},
+		{"postgres:15", "postgres:15"},
+		{"demo$(id)", `demo\$\(id\)`},
+		{"test; rm -rf", `test\;\ rm\ -rf`},
+		{"name with spaces", `name\ with\ spaces`},
+		{"quotes'and\"more", `quotes\'and\"more`},
+	}
+
+	for _, tt := range tests {
+		if got := ShellEscape(tt.input); got != tt.want {
+			t.Errorf("ShellEscape(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestAppModel_ActionMenu_FocusNormalization(t *testing.T) {
+	mockCli := helperMockService()
+	app := NewApp(mockCli)
+	app.ready = true
+	app.width = 100
+	app.height = 30
+
+	app.containerModel.SetContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "my-app", State: docker.StateRunning},
+	})
+
+	// Set focus to right pane
+	app.containerModel.SetFocus(container.FocusRightPane)
+	if app.containerModel.FocusZone() != container.FocusRightPane {
+		t.Fatal("Focus should be on right pane")
+	}
+
+	// Open action menu
+	updatedApp, _ := app.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	app = updatedApp.(AppModel)
+
+	if !app.actionMenuModal.Active {
+		t.Fatal("Action menu should be active")
+	}
+
+	// Trigger 's' (Stop action)
+	updatedApp, _ = app.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	app = updatedApp.(AppModel)
+
+	// Menu should be closed and focus normalized to Left Tree
+	if app.actionMenuModal.Active {
+		t.Error("Action menu should be dismissed")
+	}
+	if app.containerModel.FocusZone() != container.FocusLeftTree {
+		t.Errorf("Focus zone = %v, want FocusLeftTree (%v)", app.containerModel.FocusZone(), container.FocusLeftTree)
+	}
+}
+
+func TestAppModel_ActionMenu_TargetResourceInvalidation(t *testing.T) {
+	mockCli := helperMockService()
+	app := NewApp(mockCli)
+	app.ready = true
+	app.width = 100
+	app.height = 30
+
+	app.containerModel.SetContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "my-app", State: docker.StateRunning},
+	})
+
+	// Open action menu for c1
+	updatedApp, _ := app.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	app = updatedApp.(AppModel)
+
+	if !app.actionMenuModal.Active {
+		t.Fatal("Action menu should be active")
+	}
+	if app.actionMenuModal.TargetID != "c1" {
+		t.Errorf("TargetID = %q, want 'c1'", app.actionMenuModal.TargetID)
+	}
+
+	// A refresh arrives and c1 has disappeared!
+	updatedApp, _ = app.Update(ContainerListMsg([]docker.ContainerInfo{
+		{ID: "c2", Name: "other-app", State: docker.StateRunning},
+	}))
+	app = updatedApp.(AppModel)
+
+	// Action menu must be invalidated and hidden!
+	if app.actionMenuModal.Active {
+		t.Error("Action menu should be hidden when target container disappears")
+	}
 }
 
 func TestExecCustomCommand(t *testing.T) {

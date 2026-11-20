@@ -22,11 +22,13 @@ type ActionItem struct {
 // ActionMenuModal manages the popup menu listing all available actions for the selected entity.
 type ActionMenuModal struct {
 	Active        bool
+	TargetID      string
 	Title         string
 	Actions       []ActionItem
 	CustomCmds    []ActionItem
 	AppActions    []ActionItem
 	SelectedIndex int
+	ScrollOffset  int
 }
 
 // NewActionMenuModal returns a new initialized ActionMenuModal.
@@ -34,26 +36,35 @@ func NewActionMenuModal() ActionMenuModal {
 	return ActionMenuModal{
 		Active:        false,
 		SelectedIndex: 0,
+		ScrollOffset:  0,
 	}
 }
 
 // Show activates the action menu with contextual actions, custom commands, and app actions.
-func (m *ActionMenuModal) Show(title string, actions, customCmds, appActions []ActionItem) {
+func (m *ActionMenuModal) Show(title string, actions, customCmds, appActions []ActionItem, targetID ...string) {
 	m.Active = true
 	m.Title = title
 	m.Actions = actions
 	m.CustomCmds = customCmds
 	m.AppActions = appActions
 	m.SelectedIndex = 0
+	m.ScrollOffset = 0
+	if len(targetID) > 0 {
+		m.TargetID = targetID[0]
+	} else {
+		m.TargetID = ""
+	}
 }
 
 // Hide closes the action menu and clears its items.
 func (m *ActionMenuModal) Hide() {
 	m.Active = false
+	m.TargetID = ""
 	m.Actions = nil
 	m.CustomCmds = nil
 	m.AppActions = nil
 	m.SelectedIndex = 0
+	m.ScrollOffset = 0
 }
 
 // Items returns all action items combined in display order.
@@ -81,6 +92,14 @@ func (m ActionMenuModal) Update(msg tea.Msg) (ActionMenuModal, tea.Cmd) {
 	km := keys.ActionMenuKeys
 
 	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		if msg.Button == tea.MouseWheelUp && m.ScrollOffset > 0 {
+			m.ScrollOffset--
+		} else if msg.Button == tea.MouseWheelDown {
+			m.ScrollOffset++
+		}
+		return m, nil
+
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, km.Cancel):
@@ -113,10 +132,10 @@ func (m ActionMenuModal) Update(msg tea.Msg) (ActionMenuModal, tea.Cmd) {
 			return m, nil
 
 		default:
-			// Check if pressed key matches any item's shortcut key directly
+			// Check if pressed key matches any item's shortcut key directly (case-sensitive)
 			pressed := msg.String()
 			for _, item := range items {
-				if item.Key != "" && strings.EqualFold(item.Key, pressed) {
+				if item.Key != "" && item.Key == pressed {
 					cmd := item.Action
 					m.Hide()
 					return m, cmd
@@ -128,8 +147,19 @@ func (m ActionMenuModal) Update(msg tea.Msg) (ActionMenuModal, tea.Cmd) {
 	return m, nil
 }
 
+type menuVisualRow struct {
+	isHeader bool
+	flatIdx  int
+	content  string
+}
+
 // View renders the styled action menu popup with hardcoded sections: Actions, Custom Commands, Application.
 func (m ActionMenuModal) View() string {
+	return m.ViewWithHeight(0)
+}
+
+// ViewWithHeight renders the action menu fitted to a maximum height, scrolling items to keep SelectedIndex visible.
+func (m ActionMenuModal) ViewWithHeight(maxHeight int) string {
 	boxWidth := 60
 	innerWidth := boxWidth - 4 // 60 - 2(border) - 2(padding) = 56
 
@@ -145,7 +175,7 @@ func (m ActionMenuModal) View() string {
 	sb.WriteString(titleCentered)
 	sb.WriteString("\n\n")
 
-	// 2. Render hardcoded groups: Actions, Custom Commands, Application
+	// 2. Build rows for hardcoded groups: Actions, Custom Commands, Application
 	groups := []struct {
 		header string
 		items  []ActionItem
@@ -155,22 +185,27 @@ func (m ActionMenuModal) View() string {
 		{header: "APPLICATION", items: m.AppActions},
 	}
 
+	var allRows []menuVisualRow
 	flatIdx := 0
 	hasPrevGroup := false
+	selectedRowIdx := 0
+
 	for _, g := range groups {
 		if len(g.items) == 0 {
 			continue
 		}
 		if hasPrevGroup {
-			sb.WriteString("\n")
+			allRows = append(allRows, menuVisualRow{isHeader: true, flatIdx: -1, content: ""})
 		}
 		catHeader := theme.Current.MutedText.Bold(true).Render("─ " + g.header + " ─")
-		sb.WriteString(catHeader)
-		sb.WriteString("\n")
+		allRows = append(allRows, menuVisualRow{isHeader: true, flatIdx: -1, content: catHeader})
 		hasPrevGroup = true
 
 		for _, item := range g.items {
 			isSelected := flatIdx == m.SelectedIndex
+			if isSelected {
+				selectedRowIdx = len(allRows)
+			}
 
 			keyBadge := lipgloss.NewStyle().
 				Foreground(theme.Current.Palette.Primary).
@@ -195,15 +230,12 @@ func (m ActionMenuModal) View() string {
 					Render("  " + keyBadge + " " + titleStr)
 			}
 
-			sb.WriteString(rowContent)
-			sb.WriteString("\n")
+			allRows = append(allRows, menuVisualRow{isHeader: false, flatIdx: flatIdx, content: rowContent})
 			flatIdx++
 		}
 	}
 
-	sb.WriteString("\n")
-
-	// 3. Command Preview Bar (If menu contains any custom commands)
+	// 3. Determine command preview existence
 	items := m.Items()
 	hasAnyCommand := false
 	for _, it := range items {
@@ -213,6 +245,49 @@ func (m ActionMenuModal) View() string {
 		}
 	}
 
+	// 4. Calculate available content rows when maxHeight is specified
+	// Fixed lines:
+	// - Border (2) + Padding (2) = 4
+	// - Title (2: text + blank) = 2
+	// - Blank line after items = 1
+	// - Footer hint = 1
+	// - If hasAnyCommand: separator (1) + preview (1) + blank (1) = 3
+	fixedLines := 4 + 2 + 1 + 1
+	if hasAnyCommand {
+		fixedLines += 3
+	}
+
+	visibleRows := allRows
+	if maxHeight > fixedLines+3 && len(allRows) > maxHeight-fixedLines {
+		availRows := max(maxHeight - fixedLines, 4)
+
+		scrollOffset := m.ScrollOffset
+		// Keep selected row visible within the window
+		if selectedRowIdx < scrollOffset {
+			scrollOffset = selectedRowIdx
+		} else if selectedRowIdx >= scrollOffset+availRows {
+			scrollOffset = selectedRowIdx - availRows + 1
+		}
+		if scrollOffset < 0 {
+			scrollOffset = 0
+		}
+		maxScroll := max(len(allRows) - availRows, 0)
+		if scrollOffset > maxScroll {
+			scrollOffset = maxScroll
+		}
+
+		endIdx := min(scrollOffset+availRows, len(allRows))
+		visibleRows = allRows[scrollOffset:endIdx]
+	}
+
+	for _, r := range visibleRows {
+		sb.WriteString(r.content)
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n")
+
+	// 5. Command Preview Bar (If menu contains any custom commands)
 	if hasAnyCommand {
 		sb.WriteString(theme.Current.MutedText.Render(strings.Repeat("─", innerWidth)))
 		sb.WriteString("\n")
@@ -235,7 +310,7 @@ func (m ActionMenuModal) View() string {
 		sb.WriteString("\n\n")
 	}
 
-	// 4. Footer Hint
+	// 6. Footer Hint
 	hint := theme.Current.MutedText.Render("j/k: Navigate  •  Enter: Run  •  x/Esc: Close")
 	hintCentered := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint)
 	sb.WriteString(hintCentered)
@@ -251,7 +326,7 @@ func (m ActionMenuModal) View() string {
 
 // Overlay draws the modal centered over an existing background screen string.
 func (m ActionMenuModal) Overlay(bg string, totalWidth, totalHeight int) string {
-	modalStr := m.View()
+	modalStr := m.ViewWithHeight(totalHeight)
 
 	modalLines := strings.Split(modalStr, "\n")
 	modalHeight := len(modalLines)

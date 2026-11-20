@@ -36,10 +36,7 @@ func CalcMaxVisible(height int, hasFilter bool) int {
 	if hasFilter {
 		chrome = ChromeRowsWithSearch
 	}
-	maxVisible := height - chrome
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
+	maxVisible := max(height - chrome, 1)
 	return maxVisible
 }
 
@@ -61,10 +58,7 @@ func AdjustOffset(height, cursorIndex, scrollOffset, totalItems int, hasFilter b
 	if startIdx < 0 {
 		startIdx = 0
 	}
-	maxStart := totalItems - maxVisible
-	if maxStart < 0 {
-		maxStart = 0
-	}
+	maxStart := max(totalItems - maxVisible, 0)
 	if startIdx > maxStart {
 		startIdx = maxStart
 	}
@@ -84,10 +78,7 @@ func ListWindow(height, cursorIndex, scrollOffset, totalItems int, hasFilter boo
 
 	startIdx = AdjustOffset(height, cursorIndex, scrollOffset, totalItems, hasFilter)
 
-	endIdx = startIdx + maxVisible
-	if endIdx > totalItems {
-		endIdx = totalItems
-	}
+	endIdx = min(startIdx + maxVisible, totalItems)
 
 	return startIdx, endIdx, maxVisible
 }

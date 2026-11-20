@@ -250,6 +250,15 @@ func (m Model) IsZoomed() bool {
 	return m.isZoomed
 }
 
+func (m *Model) SetFocus(f FocusZone) {
+	m.focusZone = f
+	m.updatePaneSizes()
+}
+
+func (m Model) FocusZone() FocusZone {
+	return m.focusZone
+}
+
 func (m Model) isLeftZoomed() bool {
 	return m.isZoomed && m.focusZone == FocusLeftTree
 }

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -310,17 +311,6 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if a.actionMenuModal.Active {
-		switch msg := msg.(type) {
-		case tea.KeyPressMsg:
-			var cmd tea.Cmd
-			a.actionMenuModal, cmd = a.actionMenuModal.Update(msg)
-			return a, cmd
-		case tea.MouseClickMsg, tea.MouseWheelMsg:
-			return a, nil
-		}
-	}
-
 	if a.errorModal.Active {
 		switch msg := msg.(type) {
 		case tea.KeyPressMsg, tea.MouseClickMsg:
@@ -328,6 +318,28 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.errorModal, cmd = a.errorModal.Update(msg)
 			return a, cmd
 		case tea.MouseWheelMsg:
+			return a, nil
+		}
+	}
+
+	if a.actionMenuModal.Active {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			wasActive := a.actionMenuModal.Active
+			var cmd tea.Cmd
+			a.actionMenuModal, cmd = a.actionMenuModal.Update(msg)
+			if wasActive && !a.actionMenuModal.Active && cmd != nil {
+				// Normalize focus to left tree so container and compose actions run properly
+				if a.activeTab == TabContainers {
+					a.containerModel.SetFocus(container.FocusLeftTree)
+				}
+			}
+			return a, cmd
+		case tea.MouseWheelMsg:
+			var cmd tea.Cmd
+			a.actionMenuModal, cmd = a.actionMenuModal.Update(msg)
+			return a, cmd
+		case tea.MouseClickMsg:
 			return a, nil
 		}
 	}
@@ -488,6 +500,21 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
+		if a.actionMenuModal.Active && a.activeTab == TabContainers && a.actionMenuModal.TargetID != "" {
+			targetStillExists := false
+			for _, c := range msg {
+				if c.ID == a.actionMenuModal.TargetID ||
+					c.ProjectName == a.actionMenuModal.TargetID ||
+					"proj:"+c.ProjectName == a.actionMenuModal.TargetID ||
+					strings.HasPrefix(a.actionMenuModal.TargetID, "svc:"+c.ProjectName) {
+					targetStillExists = true
+					break
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
+		}
 		if cmd := a.containerModel.SetContainers(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -495,6 +522,18 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ImageListMsg:
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
+		}
+		if a.actionMenuModal.Active && a.activeTab == TabImages && a.actionMenuModal.TargetID != "" {
+			targetStillExists := false
+			for _, img := range msg {
+				if img.ID == a.actionMenuModal.TargetID {
+					targetStillExists = true
+					break
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
 		}
 		if cmd := a.imageModel.SetImages(msg); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -504,6 +543,18 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
 		}
+		if a.actionMenuModal.Active && a.activeTab == TabVolumes && a.actionMenuModal.TargetID != "" {
+			targetStillExists := false
+			for _, vol := range msg {
+				if vol.Name == a.actionMenuModal.TargetID {
+					targetStillExists = true
+					break
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
+		}
 		if cmd := a.volumeModel.SetVolumes(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -511,6 +562,18 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case NetworkListMsg:
 		if !a.daemonConnected {
 			cmds = append(cmds, a.handleDaemonReconnected()...)
+		}
+		if a.actionMenuModal.Active && a.activeTab == TabNetworks && a.actionMenuModal.TargetID != "" {
+			targetStillExists := false
+			for _, net := range msg {
+				if net.ID == a.actionMenuModal.TargetID {
+					targetStillExists = true
+					break
+				}
+			}
+			if !targetStillExists {
+				a.actionMenuModal.Hide()
+			}
 		}
 		if cmd := a.networkModel.SetNetworks(msg); cmd != nil {
 			cmds = append(cmds, cmd)
