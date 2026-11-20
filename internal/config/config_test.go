@@ -11,6 +11,7 @@ func TestDefault(t *testing.T) {
 	want := &Config{
 		Theme:          DefaultTheme,
 		Host:           "",
+		Icons:          DefaultIcons(),
 		CustomCommands: CustomCommandsConfig{},
 	}
 	if got := Default(); !reflect.DeepEqual(got, want) {
@@ -93,6 +94,7 @@ customCommands:
 			want: &Config{
 				Theme: "dracula",
 				Host:  "unix:///tmp/docker.sock",
+				Icons: DefaultIcons(),
 				CustomCommands: CustomCommandsConfig{
 					Containers: []CustomCommand{
 						{Name: "bash", Command: "docker exec -it {{ .ID }} bash"},
@@ -109,8 +111,10 @@ customCommands:
 			name: "fallback empty theme and trimmed host",
 			path: emptyThemePath,
 			want: &Config{
-				Theme: DefaultTheme,
-				Host:  "tcp://127.0.0.1:2375",
+				Theme:          DefaultTheme,
+				Host:           "tcp://127.0.0.1:2375",
+				Icons:          DefaultIcons(),
+				CustomCommands: CustomCommandsConfig{},
 			},
 			wantErr: false,
 		},
@@ -154,13 +158,38 @@ func TestSaveTemplate(t *testing.T) {
 	if err := SaveTemplate(targetPath); err != nil {
 		t.Fatalf("SaveTemplate() error = %v", err)
 	}
-
 	content, err := os.ReadFile(targetPath)
 	if err != nil {
 		t.Fatalf("Failed to read saved template: %v", err)
 	}
-
 	if len(content) == 0 {
 		t.Errorf("Saved template file is empty")
+	}
+}
+
+func TestLoadFromPath_CustomIcons(t *testing.T) {
+	tempDir := t.TempDir()
+	customPath := filepath.Join(tempDir, "custom_icons.yaml")
+	content := []byte(`icons:
+  postgres: "🐘"
+  my-app: "🚀"
+`)
+	if err := os.WriteFile(customPath, content, 0o644); err != nil {
+		t.Fatalf("Failed to write custom icons file: %v", err)
+	}
+	cfg, err := LoadFromPath(customPath)
+	if err != nil {
+		t.Fatalf("LoadFromPath unexpected error: %v", err)
+	}
+	if cfg.Icons["postgres"] != "🐘" {
+		t.Errorf("cfg.Icons['postgres'] = %q, want '🐘'", cfg.Icons["postgres"])
+	}
+	if cfg.Icons["my-app"] != "🚀" {
+		t.Errorf("cfg.Icons['my-app'] = %q, want '🚀'", cfg.Icons["my-app"])
+	}
+	// Other defaults should still be present
+	wantRedis := DefaultIcons()["redis"]
+	if cfg.Icons["redis"] != wantRedis {
+		t.Errorf("cfg.Icons['redis'] = %q, want %q", cfg.Icons["redis"], wantRedis)
 	}
 }
