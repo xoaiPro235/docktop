@@ -35,7 +35,133 @@ type CustomCommandsConfig struct {
 type Config struct {
 	Theme          string               `yaml:"theme"`
 	Host           string               `yaml:"host,omitempty"`
+	Icons          map[string]string    `yaml:"icons,omitempty"`
 	CustomCommands CustomCommandsConfig `yaml:"customCommands,omitempty"`
+}
+
+// DefaultIcons returns a default mapping of image/service keywords to Nerd Font symbols.
+func DefaultIcons() map[string]string {
+	return map[string]string{
+		// Databases
+		"postgres":      "",
+		"postgresql":    "",
+		"mysql":         "",
+		"mariadb":       "",
+		"mssql-server":  "",
+		"redis":         "",
+		"valkey":        "",
+		"memcached":     "",
+		"mongo":         "",
+		"mongodb":       "",
+		"sqlite":        "",
+		"clickhouse":    "",
+		"influxdb":      "",
+		"timescaledb":   "",
+		"couchdb":       "",
+		"neo4j":         "",
+		"cassandra":     "",
+		"elasticsearch": "",
+		"pgadmin":       "",
+		"phpmyadmin":    "",
+		"db":            "",
+		"database":      "",
+		"sql":           "",
+
+		// Web servers, Reverse Proxies & Ingress
+		"nginx":   "",
+		"apache":  "",
+		"traefik": "",
+		"envoy":   "",
+
+		// Languages & Runtimes
+		"node":   "",
+		"nodejs": "",
+		"bun":    "",
+		"deno":   "",
+		"python": "",
+		"golang": "",
+		"go":     "",
+		"rust":   "",
+		"java":   "",
+		"dotnet": "",
+		"aspnet": "",
+		"php":    "",
+		"ruby":   "",
+		"rails":  "",
+		"elixir": "",
+		"erlang": "",
+		"cpp":    "",
+		"swift":  "",
+		"kotlin": "",
+		"npm":    "",
+
+		// Message brokers, Event streaming & Queues
+		"kafka":    "󱀏",
+		"rabbitmq": "",
+		"nats":     "",
+
+		// Monitoring, Logging, Tracing & Observability
+		"prometheus":    "",
+		"grafana":       "",
+		"loki":          "",
+		"cadvisor":      "",
+		"jaeger":        "",
+		"opentelemetry": "",
+		"kibana":        "",
+		"logstash":      "",
+		"sentry":        "",
+
+		// CI/CD, Git, DevOps & Automation
+		"git":       "",
+		"jenkins":   "",
+		"gitlab":    "",
+		"gitea":     "",
+		"forgejo":   "",
+		"argocd":    "",
+		"ansible":   "",
+		"terraform": "",
+		"vault":     "",
+		"consul":    "",
+		"nomad":     "",
+		"airflow":   "",
+		"portainer": "",
+
+		// Auth, Identity & Security
+		"wireguard":   "",
+		"cloudflared": "",
+
+		// CMS, Apps, Media & AI / Self-hosted
+		"wordpress": "",
+		"ghost":     "",
+		"supabase":  "",
+		"appwrite":  "",
+		"plex":      "󰚺",
+		"emby":      "󰚴",
+		"ffmpeg":    "",
+		"jupyter":   "",
+		"ai":        "󰧑",
+		"llm":       "󰧑",
+		"bot":       "󰚩",
+		"mailpit":   "",
+		"mailhog":   "",
+
+		// Base OS & Shell / Utilities
+		"alpine": "",
+		"ubuntu": "",
+		"debian": "",
+		"fedora": "",
+		"centos": "",
+		"rocky":  "",
+		"arch":   "󰣇",
+		"bash":   "",
+		"sh":     "",
+		"zsh":    "",
+		"fish":   "󰡨",
+
+		// Tools & Fallback
+		"docker":  "󰡨",
+		"default": "",
+	}
 }
 
 // Default returns a Config struct initialized with default values.
@@ -43,6 +169,7 @@ func Default() *Config {
 	return &Config{
 		Theme:          DefaultTheme,
 		Host:           "",
+		Icons:          DefaultIcons(),
 		CustomCommands: CustomCommandsConfig{},
 	}
 }
@@ -91,6 +218,17 @@ func LoadFromPath(path string) (*Config, error) {
 	}
 	cfg.Host = strings.TrimSpace(cfg.Host)
 
+	// Merge user icons over default icons
+	if cfg.Icons == nil {
+		cfg.Icons = DefaultIcons()
+	} else {
+		merged := DefaultIcons()
+		for k, v := range cfg.Icons {
+			merged[k] = v
+		}
+		cfg.Icons = merged
+	}
+
 	return cfg, nil
 }
 
@@ -127,6 +265,20 @@ theme: "tokyo-night"
 #   host: "ssh://user@remote-vps:22"
 #   host: "tcp://192.168.1.100:2376"
 # host: ""
+
+# Container Icons:
+# Maps image names, full container names, or keywords to custom Nerd Font glyphs in the container tree.
+# Docktop includes standard built-in icons for common databases, web servers, and runtimes.
+# You can customize or add your own mappings below:
+# Examples:
+# icons:
+#   postgres: "󰆼"
+#   redis: "󰟆"
+#   mysql: "󰆚"
+#   nginx: "󱏿"
+#   node: "󰎙"
+#   python: "󰌠"
+#   default: "󰡨"
 
 # Custom Commands:
 # User-defined shell commands shown in the Action Menu ('x' key).
@@ -166,7 +318,6 @@ theme: "tokyo-night"
 #     - name: "Inspect Network"
 #       command: "docker network inspect {{ .Name }}"
 #       pause: true
-
 `
 	return os.WriteFile(path, []byte(template), 0o644)
 }

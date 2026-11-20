@@ -23,7 +23,7 @@ func TestAppModel_ActionMenu_OpenAndDismiss(t *testing.T) {
 		},
 	}
 
-	app := NewAppWithConfig(mockCli, cfg)
+	app := NewApp(mockCli, cfg)
 	app.width = 100
 	app.height = 30
 	app.ready = true
@@ -101,7 +101,7 @@ func TestAppModel_ActionMenu_CustomCommandConfirmFlow(t *testing.T) {
 		},
 	}
 
-	app := NewAppWithConfig(mockCli, cfg)
+	app := NewApp(mockCli, cfg)
 	app.width = 100
 	app.height = 30
 	app.ready = true
@@ -278,7 +278,7 @@ func TestShellEscape(t *testing.T) {
 
 func TestAppModel_ActionMenu_TargetResourceInvalidation(t *testing.T) {
 	mockCli := helperMockService()
-	app := NewApp(mockCli)
+	app := NewApp(mockCli, nil)
 	app.ready = true
 	app.width = 100
 	app.height = 30
