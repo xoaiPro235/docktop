@@ -90,6 +90,8 @@ func TestMatchIcon(t *testing.T) {
 		"redis":         "󰟆",
 		"mysql":         "󰆚",
 		"node":          "󰎙",
+		"mssql":         "",
+		"mssql/server":  "",
 		"my-custom-app": "🚀",
 		"web_worker":    "⚙️",
 		"default":       "󰡨",
@@ -109,6 +111,9 @@ func TestMatchIcon(t *testing.T) {
 		{"token in container name", "custom-internal-image:latest", "prod-mysql-slave", "󰆚"},
 		{"delimiter-containing container name exact match (hyphen)", "custom-image:latest", "my-custom-app", "🚀"},
 		{"delimiter-containing container name exact match (underscore)", "scratch:latest", "web_worker", "⚙️"},
+		{"container name overrides image icon", "postgres:16-alpine", "my-custom-app", "🚀"},
+		{"multi-part registry repo token match (mssql)", "mcr.microsoft.com/mssql/server:latest", "sql1", ""},
+		{"multi-part registry exact repo path match", "mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04", "db", ""},
 		{"token false-positive avoidance", "algo-service:latest", "trader", "󰡨"},
 		{"fallback to default", "unknown-vendor/secret-app:1.0", "worker", "󰡨"},
 	}
