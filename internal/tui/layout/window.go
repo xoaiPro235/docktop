@@ -36,17 +36,13 @@ func CalcMaxVisible(height int, hasFilter bool) int {
 	if hasFilter {
 		chrome = ChromeRowsWithSearch
 	}
-	maxVisible := height - chrome
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
+	maxVisible := max(height-chrome, 1)
 	return maxVisible
 }
 
-// AdjustOffset adjusts scrollOffset so that cursorIndex remains visible within [offset, offset + maxVisible).
+// AdjustOffsetCustom adjusts scrollOffset so that cursorIndex remains visible within [offset, offset + maxVisible).
 // When moving within the viewport, scrollOffset stays stable so the cursor moves naturally.
-func AdjustOffset(height, cursorIndex, scrollOffset, totalItems int, hasFilter bool) int {
-	maxVisible := CalcMaxVisible(height, hasFilter)
+func AdjustOffsetCustom(maxVisible, cursorIndex, scrollOffset, totalItems int) int {
 	if totalItems <= 0 {
 		return 0
 	}
@@ -61,14 +57,29 @@ func AdjustOffset(height, cursorIndex, scrollOffset, totalItems int, hasFilter b
 	if startIdx < 0 {
 		startIdx = 0
 	}
-	maxStart := totalItems - maxVisible
-	if maxStart < 0 {
-		maxStart = 0
-	}
+	maxStart := max(totalItems-maxVisible, 0)
 	if startIdx > maxStart {
 		startIdx = maxStart
 	}
 	return startIdx
+}
+
+// AdjustOffset adjusts scrollOffset so that cursorIndex remains visible within [offset, offset + maxVisible).
+// When moving within the viewport, scrollOffset stays stable so the cursor moves naturally.
+func AdjustOffset(height, cursorIndex, scrollOffset, totalItems int, hasFilter bool) int {
+	maxVisible := CalcMaxVisible(height, hasFilter)
+	return AdjustOffsetCustom(maxVisible, cursorIndex, scrollOffset, totalItems)
+}
+
+// ListWindowCustom calculates the visible slice range [startIdx, endIdx) given a known maxVisible.
+func ListWindowCustom(maxVisible, cursorIndex, scrollOffset, totalItems int) (startIdx, endIdx int) {
+	if totalItems <= 0 {
+		return 0, 0
+	}
+
+	startIdx = AdjustOffsetCustom(maxVisible, cursorIndex, scrollOffset, totalItems)
+	endIdx = min(startIdx+maxVisible, totalItems)
+	return startIdx, endIdx
 }
 
 // ListWindow calculates the visible slice range [startIdx, endIdx) and maxVisible items
@@ -82,12 +93,7 @@ func ListWindow(height, cursorIndex, scrollOffset, totalItems int, hasFilter boo
 		return 0, 0, maxVisible
 	}
 
-	startIdx = AdjustOffset(height, cursorIndex, scrollOffset, totalItems, hasFilter)
-
-	endIdx = startIdx + maxVisible
-	if endIdx > totalItems {
-		endIdx = totalItems
-	}
+	startIdx, endIdx = ListWindowCustom(maxVisible, cursorIndex, scrollOffset, totalItems)
 
 	return startIdx, endIdx, maxVisible
 }

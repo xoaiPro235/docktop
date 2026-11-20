@@ -41,6 +41,9 @@ func helperMockService() *mocks.MockService {
 		ListNetworksFunc: func(ctx context.Context) ([]docker.NetworkInfo, error) {
 			return []docker.NetworkInfo{}, nil
 		},
+		StreamContainerStatsFunc: func(ctx context.Context, id string) <-chan docker.ContainerMetrics {
+			return make(chan docker.ContainerMetrics)
+		},
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/format"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/layout"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
@@ -141,10 +141,10 @@ func (m Model) View() string {
 			}
 
 			// Styled ID
-			idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, docker.CleanImageID(img.ID)))
+			idDisplay := theme.Current.MutedText.Render(fmt.Sprintf("%-*s", idColWidth, img.ShortID()))
 
 			// Styled Size
-			sizeDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", sizeColWidth, docker.FormatImageSize(img.Size)))
+			sizeDisplay := theme.Current.Value.Render(fmt.Sprintf("%-*s", sizeColWidth, format.Size(img.Size)))
 
 			// Styled Status
 			var statusDisplay string
@@ -208,32 +208,10 @@ func (m Model) FooterBindings() []key.Binding {
 		}
 	}
 
-	var bindings []key.Binding
-	bindings = append(bindings, keys.AppKeys.FocusToggle)
-	if m.isZoomed {
-		bindings = append(bindings, keys.CommonHelpKeys.HelpUnzoom)
-	} else {
-		bindings = append(bindings, keys.CommonHelpKeys.HelpZoom)
-	}
-
-	if m.focusZone == FocusLayersPane {
-		bindings = append(bindings,
-			keys.CommonHelpKeys.HelpScroll,
-			keys.CommonHelpKeys.HelpScrollX,
-			keys.ImageKeys.ToggleWrap,
-			keys.ImageKeys.Remove,
-			keys.ImageKeys.Prune,
-			keys.AppKeys.Quit,
-		)
-		return bindings
-	}
-
-	bindings = append(bindings,
-		keys.CommonHelpKeys.HelpMove,
-		keys.CommonHelpKeys.HelpFilter,
+	return []key.Binding{
 		keys.ImageKeys.Remove,
 		keys.ImageKeys.Prune,
+		keys.AppKeys.Menu,
 		keys.AppKeys.Quit,
-	)
-	return bindings
+	}
 }

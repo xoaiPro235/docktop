@@ -182,32 +182,10 @@ func (m Model) FooterBindings() []key.Binding {
 		}
 	}
 
-	var bindings []key.Binding
-	bindings = append(bindings, keys.AppKeys.FocusToggle)
-	if m.isZoomed {
-		bindings = append(bindings, keys.CommonHelpKeys.HelpUnzoom)
-	} else {
-		bindings = append(bindings, keys.CommonHelpKeys.HelpZoom)
-	}
-
-	if m.focusZone == FocusDetailsPane {
-		bindings = append(bindings,
-			keys.CommonHelpKeys.HelpScroll,
-			keys.CommonHelpKeys.HelpScrollX,
-			keys.VolumeKeys.ToggleWrap,
-			keys.VolumeKeys.Remove,
-			keys.VolumeKeys.Prune,
-			keys.AppKeys.Quit,
-		)
-		return bindings
-	}
-
-	bindings = append(bindings,
-		keys.CommonHelpKeys.HelpMove,
-		keys.CommonHelpKeys.HelpFilter,
+	return []key.Binding{
 		keys.VolumeKeys.Remove,
 		keys.VolumeKeys.Prune,
+		keys.AppKeys.Menu,
 		keys.AppKeys.Quit,
-	)
-	return bindings
+	}
 }

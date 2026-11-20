@@ -17,7 +17,7 @@ type VolumeKeyMap struct {
 // VolumeKeys is the default instance of VolumeKeyMap.
 var VolumeKeys = VolumeKeyMap{
 	Remove: key.NewBinding(
-		key.WithKeys("d", "D", "x", "X"),
+		key.WithKeys("d", "D"),
 		key.WithHelp("d", "Remove"),
 	),
 	Prune: key.NewBinding(

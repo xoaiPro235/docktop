@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/viewport"
-	"github.com/docker/go-units"
 	"github.com/xoaiPro235/docktop/internal/docker"
+	"github.com/xoaiPro235/docktop/internal/format"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
 )
 
@@ -60,7 +60,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int, isZoome
 
 	var formattedTime string
 	if !createdAt.IsZero() {
-		formattedTime = docker.FormatTimeAgo(createdAt)
+		formattedTime = format.TimeAgo(createdAt)
 	} else {
 		formattedTime = "-"
 	}
@@ -72,7 +72,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int, isZoome
 	var formattedSize = "-"
 	if selected.UsageData != nil && selected.UsageData.Size >= 0 {
 		size := selected.UsageData.Size
-		formattedSize = units.HumanSize(float64(size))
+		formattedSize = format.Size(size)
 	}
 	sizeDisplay := formattedSize
 

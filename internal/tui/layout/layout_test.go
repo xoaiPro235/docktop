@@ -140,6 +140,60 @@ func TestListWindow(t *testing.T) {
 	}
 }
 
+func TestListWindowCustom(t *testing.T) {
+	tests := []struct {
+		name                                    string
+		maxVisible, cursor, scrollOffset, total int
+		wantStart, wantEnd                      int
+	}{
+		{
+			name:         "empty list returns 0, 0",
+			maxVisible:   5,
+			cursor:       0,
+			scrollOffset: 0,
+			total:        0,
+			wantStart:    0,
+			wantEnd:      0,
+		},
+		{
+			name:         "cursor in view keeps offset",
+			maxVisible:   5,
+			cursor:       2,
+			scrollOffset: 0,
+			total:        10,
+			wantStart:    0,
+			wantEnd:      5,
+		},
+		{
+			name:         "cursor beyond window scrolls forward",
+			maxVisible:   5,
+			cursor:       7,
+			scrollOffset: 0,
+			total:        10,
+			wantStart:    3,
+			wantEnd:      8,
+		},
+		{
+			name:         "cursor before window scrolls backward",
+			maxVisible:   5,
+			cursor:       1,
+			scrollOffset: 4,
+			total:        10,
+			wantStart:    1,
+			wantEnd:      6,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start, end := ListWindowCustom(tt.maxVisible, tt.cursor, tt.scrollOffset, tt.total)
+			if start != tt.wantStart || end != tt.wantEnd {
+				t.Errorf("ListWindowCustom() = (%d, %d), want (%d, %d)", start, end, tt.wantStart, tt.wantEnd)
+			}
+		})
+	}
+}
+
 func TestListClickTarget(t *testing.T) {
 	tests := []struct {
 		name          string

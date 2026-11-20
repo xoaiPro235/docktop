@@ -9,8 +9,9 @@ import (
 
 func TestDefault(t *testing.T) {
 	want := &Config{
-		Theme: DefaultTheme,
-		Host:  "",
+		Theme:          DefaultTheme,
+		Host:           "",
+		CustomCommands: CustomCommandsConfig{},
 	}
 	if got := Default(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Default() = %v, want %v", got, want)
@@ -48,7 +49,19 @@ func TestLoadFromPath(t *testing.T) {
 
 	// 1. Valid custom config
 	validPath := filepath.Join(tempDir, "custom.yaml")
-	validContent := []byte("theme: dracula\nhost: unix:///tmp/docker.sock\n")
+	validContent := []byte(`theme: dracula
+host: unix:///tmp/docker.sock
+customCommands:
+  containers:
+    - name: "bash"
+      command: "docker exec -it {{ .ID }} bash"
+    - name: "history"
+      command: "docker history {{ .ID }}"
+      pause: true
+  images:
+    - name: "inspect"
+      command: "docker inspect {{ .ID }}"
+`)
 	if err := os.WriteFile(validPath, validContent, 0o644); err != nil {
 		t.Fatalf("Failed to create valid config: %v", err)
 	}
@@ -80,6 +93,15 @@ func TestLoadFromPath(t *testing.T) {
 			want: &Config{
 				Theme: "dracula",
 				Host:  "unix:///tmp/docker.sock",
+				CustomCommands: CustomCommandsConfig{
+					Containers: []CustomCommand{
+						{Name: "bash", Command: "docker exec -it {{ .ID }} bash"},
+						{Name: "history", Command: "docker history {{ .ID }}", Pause: true},
+					},
+					Images: []CustomCommand{
+						{Name: "inspect", Command: "docker inspect {{ .ID }}"},
+					},
+				},
 			},
 			wantErr: false,
 		},

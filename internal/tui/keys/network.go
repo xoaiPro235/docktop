@@ -17,7 +17,7 @@ type NetworkKeyMap struct {
 // NetworkKeys is the default instance of NetworkKeyMap.
 var NetworkKeys = NetworkKeyMap{
 	Delete: key.NewBinding(
-		key.WithKeys("d", "D", "x", "X"),
+		key.WithKeys("d", "D"),
 		key.WithHelp("d", "Delete"),
 	),
 	Prune: key.NewBinding(

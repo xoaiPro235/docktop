@@ -51,7 +51,7 @@ var ContainerKeys = ContainerKeyMap{
 		key.WithHelp("r", "Restart"),
 	),
 	Remove: key.NewBinding(
-		key.WithKeys("d", "D", "x", "X"),
+		key.WithKeys("d", "D"),
 		key.WithHelp("d", "Remove"),
 	),
 	Prune: key.NewBinding(
