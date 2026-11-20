@@ -57,6 +57,19 @@ func TestTreeNode_DisplayTitle(t *testing.T) {
 		t.Errorf("Running container DisplayTitle() = %q", title)
 	}
 
+	// Running Container node with Icon
+	ctrRunningWithIcon := &TreeNode{
+		Type: NodeContainer,
+		Name: "web-1",
+		Icon: "󰆼",
+		Container: &docker.ContainerInfo{
+			State: docker.StateRunning,
+		},
+	}
+	if title := ctrRunningWithIcon.DisplayTitle(); !strings.Contains(title, "● 󰆼 web-1") {
+		t.Errorf("Running container with icon DisplayTitle() = %q, want to contain '● 󰆼 web-1'", title)
+	}
+
 	// Stopped Container node with OneOff
 	ctrStopped := &TreeNode{
 		Type: NodeContainer,
@@ -68,6 +81,45 @@ func TestTreeNode_DisplayTitle(t *testing.T) {
 	}
 	if title := ctrStopped.DisplayTitle(); !strings.Contains(title, "○") || !strings.Contains(title, "[one-off]") {
 		t.Errorf("Stopped container DisplayTitle() = %q", title)
+	}
+}
+
+func TestMatchIcon(t *testing.T) {
+	icons := map[string]string{
+		"postgres": "󰆼",
+		"redis":    "󰟆",
+		"mysql":    "󰆚",
+		"node":     "󰎙",
+		"default":  "󰡨",
+	}
+
+	tests := []struct {
+		name          string
+		imageName     string
+		containerName string
+		want          string
+	}{
+		{"exact repository match with tag", "postgres:16-alpine", "db-1", "󰆼"},
+		{"registry and repo path", "docker.io/bitnami/redis:7.2", "cache", "󰟆"},
+		{"private registry with port", "localhost:5000/company/redis:7.2", "cache", "󰟆"},
+		{"digest stripped properly", "mysql:8.0@sha256:abcdef1234567890", "db", "󰆚"},
+		{"token in repo name", "ghcr.io/org/my-node-service:v2", "api", "󰎙"},
+		{"token in container name", "custom-internal-image:latest", "prod-mysql-slave", "󰆚"},
+		{"token false-positive avoidance", "algo-service:latest", "trader", "󰡨"},
+		{"fallback to default", "unknown-vendor/secret-app:1.0", "worker", "󰡨"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MatchIcon(tt.imageName, tt.containerName, icons); got != tt.want {
+				t.Errorf("MatchIcon(%q, %q) = %q, want %q", tt.imageName, tt.containerName, got, tt.want)
+			}
+		})
+	}
+
+	// Empty map returns empty string
+	if got := MatchIcon("postgres", "db", nil); got != "" {
+		t.Errorf("MatchIcon with nil map = %q, want empty string", got)
 	}
 }
 
@@ -188,7 +240,7 @@ func TestBuildTreeAndFlatten(t *testing.T) {
 		},
 	}
 
-	roots := BuildTree(containers, nil)
+	roots := BuildTree(containers, nil, nil)
 	if len(roots) != 2 { // "myapp" and standalone
 		t.Fatalf("BuildTree roots count = %d, want 2", len(roots))
 	}

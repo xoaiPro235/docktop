@@ -44,6 +44,7 @@ type Model struct {
 	treeRoots    []*TreeNode
 	flatItems    []FlatItem
 	searchBar    searchbar.Model
+	icons        map[string]string
 
 	expandedState map[string]bool
 
@@ -115,6 +116,12 @@ func (m *Model) SelectedContainer() *docker.ContainerInfo {
 	return nil
 }
 
+// SetIcons sets the mapping of keywords to Nerd Font icons and rebuilds the tree.
+func (m *Model) SetIcons(icons map[string]string) {
+	m.icons = icons
+	m.rebuildTree()
+}
+
 func (m *Model) rebuildTree() {
 	defer m.syncScroll()
 
@@ -131,7 +138,7 @@ func (m *Model) rebuildTree() {
 
 	query := strings.ToLower(m.searchBar.Value())
 	if query == "" {
-		m.treeRoots = BuildTree(m.containers, m.expandedState)
+		m.treeRoots = BuildTree(m.containers, m.expandedState, m.icons)
 	} else {
 		var matched []docker.ContainerInfo
 		for _, c := range m.containers {
@@ -143,7 +150,7 @@ func (m *Model) rebuildTree() {
 				matched = append(matched, c)
 			}
 		}
-		m.treeRoots = BuildTree(matched, nil)
+		m.treeRoots = BuildTree(matched, nil, m.icons)
 	}
 	m.flatItems = Flatten(m.treeRoots, "")
 

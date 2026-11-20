@@ -82,7 +82,7 @@ func Test_waitForDockerEvent(t *testing.T) {
 
 func TestNewApp(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 
 	if app.dockerClient == nil {
 		t.Error("dockerClient should be assigned")
@@ -128,7 +128,7 @@ func TestAppModel_ManualReconnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSvc := helperMockService()
 			mockSvc.PingFunc = func() error { return tt.pingErr }
-			app := NewApp(mockSvc)
+			app := NewApp(mockSvc, nil)
 
 			model, cmd := app.Update(tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 			app = model.(AppModel)
@@ -173,7 +173,7 @@ func TestAppModel_ManualReconnect(t *testing.T) {
 func TestAppModel_AutomaticReconnectRetriesAreLimited(t *testing.T) {
 	mockSvc := helperMockService()
 	mockSvc.PingFunc = func() error { return errors.New("daemon unavailable") }
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 	app.reconnecting = true
 	app.reconnectAttempts = maxReconnectAttempts
 
@@ -200,7 +200,7 @@ func TestAppModel_AutomaticReconnectRetriesAreLimited(t *testing.T) {
 func TestAppModel_AutomaticReconnectAfterEventStreamCloses(t *testing.T) {
 	mockSvc := helperMockService()
 	mockSvc.PingFunc = func() error { return nil }
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 
 	model, cmd := app.Update(DockerEventStreamClosedMsg{})
 	app = model.(AppModel)
@@ -257,7 +257,7 @@ func TestAppModel_HandleActionSuccessRefreshesActiveTabOnly(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSvc := helperMockService()
-			app := NewApp(mockSvc)
+			app := NewApp(mockSvc, nil)
 			app.activeTab = TabImages
 
 			cmds := app.handleActionSuccess(tt.resourceTab)
@@ -281,7 +281,7 @@ func TestAppModel_HandleActionSuccessRefreshesActiveTabOnly(t *testing.T) {
 
 func TestAppModel_HandleActionSuccessRestoresDisconnectedDaemon(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 	app.daemonConnected = false
 	app.reconnecting = true
 	app.reconnectAttempts = 2
@@ -303,7 +303,7 @@ func TestAppModel_HandleActionSuccessRestoresDisconnectedDaemon(t *testing.T) {
 }
 
 func TestAppModel_FooterBindingsShowsReconnectWhenDisconnected(t *testing.T) {
-	app := NewApp(helperMockService())
+	app := NewApp(helperMockService(), nil)
 	app.daemonConnected = false
 
 	hasReconnect := func(bindings []key.Binding) bool {
@@ -337,7 +337,7 @@ func TestAppModel_Update_AttachFinished(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := NewApp(helperMockService())
+			app := NewApp(helperMockService(), nil)
 			model, _ := app.Update(container.AttachFinishedMsg{Err: tt.err})
 			app = model.(AppModel)
 
@@ -358,7 +358,7 @@ func TestAppModel_Update_AttachFinished(t *testing.T) {
 
 func TestAppModel_FetchCommands(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 
 	// Fetch Containers
 	cmdCtr := app.fetchContainersCmd()
@@ -391,7 +391,7 @@ func TestAppModel_FetchCommands(t *testing.T) {
 
 func TestAppModel_SwitchTab(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 
 	app.switchTab(TabImages)
 	if app.activeTab != TabImages {
@@ -411,7 +411,7 @@ func TestAppModel_SwitchTab(t *testing.T) {
 
 func TestAppModel_Init(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 
 	cmd := app.Init()
 	if cmd == nil {
@@ -421,7 +421,7 @@ func TestAppModel_Init(t *testing.T) {
 
 func TestAppModel_Update_WindowSize(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 
 	newModel, _ := app.Update(tea.WindowSizeMsg{Width: 160, Height: 50})
 	updatedApp := newModel.(AppModel)
@@ -436,7 +436,7 @@ func TestAppModel_Update_WindowSize(t *testing.T) {
 
 func TestAppModel_Update_TabKeypresses(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 	app.ready = true
 
 	// Key '2' -> TabImages
@@ -501,7 +501,7 @@ func TestAppModel_IsAnySearching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := NewApp(helperMockService())
+			app := NewApp(helperMockService(), nil)
 			if app.isAnySearching() {
 				t.Fatal("new app should not be searching")
 			}
@@ -515,7 +515,7 @@ func TestAppModel_IsAnySearching(t *testing.T) {
 }
 
 func TestAppModel_Update_SearchingKeys(t *testing.T) {
-	app := NewApp(helperMockService())
+	app := NewApp(helperMockService(), nil)
 	app.ready = true
 
 	cancelCalled := false
@@ -553,7 +553,7 @@ func TestAppModel_Update_SearchingKeys(t *testing.T) {
 
 func TestAppModel_View(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 
 	// Not ready View
 	viewNotReady := app.View()
@@ -574,7 +574,7 @@ func TestAppModel_View(t *testing.T) {
 
 func TestAppModel_ModalMouseWheel(t *testing.T) {
 	mockSvc := helperMockService()
-	app := NewApp(mockSvc)
+	app := NewApp(mockSvc, nil)
 	app.ready = true
 	newM, _ := app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	app = newM.(AppModel)

@@ -25,6 +25,7 @@ type TreeNode struct {
 	Name        string
 	ProjectName string
 	Key         string
+	Icon        string
 	Container   *docker.ContainerInfo
 	ConfigFiles string
 	WorkingDir  string
@@ -85,7 +86,11 @@ func (n *TreeNode) DisplayTitle() string {
 		if n.Container != nil && n.Container.State != docker.StateRunning {
 			statusDot = "○"
 		}
-		title := fmt.Sprintf("%s %s", statusDot, n.Name)
+		iconPrefix := ""
+		if n.Icon != "" {
+			iconPrefix = n.Icon + " "
+		}
+		title := fmt.Sprintf("%s %s%s", statusDot, iconPrefix, n.Name)
 		if n.Container != nil && n.Container.OneOff {
 			title += " [one-off]"
 		}
@@ -207,9 +212,71 @@ func findOrCreateChild(parent *TreeNode, name string, nodeType NodeType, stateMa
 	return newNode
 }
 
+// MatchIcon finds an appropriate Nerd Font icon for a container given its image and container name.
+// It prioritizes exact repository match, token keyword match on image repo and container name,
+// and falls back to icons["default"].
+func MatchIcon(imageName, containerName string, icons map[string]string) string {
+	if len(icons) == 0 {
+		return ""
+	}
+
+	img := strings.ToLower(strings.TrimSpace(imageName))
+	// 1. Strip digest (@sha256:...)
+	if idx := strings.Index(img, "@"); idx != -1 {
+		img = img[:idx]
+	}
+	// 2. Strip tag (:latest) after the last slash (retains registry:port intact)
+	lastSlash := strings.LastIndex(img, "/")
+	if lastSlash != -1 {
+		if idx := strings.Index(img[lastSlash+1:], ":"); idx != -1 {
+			img = img[:lastSlash+1+idx]
+		}
+	} else if idx := strings.Index(img, ":"); idx != -1 {
+		img = img[:idx]
+	}
+
+	baseRepo := img
+	if lastSlash != -1 {
+		baseRepo = img[lastSlash+1:]
+	}
+
+	// 1. Direct exact match on base repository
+	if icon, ok := icons[baseRepo]; ok && icon != "" {
+		return icon
+	}
+
+	// 2. Token match on base repository (e.g. "postgres-exporter" -> ["postgres", "exporter"])
+	for _, token := range splitNameTokens(baseRepo) {
+		if icon, ok := icons[token]; ok && token != "default" && icon != "" {
+			return icon
+		}
+	}
+
+	// 3. Token match on container name (e.g. "my_redis_cache" -> ["my", "redis", "cache"])
+	cName := strings.ToLower(strings.TrimSpace(containerName))
+	for _, token := range splitNameTokens(cName) {
+		if icon, ok := icons[token]; ok && token != "default" && icon != "" {
+			return icon
+		}
+	}
+
+	// 4. Fallback to default icon
+	if def, ok := icons["default"]; ok {
+		return def
+	}
+
+	return ""
+}
+
+func splitNameTokens(s string) []string {
+	return strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_' || r == '.' || r == '/' || r == ':'
+	})
+}
+
 var detectLocalComposeFunc = docker.DetectLocalCompose
 
-func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*TreeNode {
+func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool, icons map[string]string) []*TreeNode {
 	var roots []*TreeNode
 	var standaloneNode *TreeNode
 
@@ -268,9 +335,11 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 			if ctrKey == "" {
 				ctrKey = c.Name
 			}
+			ctrIcon := MatchIcon(c.Image, c.Name, icons)
 			svcNode.Children = append(svcNode.Children, &TreeNode{
 				Type:        NodeContainer,
 				Name:        c.Name,
+				Icon:        ctrIcon,
 				ProjectName: c.ProjectName,
 				Key:         "ctr:" + ctrKey,
 				Container:   c,
@@ -289,9 +358,11 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool) []*T
 			if ctrKey == "" {
 				ctrKey = c.Name
 			}
+			ctrIcon := MatchIcon(c.Image, c.Name, icons)
 			standaloneNode.Children = append(standaloneNode.Children, &TreeNode{
 				Type:      NodeContainer,
 				Name:      c.Name,
+				Icon:      ctrIcon,
 				Key:       "ctr:" + ctrKey,
 				Container: c,
 			})

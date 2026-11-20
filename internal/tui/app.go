@@ -110,21 +110,22 @@ type AppModel struct {
 	ready             bool
 }
 
-func NewApp(cli docker.Service) AppModel {
-	return NewAppWithConfig(cli, config.Default())
-}
-
-func NewAppWithConfig(cli docker.Service, cfg *config.Config) AppModel {
+func NewApp(cli docker.Service, cfg *config.Config) AppModel {
 	if cfg == nil {
 		cfg = config.Default()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	eventCh, errCh := cli.StreamEvents(ctx)
 
+	ctrModel := container.New(cli)
+	if len(cfg.Icons) > 0 {
+		ctrModel.SetIcons(cfg.Icons)
+	}
+
 	return AppModel{
 		dockerClient:      cli,
 		cfg:               cfg,
-		containerModel:    container.New(cli),
+		containerModel:    ctrModel,
 		imageModel:        image.New(cli),
 		volumeModel:       volume.New(cli),
 		networkModel:      network.New(cli),
@@ -864,15 +865,11 @@ func (a AppModel) View() tea.View {
 
 	var statusBadge string
 	if a.reconnecting {
-		if a.reconnectAttempts > 0 {
-			statusBadge = theme.Current.StatusPaused.Render(fmt.Sprintf("○ RECONNECTING (%d/%d)...", a.reconnectAttempts, maxReconnectAttempts))
-		} else {
-			statusBadge = theme.Current.StatusPaused.Render("○ RECONNECTING...")
-		}
+		statusBadge = theme.Current.StatusPaused.Render("○")
 	} else if a.daemonConnected {
-		statusBadge = theme.Current.StatusRunning.Render("● CONNECTED")
+		statusBadge = theme.Current.StatusRunning.Render("●")
 	} else {
-		statusBadge = theme.Current.StatusStopped.Render("○ DISCONNECTED")
+		statusBadge = theme.Current.StatusStopped.Render("○")
 	}
 
 	var pruningStatus string
