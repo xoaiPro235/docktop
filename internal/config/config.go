@@ -48,7 +48,6 @@ func DefaultIcons() map[string]string {
 		"mysql":         "",
 		"mariadb":       "",
 		"mssql":         "",
-		"mssql-server":  "",
 		"sqlserver":     "",
 		"redis":         "",
 		"valkey":        "",

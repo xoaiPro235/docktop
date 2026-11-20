@@ -92,6 +92,9 @@ func TestMatchIcon(t *testing.T) {
 		"node":          "󰎙",
 		"mssql":         "",
 		"mssql/server":  "",
+		"apache":        "",
+		"kafka":         "󱀏",
+		"loki":          "",
 		"my-custom-app": "🚀",
 		"web_worker":    "⚙️",
 		"default":       "󰡨",
@@ -114,6 +117,8 @@ func TestMatchIcon(t *testing.T) {
 		{"container name overrides image icon", "postgres:16-alpine", "my-custom-app", "🚀"},
 		{"multi-part registry repo token match (mssql)", "mcr.microsoft.com/mssql/server:latest", "sql1", ""},
 		{"multi-part registry exact repo path match", "mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04", "db", ""},
+		{"prefers specific product token over vendor", "apache/kafka-runner:latest", "worker", "󱀏"},
+		{"prefers base repo over vendor prefix", "grafana/loki:latest", "logger", ""},
 		{"token false-positive avoidance", "algo-service:latest", "trader", "󰡨"},
 		{"fallback to default", "unknown-vendor/secret-app:1.0", "worker", "󰡨"},
 	}

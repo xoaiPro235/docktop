@@ -268,8 +268,10 @@ func MatchIcon(imageName, containerName string, icons map[string]string) string 
 		}
 	}
 
-	// 4. Token match on repository path (e.g. "mssql/server" -> ["mssql", "server"], "postgres-exporter" -> ["postgres", "exporter"])
-	for _, token := range splitNameTokens(repoPath) {
+	// 4. Token match on repository path in reverse order (e.g. prefers product over vendor)
+	tokens := splitNameTokens(repoPath)
+	for _, token := range slices.Backward(tokens) {
+
 		if icon, ok := icons[token]; ok && token != "default" && icon != "" {
 			return icon
 		}
