@@ -93,12 +93,13 @@ make build
 | Key | Description |
 | :--- | :--- |
 | `1` - `4` | Switch tabs: Containers (`1`), Images (`2`), Volumes (`3`), Networks (`4`) |
-| `Tab` / `Esc` | Toggle focus between Tree and Detail pane |
+| `Tab` | Toggle focus between Tree and Detail pane |
 | `z` | Zoom / unzoom active pane to full screen |
 | `x` | Open Action Menu (built-in actions & custom commands) |
 | `/` | Activate search filter (Press `Esc` to clear) |
-| `b` | Open published container port in default browser |
-| `s` / `t` / `r` | Start / Stop / Restart selected container or compose service |
+| `o` | Open published container port in default browser |
+| `s` | Start / Stop selected container or compose service |
+| `r` | Restart selected container or compose service |
 | `p` | Pause / Unpause container |
 | `d` / `P` | Remove resource (`d`) or Prune unused resources (`P`) |
 | `q` / `Ctrl+C` | Quit docktop |

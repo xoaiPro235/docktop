@@ -231,21 +231,20 @@ func parseDotEnvProjectName(projectDir string) string {
 var detectComposeFunc = defaultDetectCompose
 
 func defaultDetectCompose() (binary string, subcmd []string, cmdType ComposeCommandType) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
 	// 1. Try modern "docker compose version"
-	if err := exec.CommandContext(ctx, "docker", "compose", "version").Run(); err == nil {
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel1()
+	if err := exec.CommandContext(ctx1, "docker", "compose", "version").Run(); err == nil {
 		return "docker", []string{"compose"}, ComposeV2
 	}
+
 	// 2. Fallback to legacy "docker-compose version"
-	if ctx.Err() == nil {
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel2()
-		if err := exec.CommandContext(ctx2, "docker-compose", "version").Run(); err == nil {
-			return "docker-compose", nil, ComposeV1
-		}
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2()
+	if err := exec.CommandContext(ctx2, "docker-compose", "version").Run(); err == nil {
+		return "docker-compose", nil, ComposeV1
 	}
+
 	return "", nil, ComposeNone
 }
 
