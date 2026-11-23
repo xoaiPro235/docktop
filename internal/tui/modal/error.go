@@ -1,7 +1,6 @@
 package modal
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -79,7 +78,7 @@ func (m ErrorModal) View() string {
 		Foreground(theme.Current.Palette.Danger).
 		Width(innerWidth).
 		Align(lipgloss.Center).
-		Render(fmt.Sprintf("✖  %s", m.Title))
+		Render("✖  " + m.Title)
 	sb.WriteString(titleText)
 	sb.WriteString("\n\n")
 

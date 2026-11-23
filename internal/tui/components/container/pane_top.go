@@ -2,6 +2,7 @@ package container
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -154,7 +155,7 @@ func (p TopPane) Render() string {
 			status = theme.Current.StatusStopped.Render("✕ ERROR")
 		}
 	} else {
-		status = theme.Current.Key.Render(" Processes: ") + theme.Current.AccentText.Render(fmt.Sprintf("%d", len(p.processes)))
+		status = theme.Current.Key.Render(" Processes: ") + theme.Current.AccentText.Render(strconv.Itoa(len(p.processes)))
 	}
 
 	sep := theme.Current.LineNumber.Render(" │ ")
@@ -210,7 +211,7 @@ func renderProcessesTable(titles []string, processes [][]string, totalWidth int)
 	// Separator line
 	var sepLine strings.Builder
 	prefixWidth := 0
-	for i := 0; i < colCount-1; i++ {
+	for i := range colCount - 1 {
 		sepLine.WriteString(strings.Repeat("─", colWidths[i]))
 		sepLine.WriteString("  ")
 		prefixWidth += colWidths[i] + 2

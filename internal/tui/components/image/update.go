@@ -158,7 +158,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, func() tea.Msg {
 					return modal.ShowConfirmMsg{
 						Question: fmt.Sprintf("Are you sure you want to remove image %q?", targetDisplay),
-						Command:  fmt.Sprintf("docker rmi %s", targetID),
+						Command:  "docker rmi " + targetID,
 						Style:    modal.StyleDanger,
 						OnConfirm: func() tea.Msg {
 							return RunCmdMsg{TargetID: targetID, Cmd: m.removeImageCmd(targetID)}

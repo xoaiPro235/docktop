@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/moby/moby/api/types/network"
@@ -50,10 +51,10 @@ func (c *Client) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
 				if p.IP.Is6() || (p.IP.IsValid() && !p.IP.IsUnspecified()) {
 					portStrs = append(portStrs, fmt.Sprintf("%s:%d", p.IP.String(), p.PublicPort))
 				} else {
-					portStrs = append(portStrs, fmt.Sprintf("%d", p.PublicPort))
+					portStrs = append(portStrs, strconv.FormatUint(uint64(p.PublicPort), 10))
 				}
 			} else if p.PrivatePort > 0 {
-				portStrs = append(portStrs, fmt.Sprintf("%d", p.PrivatePort))
+				portStrs = append(portStrs, strconv.FormatUint(uint64(p.PrivatePort), 10))
 			}
 		}
 		ports := "-"

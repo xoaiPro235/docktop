@@ -3,6 +3,7 @@ package container
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -138,7 +139,7 @@ func highlightYAML(content string) string {
 	lineNumStyle := theme.Current.LineNumber
 	dashStyle := theme.Current.FooterKey
 
-	maxDigits := len(fmt.Sprintf("%d", len(lines)))
+	maxDigits := len(strconv.Itoa(len(lines)))
 	lineFormat := fmt.Sprintf("%%%dd │ ", maxDigits)
 
 	for i, line := range lines {

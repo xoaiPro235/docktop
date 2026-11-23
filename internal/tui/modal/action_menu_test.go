@@ -207,7 +207,7 @@ func TestActionMenuModal_ScrollWithViewport(t *testing.T) {
 	}
 
 	// Navigate down to item 18 (below the first page)
-	for i := 0; i < 18; i++ {
+	for range 18 {
 		m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
 	}
 	if m.SelectedIndex != 18 {
@@ -238,7 +238,7 @@ func TestActionMenuModal_ScrollWithViewport(t *testing.T) {
 	}
 
 	// Scrolling up to the top should adjust ScrollOffset to 0 and show top items
-	for i := 0; i < 18; i++ {
+	for range 18 {
 		m, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	}
 	if m.SelectedIndex != 0 {
