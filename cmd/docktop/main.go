@@ -38,13 +38,15 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Hint: Make sure Docker daemon is running and reachable (check socket permissions or SSH connection).\n")
 		os.Exit(1)
 	}
-	defer dockerCli.Close()
 
 	app := tui.NewApp(dockerCli, cfg)
 
 	p := tea.NewProgram(app)
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error running docktop: %v\n", err)
+	_, runErr := p.Run()
+	_ = dockerCli.Close()
+
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "Error running docktop: %v\n", runErr)
 		os.Exit(1)
 	}
 }

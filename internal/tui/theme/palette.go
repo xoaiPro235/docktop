@@ -26,7 +26,7 @@ type Palette struct {
 	ChartGradient []color.Color
 }
 
-// DefaultPalette returns the authentic Tokyo Night theme.
+// DefaultPalette returns the Tokyo Night theme.
 func DefaultPalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#bb9af7"),
@@ -38,9 +38,9 @@ func DefaultPalette() Palette {
 		Danger:        lipgloss.Color("#db4b4b"),
 		Foreground:    lipgloss.Color("#c0caf5"),
 		ForegroundDim: lipgloss.Color("#a9b1d6"),
-		TextMuted:     lipgloss.Color("#565f89"),
-		TextDark:      lipgloss.Color("#545c7e"),
-		BorderNormal:  lipgloss.Color("#292e42"),
+		TextMuted:     lipgloss.Color("#787c99"),
+		TextDark:      lipgloss.Color("#565f89"),
+		BorderNormal:  lipgloss.Color("#3b4261"),
 		BorderFocused: lipgloss.Color("#7aa2f7"),
 		BgTabActive:   lipgloss.Color("#202330"),
 		BgPanel:       lipgloss.Color("#16161e"),
@@ -80,7 +80,7 @@ func TerminalPalette() Palette {
 	}
 }
 
-// DraculaPalette returns the authentic Dracula dark theme.
+// DraculaPalette returns the Dracula dark theme.
 func DraculaPalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#bd93f9"),
@@ -107,7 +107,7 @@ func DraculaPalette() Palette {
 	}
 }
 
-// CatppuccinMochaPalette returns the authentic Catppuccin Mocha theme.
+// CatppuccinMochaPalette returns the Catppuccin Mocha theme.
 func CatppuccinMochaPalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#cba6f7"),
@@ -134,7 +134,7 @@ func CatppuccinMochaPalette() Palette {
 	}
 }
 
-// NordPalette returns the authentic arctic, north-bluish Nord palette matching official specs.
+// NordPalette returns the arctic, north-bluish Nord palette matching official specs.
 func NordPalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#88c0d0"),
@@ -161,7 +161,7 @@ func NordPalette() Palette {
 	}
 }
 
-// OneDarkPalette returns the authentic One Dark theme.
+// OneDarkPalette returns the One Dark theme.
 func OneDarkPalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#61afef"),
@@ -188,7 +188,7 @@ func OneDarkPalette() Palette {
 	}
 }
 
-// GruvboxDarkPalette returns the authentic Gruvbox dark theme with medium contrast.
+// GruvboxDarkPalette returns the Gruvbox dark theme with medium contrast.
 func GruvboxDarkPalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#fabd2f"),
@@ -215,7 +215,7 @@ func GruvboxDarkPalette() Palette {
 	}
 }
 
-// EverforestPalette returns the authentic Everforest dark theme with medium contrast.
+// EverforestPalette returns the Everforest dark theme with medium contrast.
 func EverforestPalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#a7c080"),
@@ -242,7 +242,7 @@ func EverforestPalette() Palette {
 	}
 }
 
-// RosePinePalette returns the authentic Rosé Pine dark theme.
+// RosePinePalette returns the Rosé Pine dark theme.
 func RosePinePalette() Palette {
 	return Palette{
 		Primary:       lipgloss.Color("#ebbcba"),

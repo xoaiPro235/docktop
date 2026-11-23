@@ -49,7 +49,7 @@ nfpms:
     vendor: xoaiPro235
     homepage: https://github.com/xoaiPro235/docktop
     maintainer: xoaiPro235
-    description: "A fast, modern terminal UI for Docker containers, images, volumes, and networks."
+    description: "A fast, modern terminal UI for managing Docker."
     license: MIT
     formats:
       - deb
@@ -102,3 +102,76 @@ changelog:
     - title: "📝 Documentation"
       regexp: '(?i)^.*?docs?(\(.+\))?!?:.+$'
       order: 4
+      
+homebrew_casks:
+  - name: docktop
+    ids:
+      - default
+    binaries:
+      - docktop
+    homepage: "https://github.com/xoaiPro235/docktop"
+    description: "A fast, modern terminal UI for managing Docker."
+    directory: Casks
+    repository:
+      owner: xoaiPro235
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: xoaiPro235
+      email: "maivanluc.it@gmail.com"
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/docktop"]
+          end
+
+scoops:
+  - name: docktop
+    ids:
+      - default
+    homepage: "https://github.com/xoaiPro235/docktop"
+    description: "A fast, modern terminal UI for managing Docker."
+    license: MIT
+    repository:
+      owner: xoaiPro235
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: xoaiPro235
+      email: "maivanluc.it@gmail.com"
+
+winget:
+  - name: docktop
+    publisher: xoaiPro235
+    package_identifier: xoaiPro235.docktop
+    publisher_url: "https://github.com/xoaiPro235"
+    publisher_support_url: "https://github.com/xoaiPro235/docktop/issues"
+    short_description: "A fast, modern terminal UI for managing Docker."
+    license: MIT
+    license_url: "https://github.com/xoaiPro235/docktop/blob/main/LICENSE"
+    homepage: "https://github.com/xoaiPro235/docktop"
+    release_notes: "{{ .Changelog }}"
+    tags:
+      - docker
+      - tui
+      - cli
+      - golang
+    ids:
+      - default
+    repository:
+      owner: xoaiPro235
+      name: winget-pkgs
+      branch: "docktop-{{ .Version }}"
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+    commit_author:
+      name: xoaiPro235
+      email: "maivanluc.it@gmail.com"

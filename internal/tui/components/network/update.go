@@ -143,7 +143,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				} else {
 					question = fmt.Sprintf("Are you sure you want to remove network %q?", netName)
 				}
-				cmdStr := fmt.Sprintf("docker network rm %s", netID)
+				cmdStr := "docker network rm " + netID
 				return m, func() tea.Msg {
 					return modal.ShowConfirmMsg{
 						Question: question,

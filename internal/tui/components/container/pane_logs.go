@@ -2,6 +2,7 @@ package container
 
 import (
 	"fmt"
+	"strconv"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
@@ -163,7 +164,7 @@ func (p LogsPane) Render() string {
 		status = theme.Current.StatusPaused.Render("○ PAUSED ("+scrollPct+")") + " " + theme.Current.FooterKey.Render("[G]") + " " + theme.Current.Title.Render("Follow")
 	}
 
-	lineInfo := theme.Current.Key.Render(" Lines: ") + theme.Current.AccentText.Render(fmt.Sprintf("%d", p.count))
+	lineInfo := theme.Current.Key.Render(" Lines: ") + theme.Current.AccentText.Render(strconv.Itoa(p.count))
 	sep := theme.Current.LineNumber.Render(" │ ")
 
 	footer := theme.Current.Footer.

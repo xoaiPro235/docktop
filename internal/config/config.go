@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -191,7 +192,7 @@ func GetConfigPath() (string, error) {
 func Load() (*Config, error) {
 	path, err := GetConfigPath()
 	if err != nil {
-		return Default(), nil
+		return Default(), nil //nolint:nilerr
 	}
 	return LoadFromPath(path)
 }
@@ -224,9 +225,7 @@ func LoadFromPath(path string) (*Config, error) {
 		cfg.Icons = DefaultIcons()
 	} else {
 		merged := DefaultIcons()
-		for k, v := range cfg.Icons {
-			merged[k] = v
-		}
+		maps.Copy(merged, cfg.Icons)
 		cfg.Icons = merged
 	}
 
@@ -236,7 +235,7 @@ func LoadFromPath(path string) (*Config, error) {
 // SaveTemplate creates a documented default config.yaml at the given path.
 func SaveTemplate(path string) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
@@ -248,15 +247,15 @@ func SaveTemplate(path string) error {
 
 # UI Theme:
 # Available presets:
-#   - tokyo-night : Default vibrant Tokyo Night / Neon aesthetic
-#   - terminal    : Adaptive 16 ANSI colors (automatically matches your terminal emulator theme: Kitty, Alacritty, iTerm2, WezTerm)
-#   - dracula     : Classic Dracula dark theme
-#   - catppuccin  : Soothing Catppuccin Mocha theme
-#   - nord        : Arctic, north-bluish palette
-#   - one-dark    : Iconic Atom / VS Code One Dark Pro theme
-#   - gruvbox     : Warm retro Gruvbox dark theme (medium contrast)
-#   - everforest  : Natural comfortable green Everforest dark theme (medium contrast)
-#   - rose-pine   : Aesthetic pastel Rosé Pine dark theme
+#   - tokyo-night : Default vibrant Tokyo Night.
+#   - terminal    : Adaptive 16 ANSI colors.
+#   - dracula     : Classic Dracula dark theme.
+#   - catppuccin  : Catppuccin Mocha theme.
+#   - nord        : Arctic, north-bluish palette.
+#   - one-dark    : Iconic OneDark theme.
+#   - gruvbox     : Gruvbox dark theme.
+#   - everforest  : Everforest dark theme.
+#   - rose-pine   : Rosé Pine dark theme.
 theme: "tokyo-night"
 
 # Docker Host:
@@ -324,5 +323,5 @@ theme: "tokyo-night"
 #       command: "docker network inspect {{ .Name }}"
 #       pause: true
 `
-	return os.WriteFile(path, []byte(template), 0o644)
+	return os.WriteFile(path, []byte(template), 0o600)
 }

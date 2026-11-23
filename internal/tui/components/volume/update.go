@@ -138,10 +138,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				var question, cmdStr string
 				if force {
 					question = fmt.Sprintf("Volume is mounted by %d container(s)! Force remove %q?", len(selected.Containers), volName)
-					cmdStr = fmt.Sprintf("docker volume rm -f %s", volName)
+					cmdStr = "docker volume rm -f " + volName
 				} else {
 					question = fmt.Sprintf("Are you sure you want to remove volume %q?", volName)
-					cmdStr = fmt.Sprintf("docker volume rm %s", volName)
+					cmdStr = "docker volume rm " + volName
 				}
 				return m, func() tea.Msg {
 					return modal.ShowConfirmMsg{

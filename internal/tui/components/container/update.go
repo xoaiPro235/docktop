@@ -601,7 +601,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						return m, func() tea.Msg {
 							return modal.ShowConfirmMsg{
 								Question: fmt.Sprintf("Are you sure you want to stop %q?", c.Name),
-								Command:  fmt.Sprintf("docker stop %s", c.Name),
+								Command:  "docker stop " + c.Name,
 								Style:    modal.StyleDanger,
 								OnConfirm: func() tea.Msg {
 									return RunCmdMsg{
@@ -615,7 +615,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					return m, func() tea.Msg {
 						return modal.ShowConfirmMsg{
 							Question: fmt.Sprintf("Are you sure you want to start %q?", c.Name),
-							Command:  fmt.Sprintf("docker start %s", c.Name),
+							Command:  "docker start " + c.Name,
 							Style:    modal.StyleSuccess,
 							OnConfirm: func() tea.Msg {
 								return RunCmdMsg{
@@ -634,7 +634,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						return m, func() tea.Msg {
 							return modal.ShowConfirmMsg{
 								Question: fmt.Sprintf("Are you sure you want to unpause %q?", c.Name),
-								Command:  fmt.Sprintf("docker unpause %s", c.Name),
+								Command:  "docker unpause " + c.Name,
 								Style:    modal.StyleSuccess,
 								OnConfirm: func() tea.Msg {
 									return RunCmdMsg{
@@ -648,7 +648,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					return m, func() tea.Msg {
 						return modal.ShowConfirmMsg{
 							Question: fmt.Sprintf("Are you sure you want to pause %q?", c.Name),
-							Command:  fmt.Sprintf("docker pause %s", c.Name),
+							Command:  "docker pause " + c.Name,
 							Style:    modal.StyleWarning,
 							OnConfirm: func() tea.Msg {
 								return RunCmdMsg{
@@ -666,7 +666,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					return m, func() tea.Msg {
 						return modal.ShowConfirmMsg{
 							Question: fmt.Sprintf("Are you sure you want to restart %q?", c.Name),
-							Command:  fmt.Sprintf("docker restart %s", c.Name),
+							Command:  "docker restart " + c.Name,
 							Style:    modal.StyleWarning,
 							OnConfirm: func() tea.Msg {
 								return RunCmdMsg{
@@ -683,10 +683,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					c := selectedContainer
 					force := c.State == docker.StateRunning || c.State == docker.StatePaused
 					q := fmt.Sprintf("Are you sure you want to remove %q?", c.Name)
-					cmdStr := fmt.Sprintf("docker rm %s", c.Name)
+					cmdStr := "docker rm " + c.Name
 					if force {
 						q = fmt.Sprintf("Are you sure you want to force remove %q?", c.Name)
-						cmdStr = fmt.Sprintf("docker rm -f %s", c.Name)
+						cmdStr = "docker rm -f " + c.Name
 					}
 					return m, func() tea.Msg {
 						return modal.ShowConfirmMsg{

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/moby/moby/api/types/volume"
 	"github.com/xoaiPro235/docktop/internal/docker"
 	"github.com/xoaiPro235/docktop/internal/docker/mocks"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
@@ -56,9 +55,9 @@ func TestModel_SetVolumes(t *testing.T) {
 	m.SetSize(100, 30)
 
 	vols := []docker.VolumeInfo{
-		{Volume: volume.Volume{Name: "data-1"}},
-		{Volume: volume.Volume{Name: "data-2"}},
-		{Volume: volume.Volume{Name: "data-3"}},
+		{Name: "data-1"},
+		{Name: "data-2"},
+		{Name: "data-3"},
 	}
 
 	m.SetVolumes(vols)
@@ -72,8 +71,8 @@ func TestModel_SetVolumes(t *testing.T) {
 	// Move cursor to data-2 and update list
 	m.cursorIndex = 1
 	newVols := []docker.VolumeInfo{
-		{Volume: volume.Volume{Name: "data-3"}},
-		{Volume: volume.Volume{Name: "data-2"}},
+		{Name: "data-3"},
+		{Name: "data-2"},
 	}
 	m.SetVolumes(newVols)
 	if m.SelectedVolume() == nil || m.SelectedVolume().Name != "data-2" {
@@ -84,8 +83,8 @@ func TestModel_SetVolumes(t *testing.T) {
 func TestModel_FilterVolumes(t *testing.T) {
 	m := New(&mocks.MockVolumeService{})
 	m.SetVolumes([]docker.VolumeInfo{
-		{Volume: volume.Volume{Name: "pgdata", Driver: "local"}},
-		{Volume: volume.Volume{Name: "cache", Driver: "local"}},
+		{Name: "pgdata", Driver: "local"},
+		{Name: "cache", Driver: "local"},
 	})
 
 	sendKey := func(msg tea.Msg) {
@@ -135,8 +134,8 @@ func TestModel_SelectedVolume(t *testing.T) {
 	}
 
 	m.volumes = []docker.VolumeInfo{
-		{Volume: volume.Volume{Name: "vol-alpha"}},
-		{Volume: volume.Volume{Name: "vol-beta"}},
+		{Name: "vol-alpha"},
+		{Name: "vol-beta"},
 	}
 	m.applyFilter()
 	m.cursorIndex = 1
@@ -160,14 +159,12 @@ func TestModel_updateViewportContent(t *testing.T) {
 	// With populated volumes
 	m.volumes = []docker.VolumeInfo{
 		{
-			Volume: volume.Volume{
-				Name:       "pgdata",
-				Driver:     "local",
-				Mountpoint: "/var/lib/docker/volumes/pgdata/_data",
-				Scope:      "local",
-			},
-			InUse:  true,
-			RefCnt: 1,
+			Name:       "pgdata",
+			Driver:     "local",
+			Mountpoint: "/var/lib/docker/volumes/pgdata/_data",
+			Scope:      "local",
+			InUse:      true,
+			RefCnt:     1,
 			Containers: []docker.VolumeContainerMount{
 				{ContainerName: "postgres-db", Destination: "/var/lib/postgresql/data", RW: true},
 			},

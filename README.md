@@ -1,40 +1,84 @@
 # docktop
 
-A fast, lightweight, and modern Terminal UI (TUI) for Docker, built with Go.
+A fast, lightweight, and modern Terminal UI (TUI) for managing Docker, built with Go.
 
-Manage and monitor your Docker with keyboard-driven ease.
+Manage and monitor your Docker containers, images, volumes, and networks with keyboard-driven ease.
 
 ![docktop preview](assets/demo.gif)
 
 ---
 
+## Table of Contents
+
+- [Installation](#installation)
+  - [Linux](#linux)
+  - [macOS](#macos)
+  - [Windows](#windows)
+  - [Go Install](#go-install)
+  - [Build from Source](#build-from-source)
+- [Keybindings](#keybindings)
+- [Configuration](#configuration)
+- [Remote Docker (-H)](#remote-docker--h)
+- [🙏 Acknowledgements](#acknowledgements)
+- [📄 License](#license)
+
+---
 
 ## Installation
 
-### Option 1: Download Pre-built Package or Binary
-Download the latest package or binary for your operating system (Linux, macOS, Windows) from the [Releases](https://github.com/xoaiPro235/docktop/releases) page.
+### Linux
 
+#### Debian / Ubuntu (`.deb`)
 ```bash
-# Debian / Ubuntu (.deb)
 sudo dpkg -i docktop_*_linux_amd64.deb
-
-# Fedora / RHEL (.rpm)
-sudo rpm -i docktop_*_linux_amd64.rpm
-
-# Or extract standalone binary (Linux / macOS)
-tar -xzf docktop_*_linux_amd64.tar.gz
-sudo mv docktop /usr/local/bin/
-
-# Windows
-# Extract the .zip archive and add docktop.exe to your PATH
 ```
 
-### Option 2: Using `go install`
+#### Fedora / RHEL (`.rpm`)
+```bash
+sudo rpm -i docktop_*_linux_amd64.rpm
+```
+
+#### Standalone Binary
+Download the pre-compiled archive from [Releases](https://github.com/xoaiPro235/docktop/releases) and extract:
+```bash
+tar -xzf docktop_*_linux_amd64.tar.gz
+sudo mv docktop /usr/local/bin/
+```
+
+### macOS
+
+Install via [Homebrew](https://brew.sh/):
+
+```bash
+brew install xoaiPro235/tap/docktop
+```
+
+Or download the pre-compiled `.tar.gz` binary from the [Releases](https://github.com/xoaiPro235/docktop/releases) page.
+
+### Windows
+
+#### WinGet
+```powershell
+winget install xoaiPro235.docktop
+```
+
+#### Scoop
+```powershell
+scoop bucket add xoaipro235 https://github.com/xoaiPro235/scoop-bucket
+scoop install docktop
+```
+
+#### Manual
+Download the `.zip` archive from [Releases](https://github.com/xoaiPro235/docktop/releases) and add `docktop.exe` to your `PATH`.
+
+### Go Install
+
 ```bash
 go install github.com/xoaiPro235/docktop/cmd/docktop@latest
 ```
 
-### Option 3: Build from Source
+### Build from Source
+
 ```bash
 git clone https://github.com/xoaiPro235/docktop.git
 cd docktop
@@ -44,54 +88,61 @@ make build
 
 ---
 
-## Configuration & Themes
+## Keybindings
+
+| Key | Description |
+| :--- | :--- |
+| `1` - `4` | Switch tabs: Containers (`1`), Images (`2`), Volumes (`3`), Networks (`4`) |
+| `Tab` | Toggle focus between Tree and Detail pane |
+| `z` | Zoom / unzoom active pane to full screen |
+| `x` | Open Action Menu (built-in actions & custom commands) |
+| `/` | Activate search filter (Press `Esc` to clear) |
+| `o` | Open published container port in default browser |
+| `s` | Start / Stop selected container or compose service |
+| `r` | Restart selected container or compose service |
+| `p` | Pause / Unpause container |
+| `d` / `P` | Remove resource (`d`) or Prune unused resources (`P`) |
+| `q` / `Ctrl+C` | Quit docktop |
+
+---
+
+## Configuration
 
 `docktop` reads its configuration from the standard OS configuration directory:
+
 - **Linux/Unix:** `~/.config/docktop/config.yaml`
 - **macOS:** `~/Library/Application Support/docktop/config.yaml`
 - **Windows:** `%APPDATA%\docktop\config.yaml`
 
-If the file does not exist, `docktop` automatically creates one with default settings upon first launch.
+If the file does not exist, `docktop` automatically generates one with default settings upon first launch.
 
-### Example `config.yaml`:
+> **Note:** Ensure your terminal has a [Nerd Font](https://www.nerdfonts.com/) installed (e.g. JetBrainsMono, FiraCode) to display container and service icons properly.
+
+<details>
+<summary><b>Click to expand full example <code>config.yaml</code></b></summary>
 
 ```yaml
 # docktop configuration file
-# Default locations:
-#   - Linux/Unix : ~/.config/docktop/config.yaml
-#   - macOS      : ~/Library/Application Support/docktop/config.yaml
-#   - Windows    : %APPDATA%\docktop\config.yaml
 
 # UI Theme:
 # Available presets:
-#   - tokyo-night : Default vibrant Tokyo Night / Neon aesthetic
-#   - terminal    : Adaptive 16 ANSI colors (automatically matches your terminal emulator theme: Kitty, Alacritty, iTerm2, WezTerm)
-#   - dracula     : Classic Dracula dark theme
-#   - catppuccin  : Soothing Catppuccin Mocha theme
-#   - nord        : Arctic, north-bluish palette
-#   - one-dark    : Iconic Atom / VS Code One Dark Pro theme
-#   - gruvbox     : Warm retro Gruvbox dark theme (medium contrast)
-#   - everforest  : Natural comfortable green Everforest dark theme (medium contrast)
-#   - rose-pine   : Aesthetic pastel Rosé Pine dark theme
+#   - tokyo-night : Default vibrant Tokyo Night.
+#   - terminal    : Adaptive 16 ANSI colors.
+#   - dracula     : Classic Dracula dark theme.
+#   - catppuccin  : Catppuccin Mocha theme.
+#   - nord        : Arctic, north-bluish palette.
+#   - one-dark    : Iconic OneDark theme.
+#   - gruvbox     : Gruvbox dark theme.
+#   - everforest  : Everforest dark theme.
+#   - rose-pine   : Rosé Pine dark theme.
 theme: "terminal"
 
-# Docker Host:
-# Optional Docker daemon endpoint or remote socket.
-# If omitted or left empty, docktop falls back to the DOCKER_HOST environment variable,
-# or the standard OS Docker daemon socket / named pipe.
-# Examples:
-#   host: "unix:///var/run/docker.sock"
-#   host: "unix:///run/user/1000/docker.sock" (Rootless Docker)
-#   host: "npipe:////./pipe/dockerDesktopLinuxEngine" (Windows Docker Desktop)
-#   host: "ssh://user@remote-vps:22"
-#   host: "tcp://192.168.1.100:2376"
-# host: ""
+# Docker Host (optional daemon socket or remote endpoint):
+# host: "unix:///var/run/docker.sock"
+# host: "npipe:////./pipe/dockerDesktopLinuxEngine"
+# host: "ssh://user@remote-vps:22"
 
-# Container Icons:
-# Maps image names, full container names, or keywords to custom Nerd Font glyphs in the container tree.
-# Docktop includes standard built-in icons for common databases, web servers, and runtimes.
-# You can customize or add your own mappings below:
-# Examples:
+# Container Icons (Nerd Font mappings):
 # icons:
 #   postgres: "󰆼"
 #   redis: "󰟆"
@@ -101,19 +152,12 @@ theme: "terminal"
 #   python: "󰌠"
 #   default: "󰡨"
 
-# Custom Commands:
-# User-defined shell commands shown in the Action Menu ('x' key).
-# Commands execute in the terminal with template variables:
+# Custom Commands (Shown in Action Menu 'x'):
+# Template variables:
 #   Containers: {{ .ID }}, {{ .Name }}, {{ .Image }}
 #   Images:     {{ .ID }}, {{ .Repository }}, {{ .Tag }}
 #   Volumes:    {{ .Name }}
 #   Networks:   {{ .ID }}, {{ .Name }}
-#
-# Options:
-#   pause: true - Waits for user to press Enter before returning to docktop.
-#                 Recommended for informational commands (e.g., inspect, history, top).
-#
-# Examples:
 # customCommands:
 #   containers:
 #     - name: "Bash Shell"
@@ -121,15 +165,9 @@ theme: "terminal"
 #     - name: "Inspect Container JSON"
 #       command: "docker inspect {{ .ID }}"
 #       pause: true
-#     - name: "Top Processes"
-#       command: "docker top {{ .ID }}"
-#       pause: true
 #   images:
 #     - name: "Image History"
 #       command: "docker history {{ .ID }}"
-#       pause: true
-#     - name: "Inspect Image"
-#       command: "docker image inspect {{ .ID }}"
 #       pause: true
 #   volumes:
 #     - name: "Browse Files (Busybox)"
@@ -141,17 +179,29 @@ theme: "terminal"
 #       pause: true
 ```
 
-> **Tip:** Setting `theme: "terminal"` will make `docktop` automatically inherit whatever colors your terminal emulator (Kitty, Alacritty, iTerm2, WezTerm) is configured with!
->
-> **Action Menu (`x` key):** Press `x` anywhere to open the Action Menu for the selected container, image, volume, or network to execute built-in actions or your own `customCommands`.
->
-> **Nerd Font Icons:** Docktop uses Nerd Font glyphs to display intuitive service/container icons in the tree. Ensure your terminal has a [Nerd Font](https://www.nerdfonts.com/) installed (e.g., JetBrainsMono, FiraCode) for best appearance.
->
-> **Remote Docker / SSH:** You can specify a remote Docker endpoint via `-H / --host`, the `host` config option, or `DOCKER_HOST`:
-> ```bash
-> docktop -H ssh://user@remote-vps
-> ```
+</details>
+
 ---
+
+## Remote Docker (-H)
+
+By default, `docktop` connects to your local Docker daemon socket (`/var/run/docker.sock` on Linux/macOS or named pipe on Windows).
+
+To connect to a remote Docker host or custom socket, use the `-H` (or `--host`) flag:
+
+```bash
+# Connect securely to a remote host via SSH
+docktop -H ssh://user@remote-server
+
+# Connect to a Rootless Docker socket
+docktop -H unix:///run/user/1000/docker.sock
+```
+
+You can also specify a default host in `config.yaml` or via the standard `DOCKER_HOST` environment variable.
+
+---
+
+<a id="acknowledgements"></a>
 ## 🙏 Acknowledgements
 
 `docktop` is inspired by and learns from amazing open-source projects:
@@ -159,9 +209,11 @@ theme: "terminal"
 - **[btop](https://github.com/aristocratos/btop)** by aristocratos – Visual inspiration for Braille graph resource monitoring and mirrored layouts.
 - **[lazydocker](https://github.com/jesseduffield/lazydocker)** by Jesse Duffield – Workflow inspiration for container lifecycle management and compose tree structure.
 - **[Charmbracelet (Bubble Tea & Lipgloss)](https://github.com/charmbracelet)** – The wonderful TUI framework and styling toolkit powering this project.
-- Container statistics calculation logic adapted from [docker/cli](https://github.com/docker/cli) (Apache-2.0 License).
+- **[docker/cli](https://github.com/docker/cli)** - Container statistics calculation logic (Apache-2.0 License).
+
 ---
 
+<a id="license"></a>
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).

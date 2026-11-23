@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -214,10 +215,10 @@ func parseDotEnvProjectName(projectDir string) string {
 	if err != nil {
 		return ""
 	}
-	for _, line := range strings.Split(string(envData), "\n") {
+	for line := range strings.SplitSeq(string(envData), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "COMPOSE_PROJECT_NAME=") {
-			val := strings.TrimPrefix(line, "COMPOSE_PROJECT_NAME=")
+		if after, ok := strings.CutPrefix(line, "COMPOSE_PROJECT_NAME="); ok {
+			val := after
 			val = strings.Trim(val, `"' `)
 			if val != "" {
 				return val
@@ -231,13 +232,19 @@ var detectComposeFunc = defaultDetectCompose
 
 func defaultDetectCompose() (binary string, subcmd []string, cmdType ComposeCommandType) {
 	// 1. Try modern "docker compose version"
-	if err := exec.Command("docker", "compose", "version").Run(); err == nil {
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel1()
+	if err := exec.CommandContext(ctx1, "docker", "compose", "version").Run(); err == nil {
 		return "docker", []string{"compose"}, ComposeV2
 	}
+
 	// 2. Fallback to legacy "docker-compose version"
-	if err := exec.Command("docker-compose", "version").Run(); err == nil {
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2()
+	if err := exec.CommandContext(ctx2, "docker-compose", "version").Run(); err == nil {
 		return "docker-compose", nil, ComposeV1
 	}
+
 	return "", nil, ComposeNone
 }
 

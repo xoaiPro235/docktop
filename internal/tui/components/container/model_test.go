@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -359,7 +360,7 @@ func TestModel_StatsHistoryPreservedWhileLeftZoomed(t *testing.T) {
 
 	// Seed 60 samples before zoom to verify that retention capacity
 	// does not drop to the 20-point minimum while the left pane is zoomed.
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		m.statsPane.AddCPUData(float64(i), 120)
 	}
 
@@ -414,5 +415,30 @@ func TestModel_MouseClickAtColumnZeroWhileRightZoomed(t *testing.T) {
 	m, _ = m.Update(tea.MouseWheelMsg{X: 0, Y: 5, Button: tea.MouseWheelDown})
 	if m.cursorIndex != initialCursor {
 		t.Errorf("cursorIndex = %d, want %d (wheel should not scroll hidden tree)", m.cursorIndex, initialCursor)
+	}
+}
+
+func TestModel_ContainerStats(t *testing.T) {
+	mockCli := &mocks.MockContainerService{
+		StreamContainerStatsFunc: func(ctx context.Context, id string) <-chan docker.ContainerMetrics {
+			return make(chan docker.ContainerMetrics)
+		},
+	}
+	m := New(mockCli)
+	m.SetContainers([]docker.ContainerInfo{
+		{ID: "c1", Name: "app1", State: docker.StateRunning},
+		{ID: "c2", Name: "app2", State: docker.StateRunning},
+		{ID: "c3", Name: "app3", State: "exited"},
+	})
+
+	running, stopped, total := m.ContainerStats()
+	if total != 3 || running != 2 || stopped != 1 {
+		t.Fatalf("expected 2 running, 1 stopped, 3 total; got running=%d stopped=%d total=%d", running, stopped, total)
+	}
+
+	m.SetSize(120, 30)
+	viewOutput := m.View()
+	if !strings.Contains(viewOutput, "CONTAINERS:") || !strings.Contains(viewOutput, "running") || !strings.Contains(viewOutput, "stopped") {
+		t.Fatalf("expected view header to render stats, got:\n%s", viewOutput)
 	}
 }

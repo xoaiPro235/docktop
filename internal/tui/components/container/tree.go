@@ -335,11 +335,9 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool, icon
 					Expanded:    isNodeExpanded(key, stateMap),
 				}
 				roots = append(roots, projNode)
-			} else {
-				if projNode.ConfigFiles == "" && cleanFile != "" {
-					projNode.ConfigFiles = cleanFile
-					projNode.WorkingDir = workDir
-				}
+			} else if projNode.ConfigFiles == "" && cleanFile != "" {
+				projNode.ConfigFiles = cleanFile
+				projNode.WorkingDir = workDir
 			}
 
 			svcName := c.Service
@@ -418,11 +416,9 @@ func BuildTree(containers []docker.ContainerInfo, stateMap map[string]bool, icon
 					Expanded:    isNodeExpanded(key, stateMap),
 				}
 				roots = append(roots, existingProj)
-			} else {
-				if existingProj.ConfigFiles == "" {
-					existingProj.ConfigFiles = localProj.ConfigFile
-					existingProj.WorkingDir = localProj.WorkingDir
-				}
+			} else if existingProj.ConfigFiles == "" {
+				existingProj.ConfigFiles = localProj.ConfigFile
+				existingProj.WorkingDir = localProj.WorkingDir
 			}
 
 			for _, svcName := range localProj.Services {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -116,7 +117,7 @@ func (a *AppModel) buildContainerActionMenu() (string, string, []modal.ActionIte
 			cCopy.Image = ShellEscape(cCopy.Image)
 			for i, cc := range a.cfg.CustomCommands.Containers {
 				cmdDef := cc
-				keyBadge := fmt.Sprintf("%d", i+1)
+				keyBadge := strconv.Itoa(i + 1)
 				rendered, renderErr := RenderCustomCommand(cmdDef.Command, cCopy)
 				customCmds = append(customCmds, modal.ActionItem{
 					Key:     keyBadge,
@@ -198,7 +199,7 @@ func (a *AppModel) buildImageActionMenu() (string, string, []modal.ActionItem, [
 			}
 			for i, cc := range a.cfg.CustomCommands.Images {
 				cmdDef := cc
-				keyBadge := fmt.Sprintf("%d", i+1)
+				keyBadge := strconv.Itoa(i + 1)
 				rendered, renderErr := RenderCustomCommand(cmdDef.Command, imgCopy)
 				customCmds = append(customCmds, modal.ActionItem{
 					Key:     keyBadge,
@@ -246,7 +247,7 @@ func (a *AppModel) buildVolumeActionMenu() (string, string, []modal.ActionItem, 
 			volCopy.Driver = ShellEscape(volCopy.Driver)
 			for i, cc := range a.cfg.CustomCommands.Volumes {
 				cmdDef := cc
-				keyBadge := fmt.Sprintf("%d", i+1)
+				keyBadge := strconv.Itoa(i + 1)
 				rendered, renderErr := RenderCustomCommand(cmdDef.Command, volCopy)
 				customCmds = append(customCmds, modal.ActionItem{
 					Key:     keyBadge,
@@ -294,7 +295,7 @@ func (a *AppModel) buildNetworkActionMenu() (string, string, []modal.ActionItem,
 			netCopy.Driver = ShellEscape(netCopy.Driver)
 			for i, cc := range a.cfg.CustomCommands.Networks {
 				cmdDef := cc
-				keyBadge := fmt.Sprintf("%d", i+1)
+				keyBadge := strconv.Itoa(i + 1)
 				rendered, renderErr := RenderCustomCommand(cmdDef.Command, netCopy)
 				customCmds = append(customCmds, modal.ActionItem{
 					Key:     keyBadge,
