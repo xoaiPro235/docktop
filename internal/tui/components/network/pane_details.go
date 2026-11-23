@@ -171,8 +171,3 @@ func FormatNetworkViewportContent(selected *docker.NetworkInfo, width int, isZoo
 
 	return strings.TrimRight(sb.String(), "\n")
 }
-
-// FormatConnectedEndpoints is kept for backwards compatibility.
-func FormatConnectedEndpoints(selected *docker.NetworkInfo, width int) string {
-	return FormatNetworkViewportContent(selected, width)
-}

@@ -20,28 +20,15 @@ func (m Model) View() string {
 	leftWidth := m.leftWidth()
 	rightWidth := m.rightWidth()
 
-	leftBorderColor := theme.Current.Palette.BorderNormal
-	rightBorderColor := theme.Current.Palette.BorderNormal
-
-	if m.focusZone == FocusNetworksList {
-		leftBorderColor = theme.Current.Palette.BorderFocused
-	} else {
-		rightBorderColor = theme.Current.Palette.BorderFocused
-	}
-
-	leftStyle := lipgloss.NewStyle().
+	leftStyle := theme.Current.PaneBorder(m.focusZone == FocusNetworksList).
 		Width(leftWidth).
 		Height(m.height).
-		MaxHeight(m.height).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(leftBorderColor)
+		MaxHeight(m.height)
 
-	rightStyle := lipgloss.NewStyle().
+	rightStyle := theme.Current.PaneBorder(m.focusZone != FocusNetworksList).
 		Width(rightWidth).
 		Height(m.height).
-		MaxHeight(m.height).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(rightBorderColor)
+		MaxHeight(m.height)
 
 	// 1. Render Left Pane (Networks Table)
 	innerLeftWidth := max(leftWidth-2, 10)

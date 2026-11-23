@@ -69,6 +69,10 @@ If the file does not exist, `docktop` automatically creates one with default set
 #   - dracula     : Classic Dracula dark theme
 #   - catppuccin  : Soothing Catppuccin Mocha theme
 #   - nord        : Arctic, north-bluish palette
+#   - one-dark    : Iconic Atom / VS Code One Dark Pro theme
+#   - gruvbox     : Warm retro Gruvbox dark theme (medium contrast)
+#   - everforest  : Natural comfortable green Everforest dark theme (medium contrast)
+#   - rose-pine   : Aesthetic pastel Rosé Pine dark theme
 theme: "terminal"
 
 # Docker Host:

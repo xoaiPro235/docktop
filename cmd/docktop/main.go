@@ -15,7 +15,6 @@ import (
 func main() {
 	opts := parseFlags()
 
-	// 1. Load configuration (~/.config/docktop/config.yaml)
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Notice: using default configuration (%v)\n", err)
@@ -24,14 +23,12 @@ func main() {
 		theme.SetThemeByName(cfg.Theme)
 	}
 
-	// 2. Resolve Docker host endpoint
 	// Precedence: CLI flag (-H/--host) > config file (host) > DOCKER_HOST env / default socket
 	dockerHost := strings.TrimSpace(opts.host)
 	if dockerHost == "" && cfg != nil {
 		dockerHost = strings.TrimSpace(cfg.Host)
 	}
 
-	// 3. Connect to Docker Engine
 	dockerCli, err := docker.NewClient(dockerHost)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error connecting to Docker Engine: %v\n", err)
@@ -43,10 +40,8 @@ func main() {
 	}
 	defer dockerCli.Close()
 
-	// 4. Initialize Bubble Tea Root Model
 	app := tui.NewApp(dockerCli, cfg)
 
-	// 5. Run application
 	p := tea.NewProgram(app)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error running docktop: %v\n", err)

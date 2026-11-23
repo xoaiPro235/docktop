@@ -360,7 +360,7 @@ func (s StatsPane) Render(selected *docker.ContainerInfo, width, height int, isR
 			units.BytesSize(peakMem), memDirSymbol)
 	}
 
-	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(theme.Current.Palette.Warning).Render(memTitle))
+	b.WriteString(theme.Current.MemSectionTitle.Render(memTitle))
 	b.WriteString("\n")
 
 	rawMemLines := renderBtopBraille(s.memHistory, graphWidth, graphHeight, displayLimit, memDir)

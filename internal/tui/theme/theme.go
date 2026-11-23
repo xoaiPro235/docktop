@@ -57,6 +57,28 @@ type Theme struct {
 
 	// Actions & Spinners
 	ActionLoading lipgloss.Style
+
+	// Menu & Action Menu
+	MenuTitle      lipgloss.Style
+	MenuCategory   lipgloss.Style
+	MenuKeyBadge   lipgloss.Style
+	MenuItemNormal lipgloss.Style
+	MenuItemActive lipgloss.Style
+	MenuCursor     lipgloss.Style
+
+	// Modal shared
+	CmdPrompt lipgloss.Style
+	HintText  lipgloss.Style
+
+	// Buttons
+	BtnPrimary  lipgloss.Style
+	BtnDanger   lipgloss.Style
+	BtnInactive lipgloss.Style
+
+	// Content helpers
+	WarningText     lipgloss.Style
+	YamlKey         lipgloss.Style
+	MemSectionTitle lipgloss.Style
 }
 
 // NewTheme creates a Theme configured with the given Palette.
@@ -116,7 +138,7 @@ func NewTheme(p Palette) *Theme {
 			Bold(true).
 			Foreground(p.Highlight),
 		SubTabInactive: lipgloss.NewStyle().
-			Foreground(p.BorderNormal),
+			Foreground(p.TextMuted),
 
 		// Status Badges
 		StatusRunning: lipgloss.NewStyle().
@@ -143,7 +165,7 @@ func NewTheme(p Palette) *Theme {
 			Bold(true).
 			Foreground(p.ForegroundDim),
 		Value: lipgloss.NewStyle().
-			Foreground(p.TextMuted),
+			Foreground(p.ForegroundDim),
 		AccentText: lipgloss.NewStyle().
 			Foreground(p.Accent),
 		MutedText: lipgloss.NewStyle().
@@ -162,6 +184,57 @@ func NewTheme(p Palette) *Theme {
 		ActionLoading: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(p.Highlight),
+
+		// Menu & Action Menu
+		MenuTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.Accent),
+		MenuCategory: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.TextMuted),
+		MenuKeyBadge: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.Primary),
+		MenuItemNormal: lipgloss.NewStyle().
+			Foreground(p.Foreground),
+		MenuItemActive: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.Accent),
+		MenuCursor: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.Accent),
+
+		// Modal shared
+		CmdPrompt: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.Accent),
+		HintText: lipgloss.NewStyle().
+			Foreground(p.TextDark),
+
+		// Buttons
+		BtnPrimary: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.BgPanel).
+			Background(p.Success).
+			Padding(0, 3),
+		BtnDanger: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.BgPanel).
+			Background(p.Danger).
+			Padding(0, 3),
+		BtnInactive: lipgloss.NewStyle().
+			Foreground(p.ForegroundDim).
+			Background(p.BorderNormal).
+			Padding(0, 3),
+
+		// Content helpers
+		WarningText: lipgloss.NewStyle().
+			Foreground(p.Warning),
+		YamlKey: lipgloss.NewStyle().
+			Foreground(p.Secondary),
+		MemSectionTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(p.Warning),
 	}
 }
 
@@ -173,7 +246,7 @@ func SetTheme(p Palette) {
 	Current = NewTheme(p)
 }
 
-// SetThemeByName updates the global theme using a preset name (e.g. "tokyo-night", "terminal", "dracula", "nord", "catppuccin").
+// SetThemeByName updates the global theme using a preset name (e.g. "tokyo-night", "terminal", "dracula", "nord", "catppuccin", "one-dark", "gruvbox", "everforest", "rose-pine").
 // Returns true if the preset was found and applied, false otherwise.
 func SetThemeByName(name string) bool {
 	if p, ok := Presets[strings.ToLower(strings.TrimSpace(name))]; ok {
@@ -181,6 +254,14 @@ func SetThemeByName(name string) bool {
 		return true
 	}
 	return false
+}
+
+// PaneBorder returns the appropriate border style based on whether the pane is focused.
+func (t Theme) PaneBorder(focused bool) lipgloss.Style {
+	if focused {
+		return t.BorderFocused
+	}
+	return t.BorderNormal
 }
 
 // SectionHeader renders a standardized divider line with a section title (e.g. "── TITLE ──────\n").

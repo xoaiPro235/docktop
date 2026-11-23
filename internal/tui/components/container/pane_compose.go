@@ -8,7 +8,6 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/xoaiPro235/docktop/internal/tui/keys"
 	"github.com/xoaiPro235/docktop/internal/tui/theme"
@@ -133,8 +132,8 @@ func highlightYAML(content string) string {
 	lines := strings.Split(content, "\n")
 	var sb strings.Builder
 
-	keyStyle := lipgloss.NewStyle().Foreground(theme.Current.Palette.Secondary)
-	valStyle := theme.Current.Title
+	keyStyle := theme.Current.YamlKey
+	valStyle := theme.Current.Value
 	commentStyle := theme.Current.Comment
 	lineNumStyle := theme.Current.LineNumber
 	dashStyle := theme.Current.FooterKey
@@ -206,7 +205,7 @@ func renderProjectSummary(node *TreeNode, extraNote string, width int) string {
 	sb.WriteString("\n\n")
 
 	if extraNote != "" {
-		sb.WriteString(lipgloss.NewStyle().Foreground(theme.Current.Palette.Warning).Render(extraNote + "\n\n"))
+		sb.WriteString(theme.Current.WarningText.Render(extraNote + "\n\n"))
 	}
 
 	sb.WriteString(labelStyle.Render("Services:\n"))
