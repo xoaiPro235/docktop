@@ -214,12 +214,12 @@ func NewTheme(p Palette) *Theme {
 		// Buttons
 		BtnPrimary: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(p.Foreground).
+			Foreground(p.BgPanel).
 			Background(p.Success).
 			Padding(0, 3),
 		BtnDanger: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(p.Foreground).
+			Foreground(p.BgPanel).
 			Background(p.Danger).
 			Padding(0, 3),
 		BtnInactive: lipgloss.NewStyle().
