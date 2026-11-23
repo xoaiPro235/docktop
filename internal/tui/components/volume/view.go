@@ -20,28 +20,15 @@ func (m Model) View() string {
 	leftWidth := m.leftWidth()
 	rightWidth := m.rightWidth()
 
-	leftBorderColor := theme.Current.Palette.BorderNormal
-	rightBorderColor := theme.Current.Palette.BorderNormal
-
-	if m.focusZone == FocusVolumesList {
-		leftBorderColor = theme.Current.Palette.BorderFocused
-	} else {
-		rightBorderColor = theme.Current.Palette.BorderFocused
-	}
-
-	leftStyle := lipgloss.NewStyle().
+	leftStyle := theme.Current.PaneBorder(m.focusZone == FocusVolumesList).
 		Width(leftWidth).
 		Height(m.height).
-		MaxHeight(m.height).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(leftBorderColor)
+		MaxHeight(m.height)
 
-	rightStyle := lipgloss.NewStyle().
+	rightStyle := theme.Current.PaneBorder(m.focusZone != FocusVolumesList).
 		Width(rightWidth).
 		Height(m.height).
-		MaxHeight(m.height).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(rightBorderColor)
+		MaxHeight(m.height)
 
 	// 1. Render Left Pane (Volumes Table)
 	innerLeftWidth := max(leftWidth-2, 10)

@@ -42,12 +42,10 @@ func (m *ErrorModal) Hide() {
 	m.Active = false
 }
 
-// Init
 func (m ErrorModal) Init() tea.Cmd {
 	return nil
 }
 
-// Update
 func (m ErrorModal) Update(msg tea.Msg) (ErrorModal, tea.Cmd) {
 	if !m.Active {
 		return m, nil
@@ -69,7 +67,6 @@ func (m ErrorModal) Update(msg tea.Msg) (ErrorModal, tea.Cmd) {
 	return m, nil
 }
 
-// View
 func (m ErrorModal) View() string {
 	boxWidth := 54
 	innerWidth := boxWidth - 6 // 54 - 2(borders) - 4(paddings) = 48 exact content space
@@ -96,12 +93,7 @@ func (m ErrorModal) View() string {
 	sb.WriteString("\n\n")
 
 	// 3. Single Button: "✔ Yes"
-	yesBtn := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(theme.Current.Palette.Foreground).
-		Background(theme.Current.Palette.Danger).
-		Padding(0, 4).
-		Render("✔ Yes")
+	yesBtn := theme.Current.BtnDanger.Padding(0, 4).Render("✔ Yes")
 
 	btnCentered := lipgloss.NewStyle().
 		Width(innerWidth).
@@ -111,10 +103,9 @@ func (m ErrorModal) View() string {
 	sb.WriteString("\n\n")
 
 	// 4. Shortcut hint
-	hintText := lipgloss.NewStyle().
+	hintText := theme.Current.HintText.
 		Width(innerWidth).
 		Align(lipgloss.Center).
-		Foreground(theme.Current.Palette.TextDark).
 		Render("y / Enter / Esc: Dismiss")
 	sb.WriteString(hintText)
 
@@ -170,7 +161,6 @@ func (m ErrorModal) Overlay(bg string, totalWidth, totalHeight int) string {
 	return strings.Join(result, "\n")
 }
 
-// FooterBindings returns the footer key shortcuts while the error modal is visible.
 func (m ErrorModal) FooterBindings() []key.Binding {
 	return []key.Binding{
 		keys.ErrorModalKeys.Dismiss,

@@ -81,6 +81,10 @@ func TestSetThemeByName(t *testing.T) {
 		{"Dracula", "dracula", true},
 		{"Catppuccin", "catppuccin", true},
 		{"Nord", "nord", true},
+		{"One Dark", "one-dark", true},
+		{"Gruvbox", "gruvbox", true},
+		{"Everforest", "everforest", true},
+		{"Rose Pine", "rose-pine", true},
 		{"Uppercase / Spaces", "  NORD  ", true},
 		{"Invalid Theme", "invalid-theme-xyz", false},
 	}

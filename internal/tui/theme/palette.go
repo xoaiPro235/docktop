@@ -91,9 +91,9 @@ func DraculaPalette() Palette {
 		Warning:       lipgloss.Color("#ffb86c"),
 		Danger:        lipgloss.Color("#ff5555"),
 		Foreground:    lipgloss.Color("#f8f8f2"),
-		ForegroundDim: lipgloss.Color("#e2e8f0"),
+		ForegroundDim: lipgloss.Color("#dadad5"),
 		TextMuted:     lipgloss.Color("#6272a4"),
-		TextDark:      lipgloss.Color("#6272a4"),
+		TextDark:      lipgloss.Color("#44475a"),
 		BorderNormal:  lipgloss.Color("#44475a"),
 		BorderFocused: lipgloss.Color("#bd93f9"),
 		BgTabActive:   lipgloss.Color("#44475a"),
@@ -121,6 +121,7 @@ func CatppuccinMochaPalette() Palette {
 		ForegroundDim: lipgloss.Color("#bac2de"),
 		TextMuted:     lipgloss.Color("#a6adc8"),
 		TextDark:      lipgloss.Color("#7f849c"),
+		BorderNormal:  lipgloss.Color("#45475a"),
 		BorderFocused: lipgloss.Color("#cba6f7"),
 		BgTabActive:   lipgloss.Color("#313244"),
 		BgPanel:       lipgloss.Color("#1e1e2e"),
@@ -145,8 +146,8 @@ func NordPalette() Palette {
 		Danger:        lipgloss.Color("#bf616a"),
 		Foreground:    lipgloss.Color("#eceff4"),
 		ForegroundDim: lipgloss.Color("#d8dee9"),
-		TextMuted:     lipgloss.Color("#5e81ac"),
-		TextDark:      lipgloss.Color("#5e81ac"),
+		TextMuted:     lipgloss.Color("#4c566a"),
+		TextDark:      lipgloss.Color("#434c5e"),
 		BorderNormal:  lipgloss.Color("#434c5e"),
 		BorderFocused: lipgloss.Color("#88c0d0"),
 		BgTabActive:   lipgloss.Color("#3b4252"),
@@ -160,6 +161,114 @@ func NordPalette() Palette {
 	}
 }
 
+// OneDarkPalette returns the authentic One Dark theme.
+func OneDarkPalette() Palette {
+	return Palette{
+		Primary:       lipgloss.Color("#61afef"),
+		Secondary:     lipgloss.Color("#c678dd"),
+		Accent:        lipgloss.Color("#56b6c2"),
+		Highlight:     lipgloss.Color("#d19a66"),
+		Success:       lipgloss.Color("#98c379"),
+		Warning:       lipgloss.Color("#e5c07b"),
+		Danger:        lipgloss.Color("#e06c75"),
+		Foreground:    lipgloss.Color("#abb2bf"),
+		ForegroundDim: lipgloss.Color("#9da5b4"),
+		TextMuted:     lipgloss.Color("#5c6370"),
+		TextDark:      lipgloss.Color("#495162"),
+		BorderNormal:  lipgloss.Color("#3e4452"),
+		BorderFocused: lipgloss.Color("#61afef"),
+		BgTabActive:   lipgloss.Color("#323842"),
+		BgPanel:       lipgloss.Color("#21252b"),
+		ChartGradient: []color.Color{
+			lipgloss.Color("#98c379"),
+			lipgloss.Color("#e5c07b"),
+			lipgloss.Color("#d19a66"),
+			lipgloss.Color("#e06c75"),
+		},
+	}
+}
+
+// GruvboxDarkPalette returns the authentic Gruvbox dark theme with medium contrast.
+func GruvboxDarkPalette() Palette {
+	return Palette{
+		Primary:       lipgloss.Color("#fabd2f"),
+		Secondary:     lipgloss.Color("#83a598"),
+		Accent:        lipgloss.Color("#8ec07c"),
+		Highlight:     lipgloss.Color("#fe8019"),
+		Success:       lipgloss.Color("#b8bb26"),
+		Warning:       lipgloss.Color("#fabd2f"),
+		Danger:        lipgloss.Color("#fb4934"),
+		Foreground:    lipgloss.Color("#ebdbb2"),
+		ForegroundDim: lipgloss.Color("#d5c4a1"),
+		TextMuted:     lipgloss.Color("#928374"),
+		TextDark:      lipgloss.Color("#665c54"),
+		BorderNormal:  lipgloss.Color("#504945"),
+		BorderFocused: lipgloss.Color("#fabd2f"),
+		BgTabActive:   lipgloss.Color("#3c3836"),
+		BgPanel:       lipgloss.Color("#282828"),
+		ChartGradient: []color.Color{
+			lipgloss.Color("#b8bb26"),
+			lipgloss.Color("#fabd2f"),
+			lipgloss.Color("#fe8019"),
+			lipgloss.Color("#fb4934"),
+		},
+	}
+}
+
+// EverforestPalette returns the authentic Everforest dark theme with medium contrast.
+func EverforestPalette() Palette {
+	return Palette{
+		Primary:       lipgloss.Color("#a7c080"),
+		Secondary:     lipgloss.Color("#7fbbb3"),
+		Accent:        lipgloss.Color("#83c092"),
+		Highlight:     lipgloss.Color("#a7c080"),
+		Success:       lipgloss.Color("#a7c080"),
+		Warning:       lipgloss.Color("#dbbc7f"),
+		Danger:        lipgloss.Color("#e67e80"),
+		Foreground:    lipgloss.Color("#d3c6aa"),
+		ForegroundDim: lipgloss.Color("#9da9a0"),
+		TextMuted:     lipgloss.Color("#859289"),
+		TextDark:      lipgloss.Color("#7a8478"),
+		BorderNormal:  lipgloss.Color("#414b50"),
+		BorderFocused: lipgloss.Color("#a7c080"),
+		BgTabActive:   lipgloss.Color("#374145"),
+		BgPanel:       lipgloss.Color("#272e33"),
+		ChartGradient: []color.Color{
+			lipgloss.Color("#a7c080"),
+			lipgloss.Color("#dbbc7f"),
+			lipgloss.Color("#e69875"),
+			lipgloss.Color("#e67e80"),
+		},
+	}
+}
+
+// RosePinePalette returns the authentic Rosé Pine dark theme.
+func RosePinePalette() Palette {
+	return Palette{
+		Primary:       lipgloss.Color("#ebbcba"),
+		Secondary:     lipgloss.Color("#c4a7e7"),
+		Accent:        lipgloss.Color("#9ccfd8"),
+		Highlight:     lipgloss.Color("#ebbcba"),
+		Success:       lipgloss.Color("#9ccfd8"),
+		Warning:       lipgloss.Color("#f6c177"),
+		Danger:        lipgloss.Color("#eb6f92"),
+		Foreground:    lipgloss.Color("#e0def4"),
+		ForegroundDim: lipgloss.Color("#908caa"),
+		TextMuted:     lipgloss.Color("#908caa"),
+		TextDark:      lipgloss.Color("#817c9c"),
+		BorderNormal:  lipgloss.Color("#524f67"),
+		BorderFocused: lipgloss.Color("#ebbcba"),
+		BgTabActive:   lipgloss.Color("#2a283e"),
+		BgPanel:       lipgloss.Color("#191724"),
+		ChartGradient: []color.Color{
+			lipgloss.Color("#9ccfd8"),
+			lipgloss.Color("#f6c177"),
+			lipgloss.Color("#ebbcba"),
+			lipgloss.Color("#eb6f92"),
+		},
+	}
+}
+
 // Presets maps theme names to their corresponding palette.
 var Presets = map[string]Palette{
 	"tokyo-night": DefaultPalette(),
@@ -169,4 +278,8 @@ var Presets = map[string]Palette{
 	"dracula":     DraculaPalette(),
 	"catppuccin":  CatppuccinMochaPalette(),
 	"nord":        NordPalette(),
+	"one-dark":    OneDarkPalette(),
+	"gruvbox":     GruvboxDarkPalette(),
+	"everforest":  EverforestPalette(),
+	"rose-pine":   RosePinePalette(),
 }

@@ -22,17 +22,15 @@ const (
 	EventCanceled
 )
 
-// Model wraps a textinput.Model configured for search/filtering.
 type Model struct {
 	input  textinput.Model
 	active bool
 	query  string
 }
 
-// New creates a new SearchBar model with default docktop styling.
 func New(placeholder string) Model {
 	ti := textinput.New()
-	ti.Prompt = "🔍 / "
+	ti.Prompt = " / "
 	ti.Placeholder = placeholder
 	ti.CharLimit = 64
 
@@ -87,7 +85,6 @@ func (m Model) Value() string {
 	return m.query
 }
 
-// Update processes key events for the search input.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Event) {
 	if !m.active {
 		if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
@@ -121,7 +118,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Event) {
 	return m, cmd, EventNone
 }
 
-// View renders the search bar based on its active and filtered state.
 func (m Model) View(width int) string {
 	if !m.active && m.query == "" {
 		return ""
@@ -143,7 +139,7 @@ func (m Model) View(width int) string {
 	}
 
 	// Filter is applied but input is closed (inactive browsing mode)
-	filterBadge := theme.Current.StatusRunning.Render(fmt.Sprintf("🔍 Filter: %q", m.query))
+	filterBadge := theme.Current.StatusRunning.Render(fmt.Sprintf(" Filter: %q", m.query))
 	hint := theme.Current.MutedText.Render("[/ to edit | esc to clear]")
 	badgeWidth := ansi.StringWidth(filterBadge)
 	hintWidth := ansi.StringWidth(hint)

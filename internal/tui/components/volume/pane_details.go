@@ -76,7 +76,7 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int, isZoome
 	}
 	sizeDisplay := formattedSize
 
-	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Size:       "), theme.Current.StatusRunning.Render(sizeDisplay))
+	fmt.Fprintf(&sb, "%s %s\n", theme.Current.Key.Render("Size:       "), theme.Current.AccentText.Render(sizeDisplay))
 
 	// Mountpoint
 	mountDisplay := selected.Mountpoint
@@ -182,9 +182,4 @@ func FormatVolumeViewportContent(selected *docker.VolumeInfo, width int, isZoome
 	}
 
 	return strings.TrimRight(sb.String(), "\n")
-}
-
-// FormatMountedContainers is kept for backwards compatibility.
-func FormatMountedContainers(selected *docker.VolumeInfo, width int) string {
-	return FormatVolumeViewportContent(selected, width)
 }

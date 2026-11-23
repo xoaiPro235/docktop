@@ -33,7 +33,6 @@ type ActionMenuModal struct {
 	Height        int
 }
 
-// NewActionMenuModal returns a new initialized ActionMenuModal.
 func NewActionMenuModal() ActionMenuModal {
 	return ActionMenuModal{
 		Active:        false,
@@ -42,13 +41,11 @@ func NewActionMenuModal() ActionMenuModal {
 	}
 }
 
-// SetHeight sets the maximum available height and synchronizes scroll position.
 func (m *ActionMenuModal) SetHeight(h int) {
 	m.Height = h
 	m.syncScroll()
 }
 
-// Show activates the action menu with contextual actions, custom commands, and app actions.
 func (m *ActionMenuModal) Show(title string, actions, customCmds, appActions []ActionItem, targetID ...string) {
 	m.Active = true
 	m.Title = title
@@ -65,7 +62,6 @@ func (m *ActionMenuModal) Show(title string, actions, customCmds, appActions []A
 	m.syncScroll()
 }
 
-// Hide closes the action menu and clears its items.
 func (m *ActionMenuModal) Hide() {
 	m.Active = false
 	m.TargetID = ""
@@ -134,7 +130,7 @@ func (m ActionMenuModal) buildRows(innerWidth int) ([]menuVisualRow, int) {
 		if hasPrevGroup {
 			allRows = append(allRows, menuVisualRow{isHeader: true, flatIdx: -1, content: ""})
 		}
-		catHeader := theme.Current.MutedText.Bold(true).Render("─ " + g.header + " ─")
+		catHeader := theme.Current.MenuCategory.Render("─ " + g.header + " ─")
 		allRows = append(allRows, menuVisualRow{isHeader: true, flatIdx: -1, content: catHeader})
 		hasPrevGroup = true
 
@@ -144,20 +140,18 @@ func (m ActionMenuModal) buildRows(innerWidth int) ([]menuVisualRow, int) {
 				selectedRowIdx = len(allRows)
 			}
 
-			keyBadge := lipgloss.NewStyle().
-				Foreground(theme.Current.Palette.Primary).
-				Bold(true).
-				Render("[" + item.Key + "]")
+			keyBadge := theme.Current.MenuKeyBadge.Render("[" + item.Key + "]")
 
-			titleStyle := lipgloss.NewStyle().Foreground(theme.Current.Palette.Foreground)
+			var titleStr string
 			if isSelected {
-				titleStyle = titleStyle.Bold(true).Foreground(theme.Current.Palette.Accent)
+				titleStr = theme.Current.MenuItemActive.Render(item.Title)
+			} else {
+				titleStr = theme.Current.MenuItemNormal.Render(item.Title)
 			}
-			titleStr := titleStyle.Render(item.Title)
 
 			var rowContent string
 			if isSelected {
-				cursor := lipgloss.NewStyle().Foreground(theme.Current.Palette.Accent).Bold(true).Render("▸ ")
+				cursor := theme.Current.MenuCursor.Render("▸ ")
 				rowContent = lipgloss.NewStyle().
 					Width(innerWidth).
 					Render(cursor + keyBadge + " " + titleStr)
@@ -191,12 +185,10 @@ func (m *ActionMenuModal) syncScroll() {
 	m.ScrollOffset = layout.AdjustOffsetCustom(availRows, selectedRowIdx, m.ScrollOffset, len(rows))
 }
 
-// Init initializes the modal.
 func (m ActionMenuModal) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles navigation, quick key triggers, and selection inside the menu.
 func (m ActionMenuModal) Update(msg tea.Msg) (ActionMenuModal, tea.Cmd) {
 	items := m.Items()
 	if !m.Active || len(items) == 0 {
@@ -265,12 +257,10 @@ func (m ActionMenuModal) Update(msg tea.Msg) (ActionMenuModal, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the styled action menu popup with hardcoded sections: Actions, Custom Commands, Application.
 func (m ActionMenuModal) View() string {
 	return m.ViewWithHeight(0)
 }
 
-// ViewWithHeight renders the action menu fitted to a maximum height, scrolling items to keep SelectedIndex visible.
 func (m ActionMenuModal) ViewWithHeight(maxHeight int) string {
 	boxWidth := 60
 	innerWidth := boxWidth - 4 // 60 - 2(border) - 2(padding) = 56
@@ -282,7 +272,7 @@ func (m ActionMenuModal) ViewWithHeight(maxHeight int) string {
 	if titleText == "" {
 		titleText = "Actions Menu"
 	}
-	titleFormatted := theme.Current.AccentText.Bold(true).Render(titleText)
+	titleFormatted := theme.Current.MenuTitle.Render(titleText)
 	titleCentered := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(titleFormatted)
 	sb.WriteString(titleCentered)
 	sb.WriteString("\n\n")
@@ -320,10 +310,10 @@ func (m ActionMenuModal) ViewWithHeight(maxHeight int) string {
 		}
 
 		if selectedCmd != "" {
-			prompt := lipgloss.NewStyle().Foreground(theme.Current.Palette.Accent).Bold(true).Render("$ ")
+			prompt := theme.Current.CmdPrompt.Render("$ ")
 			availWidth := max(innerWidth-ansi.StringWidth(prompt), 10)
 			truncatedCmd := ansi.Truncate(selectedCmd, availWidth, "…")
-			cmdStyled := lipgloss.NewStyle().Foreground(theme.Current.Palette.Foreground).Render(truncatedCmd)
+			cmdStyled := theme.Current.MenuItemNormal.Render(truncatedCmd)
 			sb.WriteString(prompt)
 			sb.WriteString(cmdStyled)
 		} else {
@@ -333,7 +323,7 @@ func (m ActionMenuModal) ViewWithHeight(maxHeight int) string {
 	}
 
 	// 6. Footer Hint
-	hint := theme.Current.MutedText.Render("j/k: Navigate  •  Enter: Run  •  x/Esc: Close")
+	hint := theme.Current.HintText.Render("j/k: Navigate  •  Enter: Run  •  x/Esc: Close")
 	hintCentered := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint)
 	sb.WriteString(hintCentered)
 
@@ -387,7 +377,6 @@ func (m ActionMenuModal) Overlay(bg string, totalWidth, totalHeight int) string 
 	return strings.Join(bgLines, "\n")
 }
 
-// FooterBindings returns the keybindings shown in the footer when the modal is active.
 func (m ActionMenuModal) FooterBindings() []key.Binding {
 	km := keys.ActionMenuKeys
 	return []key.Binding{km.Up, km.Down, km.Enter, km.Cancel}

@@ -61,12 +61,10 @@ func (m *ConfirmModal) Hide() {
 	m.OnConfirm = nil
 }
 
-// Init returns initial command for the modal.
 func (m ConfirmModal) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles keyboard navigation and confirmation inside the modal.
 func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, tea.Cmd) {
 	if !m.Active {
 		return m, nil
@@ -104,7 +102,6 @@ func (m ConfirmModal) Update(msg tea.Msg) (ConfirmModal, tea.Cmd) {
 	return m, nil
 }
 
-// View builds the clean, minimalist styled modal dialog string.
 func (m ConfirmModal) View() string {
 	boxWidth := 52
 	innerWidth := boxWidth - 6 // 52 - 2(borders) - 4(paddings) = 46 exact content space
@@ -142,29 +139,11 @@ func (m ConfirmModal) View() string {
 	// 3. Buttons (Yes / No)
 	var yesBtn, noBtn string
 	if m.SelectedYes {
-		yesBtn = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.Current.Palette.Foreground).
-			Background(theme.Current.Palette.Success).
-			Padding(0, 3).
-			Render("✔ Yes")
-		noBtn = lipgloss.NewStyle().
-			Foreground(theme.Current.Palette.ForegroundDim).
-			Background(theme.Current.Palette.BorderNormal).
-			Padding(0, 3).
-			Render("✖ No")
+		yesBtn = theme.Current.BtnPrimary.Render("✔ Yes")
+		noBtn = theme.Current.BtnInactive.Render("✖ No")
 	} else {
-		yesBtn = lipgloss.NewStyle().
-			Foreground(theme.Current.Palette.ForegroundDim).
-			Background(theme.Current.Palette.BorderNormal).
-			Padding(0, 3).
-			Render("✔ Yes")
-		noBtn = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.Current.Palette.Foreground).
-			Background(theme.Current.Palette.Danger).
-			Padding(0, 3).
-			Render("✖ No")
+		yesBtn = theme.Current.BtnInactive.Render("✔ Yes")
+		noBtn = theme.Current.BtnDanger.Render("✖ No")
 	}
 
 	btnRow := lipgloss.JoinHorizontal(lipgloss.Center, yesBtn, "     ", noBtn)
@@ -174,7 +153,7 @@ func (m ConfirmModal) View() string {
 
 	// 4. Compact, subtle shortcut hint
 	hintText := "y: Yes  •  n/Esc: No  •  Tab: Switch"
-	sb.WriteString(lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Foreground(theme.Current.Palette.TextDark).Render(hintText))
+	sb.WriteString(theme.Current.HintText.Width(innerWidth).Align(lipgloss.Center).Render(hintText))
 
 	// Outer Dialog Box
 	return lipgloss.NewStyle().
@@ -228,7 +207,6 @@ func (m ConfirmModal) Overlay(bg string, totalWidth, totalHeight int) string {
 	return strings.Join(result, "\n")
 }
 
-// FooterBindings returns the footer key shortcuts while the modal is visible.
 func (m ConfirmModal) FooterBindings() []key.Binding {
 	km := keys.ConfirmModalKeys
 	return []key.Binding{
