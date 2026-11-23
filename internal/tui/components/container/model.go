@@ -41,6 +41,8 @@ const ActionTargetAll = "*"
 type Model struct {
 	dockerClient docker.ContainerService
 	containers   []docker.ContainerInfo
+	runningCount int
+	stoppedCount int
 	treeRoots    []*TreeNode
 	flatItems    []FlatItem
 	searchBar    searchbar.Model
@@ -83,6 +85,8 @@ func New(cli docker.ContainerService) Model {
 
 	return Model{
 		dockerClient:  cli,
+		runningCount:  0,
+		stoppedCount:  0,
 		expandedState: make(map[string]bool),
 		runningIDs:    make(map[string]bool),
 		focusZone:     FocusLeftTree,
@@ -195,7 +199,19 @@ func (m *Model) rebuildTree() {
 
 func (m *Model) updateContainers(newContainers []docker.ContainerInfo) {
 	m.containers = newContainers
+	m.runningCount = 0
+	for _, c := range newContainers {
+		if c.State == docker.StateRunning {
+			m.runningCount++
+		}
+	}
+	m.stoppedCount = len(newContainers) - m.runningCount
 	m.rebuildTree()
+}
+
+// ContainerStats returns the precomputed running, stopped, and total container counts.
+func (m Model) ContainerStats() (running, stopped, total int) {
+	return m.runningCount, m.stoppedCount, len(m.containers)
 }
 
 func (m *Model) SetContainers(list []docker.ContainerInfo) tea.Cmd {

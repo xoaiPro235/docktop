@@ -2,6 +2,7 @@ package container
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -40,8 +41,22 @@ func (m Model) View() string {
 		leftContent.WriteString("\n\n")
 	}
 
-	headerTitle := ansi.Truncate("PROJECT / SERVICE / CONTAINER", innerLeftWidth, "…")
-	leftContent.WriteString(theme.Current.TreeHeader.Render(headerTitle))
+	var headerText string
+	running, stopped, total := m.ContainerStats()
+	if total == 0 {
+		headerText = theme.Current.TreeHeader.Render("CONTAINERS: 0")
+	} else {
+		lbl := theme.Current.TreeHeader.Render("CONTAINERS: ")
+		runNum := theme.Current.StatusRunning.Render(strconv.Itoa(running))
+		runLabel := theme.Current.StatusRunning.Bold(false).Render(" running")
+		sep := theme.Current.MutedText.Render(" · ")
+		stopNum := theme.Current.TreeContainerStopped.Bold(true).Render(strconv.Itoa(stopped))
+		stopLabel := theme.Current.TreeContainerStopped.Render(" stopped")
+		headerText = fmt.Sprintf("%s%s%s%s%s%s", lbl, runNum, runLabel, sep, stopNum, stopLabel)
+	}
+
+	headerTitle := ansi.Truncate(headerText, innerLeftWidth, "…")
+	leftContent.WriteString(headerTitle)
 	leftContent.WriteString("\n\n")
 
 	if len(m.flatItems) == 0 {
@@ -65,48 +80,55 @@ func (m Model) View() string {
 		for i := startIdx; i < endIdx; i++ {
 			item := m.flatItems[i]
 
+			branch := theme.Current.TreeBranch.Render(item.Prefix)
+			title := item.Node.DisplayTitle()
+
+			var isRunningAction bool
+			switch item.Node.Type {
+			case NodeProject, NodeService:
+				isRunningAction = m.runningIDs[item.Node.Key]
+			case NodeContainer:
+				if item.Node.Container != nil {
+					isRunningAction = m.runningIDs[item.Node.Container.ID]
+				}
+			}
+
 			var cursorMark string
 			if i == m.cursorIndex {
-				cursorMark = "> "
+				if m.focusZone == FocusLeftTree {
+					cursorMark = theme.Current.TreeSelected.Render("> ")
+				} else {
+					cursorMark = theme.Current.AccentText.Render("> ")
+				}
 			} else {
 				cursorMark = "  "
 			}
 
-			branch := theme.Current.TreeBranch.Render(item.Prefix)
-			title := item.Node.DisplayTitle()
-
 			var styledTitle string
-			switch item.Node.Type {
-			case NodeProject:
-				if m.runningIDs[item.Node.Key] {
-					styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
-				} else {
+			if isRunningAction {
+				styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
+			} else if i == m.cursorIndex && m.focusZone == FocusLeftTree {
+				styledTitle = theme.Current.TreeSelected.Render(title)
+			} else {
+				switch item.Node.Type {
+				case NodeProject:
 					styledTitle = theme.Current.TreeProject.Render(title)
-				}
-			case NodeService:
-				if m.runningIDs[item.Node.Key] {
-					styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
-				} else {
+				case NodeService:
 					styledTitle = theme.Current.TreeService.Render(title)
-				}
-			case NodeContainer:
-				if item.Node.Container != nil {
-					if m.runningIDs[item.Node.Container.ID] {
-						styledTitle = theme.Current.ActionLoading.Render(m.spinner.View() + " " + title)
-					} else if item.Node.Container.State == docker.StateRunning {
-						styledTitle = theme.Current.TreeContainerRunning.Render(title)
-					} else {
-						styledTitle = theme.Current.TreeContainerStopped.Render(title)
+				case NodeContainer:
+					if item.Node.Container != nil {
+						if item.Node.Container.State == docker.StateRunning {
+							styledTitle = theme.Current.TreeContainerRunning.Render(title)
+						} else {
+							styledTitle = theme.Current.TreeContainerStopped.Render(title)
+						}
 					}
+				default:
+					styledTitle = title
 				}
-			default:
-				styledTitle = title
 			}
 
 			line := fmt.Sprintf("%s%s%s", cursorMark, branch, styledTitle)
-			if i == m.cursorIndex && m.focusZone == FocusLeftTree {
-				line = theme.Current.TreeSelected.Render(line)
-			}
 			leftContent.WriteString(line)
 			leftContent.WriteString("\n")
 		}
